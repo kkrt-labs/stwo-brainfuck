@@ -50,10 +50,10 @@ fn main() {
     let mut bf_vm = Machine::new(ins, stdin, stdout);
     println!("Input: ");
     bf_vm.execute().unwrap();
-
+    println!();
     let traces = bf_vm.get_trace();
-    println!("======================== ");
     if args.print_trace {
+        println!("======================== ");
         println!("Execution trace:");
         for trace in traces {
             println!("{:?}", trace);
