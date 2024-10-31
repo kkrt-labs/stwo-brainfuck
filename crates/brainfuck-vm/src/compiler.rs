@@ -40,3 +40,30 @@ impl Compiler {
         self.instructions.clone()
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_new() {
+        let code = "++>,<[>+.<-]".to_string();
+        let compiler = Compiler::new(code);
+        let expected_trimmed_code =
+            vec!['+', '+', '>', ',', '<', '[', '>', '+', '.', '<', '-', ']'];
+        assert_eq!(expected_trimmed_code, compiler.code,);
+    }
+
+    #[test]
+    fn test_compile() {
+        let code = "++>,<[>+.<-]".to_string();
+        let mut compiler = Compiler::new(code);
+        let instructions = compiler.compile();
+        let expected_ins: Vec<BaseField> =
+            vec![43, 43, 62, 44, 60, 91, 13, 62, 43, 46, 60, 45, 93, 7]
+                .into_iter()
+                .map(|x| BaseField::from(x as u32))
+                .collect();
+        assert_eq!(instructions, expected_ins);
+    }
+}
