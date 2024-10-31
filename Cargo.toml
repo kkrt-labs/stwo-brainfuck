@@ -1,0 +1,16 @@
+[workspace]
+members = [
+  "crates/brainfuck-vm",
+  "crates/brainfuck-prover",
+]
+resolver = "2"
+
+[workspace.package]
+version = "0.1.0"
+edition = "2021"
+authors = ["Simon Malatrait <simon@kakarot.org>"]
+description = "Brainfuck ZK-VM with STWO"
+
+[workspace.dependencies]
+stwo-prover = { git = "https://github.com/starkware-libs/stwo", rev = "f6214d1" }
+clap = { version = "4.3.10", features = ["derive"] }
