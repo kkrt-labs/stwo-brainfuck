@@ -1,3 +1,5 @@
+// Adapted from rkdud007 brainfuck-zkvm https://github.com/rkdud007/brainfuck-zkvm/blob/main/src/main.rs
+
 pub mod compiler;
 pub mod instruction;
 pub mod machine;

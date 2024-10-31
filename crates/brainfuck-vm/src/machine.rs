@@ -1,3 +1,5 @@
+// Adapted from rkdud007 brainfuck-zkvm https://github.com/rkdud007/brainfuck-zkvm/blob/main/src/machine.rs
+
 use std::{
     error::Error,
     io::{Read, Stdin, Stdout, Write},

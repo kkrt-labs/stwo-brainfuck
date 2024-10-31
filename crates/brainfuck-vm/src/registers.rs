@@ -1,3 +1,5 @@
+// Adapted from rkdud007 brainfuck-zkvm https://github.com/rkdud007/brainfuck-zkvm/blob/main/src/registers.rs
+
 use num_traits::identities::Zero;
 use stwo_prover::core::fields::m31::BaseField;
 
