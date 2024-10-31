@@ -67,3 +67,102 @@ impl InstructionType {
         Self::from_str(&(ins as char).to_string()).expect("Invalid instruction")
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    // Test FromStr implementation
+    #[test]
+    fn test_instruction_type_from_str() {
+        // Test valid instruction mappings
+        assert_eq!(
+            InstructionType::from_str(">").unwrap(),
+            InstructionType::Right
+        );
+        assert_eq!(
+            InstructionType::from_str("<").unwrap(),
+            InstructionType::Left
+        );
+        assert_eq!(
+            InstructionType::from_str("+").unwrap(),
+            InstructionType::Plus
+        );
+        assert_eq!(
+            InstructionType::from_str("-").unwrap(),
+            InstructionType::Minus
+        );
+        assert_eq!(
+            InstructionType::from_str(".").unwrap(),
+            InstructionType::PutChar
+        );
+        assert_eq!(
+            InstructionType::from_str(",").unwrap(),
+            InstructionType::ReadChar
+        );
+        assert_eq!(
+            InstructionType::from_str("[").unwrap(),
+            InstructionType::JumpIfZero
+        );
+        assert_eq!(
+            InstructionType::from_str("]").unwrap(),
+            InstructionType::JumpIfNotZero
+        );
+    }
+
+    // Test invalid input for FromStr
+    #[test]
+    fn test_instruction_type_from_str_invalid() {
+        assert!(InstructionType::from_str("x").is_err());
+        assert!(InstructionType::from_str("").is_err());
+        assert!(InstructionType::from_str("++").is_err());
+    }
+
+    // Test Display implementation
+    #[test]
+    fn test_instruction_type_display() {
+        assert_eq!(format!("{}", InstructionType::Right), ">");
+        assert_eq!(format!("{}", InstructionType::Left), "<");
+        assert_eq!(format!("{}", InstructionType::Plus), "+");
+        assert_eq!(format!("{}", InstructionType::Minus), "-");
+        assert_eq!(format!("{}", InstructionType::PutChar), ".");
+        assert_eq!(format!("{}", InstructionType::ReadChar), ",");
+        assert_eq!(format!("{}", InstructionType::JumpIfZero), "[");
+        assert_eq!(format!("{}", InstructionType::JumpIfNotZero), "]");
+    }
+
+    // Test from_u8 implementation
+    #[test]
+    fn test_instruction_type_from_u8() {
+        assert_eq!(InstructionType::from_u8(b'>'), InstructionType::Right);
+        assert_eq!(InstructionType::from_u8(b'<'), InstructionType::Left);
+        assert_eq!(InstructionType::from_u8(b'+'), InstructionType::Plus);
+        assert_eq!(InstructionType::from_u8(b'-'), InstructionType::Minus);
+        assert_eq!(InstructionType::from_u8(b'.'), InstructionType::PutChar);
+        assert_eq!(InstructionType::from_u8(b','), InstructionType::ReadChar);
+        assert_eq!(InstructionType::from_u8(b'['), InstructionType::JumpIfZero);
+        assert_eq!(
+            InstructionType::from_u8(b']'),
+            InstructionType::JumpIfNotZero
+        );
+    }
+
+    // Test from_u8 with invalid input (should panic)
+    #[test]
+    #[should_panic(expected = "Invalid instruction")]
+    fn test_instruction_type_from_u8_invalid() {
+        InstructionType::from_u8(b'x');
+    }
+
+    // Test Instruction struct creation
+    #[test]
+    fn test_instruction_creation() {
+        let instruction = Instruction {
+            ins_type: InstructionType::Right,
+            argument: 42,
+        };
+
+        assert_eq!(instruction.ins_type, InstructionType::Right);
+        assert_eq!(instruction.argument, 42);
+    }
+}
