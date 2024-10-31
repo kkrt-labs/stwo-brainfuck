@@ -3,7 +3,6 @@
 use std::{
     error::Error,
     io::{Read, Stdin, Stdout, Write},
-    str::FromStr,
 };
 
 use num_traits::identities::{One, Zero};
@@ -57,7 +56,7 @@ impl Machine {
         self.state.registers.ni =
             self.program.code[(self.state.registers.ip + BaseField::one()).0 as usize];
         let target_ci = self.state.registers.ci;
-        let ins_type = InstructionType::from_str(&(target_ci.0 as u8 as char).to_string()).unwrap();
+        let ins_type = InstructionType::from_u8(target_ci.0 as u8);
         self.write_trace();
         self.execute_instruction(ins_type)?;
 
