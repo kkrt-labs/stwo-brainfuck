@@ -20,6 +20,12 @@ impl TestWriter {
     }
 }
 
+impl Default for TestWriter {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl Write for TestWriter {
     fn write(&mut self, buf: &[u8]) -> std::io::Result<usize> {
         self.buffer.borrow_mut().extend_from_slice(buf);
