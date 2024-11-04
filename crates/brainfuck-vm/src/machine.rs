@@ -172,3 +172,143 @@ impl Machine {
         self.trace.clone()
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::test_helper::*;
+    use std::io::Cursor;
+    use stwo_prover::core::fields::m31::P;
+
+    // Helper function to create a test machine
+    fn create_test_machine(code: Vec<BaseField>, input: &[u8]) -> (Machine, TestWriter) {
+        let input = Cursor::new(input.to_vec());
+        let output = TestWriter::new();
+        let test_output = output.clone();
+        let machine = Machine::new(code, input, output);
+        (machine, test_output)
+    }
+
+    #[test]
+    fn test_machine_initialization() {
+        let code = vec![BaseField::from(43)];
+        let (machine, _) = create_test_machine(code.clone(), &[]);
+
+        assert_eq!(machine.program.code, code);
+        assert_eq!(machine.state.ram.len(), 30000);
+        assert!(machine.state.ram.iter().all(|&x| x == BaseField::zero()));
+    }
+
+    #[test]
+    fn test_right_instruction() -> Result<(), Box<dyn Error>> {
+        let code = vec![BaseField::from(62), BaseField::from(62)]; // '>>'
+        let (mut machine, _) = create_test_machine(code, &[]);
+        machine.execute()?;
+
+        assert_eq!(machine.state.registers.mp, BaseField::from(2));
+        Ok(())
+    }
+
+    #[test]
+    fn test_left_instruction() -> Result<(), Box<dyn Error>> {
+        let code = vec![
+            BaseField::from(62),
+            BaseField::from(62),
+            BaseField::from(60),
+        ]; // '>><'
+        let (mut machine, _) = create_test_machine(code, &[]);
+        machine.execute()?;
+
+        assert_eq!(machine.state.registers.mp, BaseField::from(1));
+        Ok(())
+    }
+
+    #[test]
+    fn test_plus_instruction() -> Result<(), Box<dyn Error>> {
+        let code = vec![BaseField::from(43), BaseField::from(43)]; // '++'
+        let (mut machine, _) = create_test_machine(code, &[]);
+        machine.execute()?;
+
+        assert_eq!(machine.state.ram[0], BaseField::from(2));
+        assert_eq!(machine.state.registers.mv, BaseField::from(2));
+        Ok(())
+    }
+    #[test]
+
+    fn test_minus_instruction() -> Result<(), Box<dyn Error>> {
+        let code = vec![BaseField::from(45), BaseField::from(45)]; // '--'
+        let (mut machine, _) = create_test_machine(code, &[]);
+        machine.execute()?;
+
+        assert_eq!(machine.state.ram[0], BaseField::from(P - 2));
+        assert_eq!(machine.state.registers.mv, BaseField::from(P - 2));
+        Ok(())
+    }
+
+    #[test]
+    fn test_read_write_char() -> Result<(), Box<dyn Error>> {
+        let code = vec![BaseField::from(44), BaseField::from(46)]; // ','
+        let input = b"a";
+        let (mut machine, output) = create_test_machine(code, input);
+
+        machine.execute()?;
+
+        let output_data = output.get_output();
+        assert_eq!(output_data, input);
+        Ok(())
+    }
+
+    #[test]
+    fn test_skip_loop() -> Result<(), Box<dyn Error>> {
+        // Skip the loop
+        // '[-]+'
+        let code = vec![
+            BaseField::from(91),
+            BaseField::from(4),  // Jump to index 5 if zero
+            BaseField::from(45), // This should be skipped
+            BaseField::from(93),
+            BaseField::from(2),
+            BaseField::from(43),
+        ];
+        let (mut machine, _) = create_test_machine(code, &[]);
+        machine.execute()?;
+
+        // Since initial memory is zero, it should jump
+        assert_eq!(machine.state.ram[0], BaseField::one());
+        assert_eq!(machine.state.registers.mv, BaseField::one());
+        Ok(())
+    }
+
+    #[test]
+    fn test_enter_loop() -> Result<(), Box<dyn Error>> {
+        // Enter the loop
+        // '+[+>]'
+        let code = vec![
+            BaseField::from(43),
+            BaseField::from(91),
+            BaseField::from(6),
+            BaseField::from(43),
+            BaseField::from(62),
+            BaseField::from(93),
+            BaseField::from(3),
+        ];
+        let (mut machine, _) = create_test_machine(code, &[]);
+        machine.execute()?;
+
+        // Since initial memory is zero, it should jump
+        assert_eq!(machine.state.ram[0], BaseField::from(2));
+        assert_eq!(machine.state.registers.mp, BaseField::one());
+        assert_eq!(machine.state.registers.mv, BaseField::zero());
+        Ok(())
+    }
+    #[test]
+    fn test_get_trace() -> Result<(), Box<dyn Error>> {
+        let code = vec![BaseField::from(43), BaseField::from(43)];
+        let (mut machine, _) = create_test_machine(code, &[]);
+        machine.execute()?;
+
+        let trace = machine.get_trace();
+        assert!(trace.len() == 3);
+        Ok(())
+    }
+}

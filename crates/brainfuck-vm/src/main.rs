@@ -5,6 +5,8 @@ pub mod instruction;
 pub mod machine;
 pub mod registers;
 
+mod test_helper;
+
 use clap::{Parser, ValueHint};
 use std::{
     fs,
