@@ -1,6 +1,8 @@
+use crate::machine::Machine;
 use std::cell::RefCell;
-use std::io::Write;
+use std::io::{Cursor, Write};
 use std::rc::Rc;
+use stwo_prover::core::fields::m31::BaseField;
 
 pub struct TestWriter {
     buffer: Rc<RefCell<Vec<u8>>>,
@@ -35,4 +37,13 @@ impl Clone for TestWriter {
             buffer: Rc::clone(&self.buffer), // This creates a new reference to the same buffer
         }
     }
+}
+
+// Helper function to create a test machine
+pub fn create_test_machine(code: Vec<BaseField>, input: &[u8]) -> (Machine, TestWriter) {
+    let input = Cursor::new(input.to_vec());
+    let output = TestWriter::new();
+    let test_output = output.clone();
+    let machine = Machine::new(code, input, output);
+    (machine, test_output)
 }

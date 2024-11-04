@@ -1,12 +1,5 @@
 // Adapted from rkdud007 brainfuck-zkvm https://github.com/rkdud007/brainfuck-zkvm/blob/main/src/main.rs
 
-pub mod compiler;
-pub mod instruction;
-pub mod machine;
-pub mod registers;
-
-mod test_helper;
-
 use clap::{Parser, ValueHint};
 use std::{
     fs,
@@ -14,8 +7,7 @@ use std::{
     path::PathBuf,
 };
 
-use compiler::Compiler;
-use machine::Machine;
+use brainfuck_vm::{compiler::Compiler, machine::Machine};
 
 #[derive(Parser)]
 #[clap(author, version, about, long_about = None)]
@@ -34,7 +26,6 @@ fn main() {
         .replace(' ', "");
     let mut bf_compiler = Compiler::new(code);
     let ins = bf_compiler.compile();
-    println!("{}", ins.len());
     print!("Assembled Instructions: ");
     print!("[");
     for (index, ins) in ins.iter().enumerate() {

@@ -173,17 +173,7 @@ impl Machine {
 mod tests {
     use super::*;
     use crate::test_helper::*;
-    use std::io::Cursor;
     use stwo_prover::core::fields::m31::P;
-
-    // Helper function to create a test machine
-    fn create_test_machine(code: Vec<BaseField>, input: &[u8]) -> (Machine, TestWriter) {
-        let input = Cursor::new(input.to_vec());
-        let output = TestWriter::new();
-        let test_output = output.clone();
-        let machine = Machine::new(code, input, output);
-        (machine, test_output)
-    }
 
     #[test]
     fn test_machine_initialization() {
