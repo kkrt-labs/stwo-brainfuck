@@ -3,7 +3,7 @@
 use num_traits::identities::Zero;
 use stwo_prover::core::fields::m31::BaseField;
 
-#[derive(Clone)]
+#[derive(PartialEq, Clone)]
 pub struct Registers {
     /// Clock Cycle Counter
     pub clk: BaseField,

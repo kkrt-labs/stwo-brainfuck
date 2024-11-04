@@ -191,6 +191,7 @@ mod tests {
 
     #[test]
     fn test_machine_initialization() {
+        // '+'
         let code = vec![BaseField::from(43)];
         let (machine, _) = create_test_machine(code.clone(), &[]);
 
@@ -201,7 +202,8 @@ mod tests {
 
     #[test]
     fn test_right_instruction() -> Result<(), Box<dyn Error>> {
-        let code = vec![BaseField::from(62), BaseField::from(62)]; // '>>'
+        // '>>'
+        let code = vec![BaseField::from(62), BaseField::from(62)];
         let (mut machine, _) = create_test_machine(code, &[]);
         machine.execute()?;
 
@@ -211,11 +213,12 @@ mod tests {
 
     #[test]
     fn test_left_instruction() -> Result<(), Box<dyn Error>> {
+        // '>><'
         let code = vec![
             BaseField::from(62),
             BaseField::from(62),
             BaseField::from(60),
-        ]; // '>><'
+        ];
         let (mut machine, _) = create_test_machine(code, &[]);
         machine.execute()?;
 
@@ -225,7 +228,8 @@ mod tests {
 
     #[test]
     fn test_plus_instruction() -> Result<(), Box<dyn Error>> {
-        let code = vec![BaseField::from(43), BaseField::from(43)]; // '++'
+        // '++'
+        let code = vec![BaseField::from(43), BaseField::from(43)];
         let (mut machine, _) = create_test_machine(code, &[]);
         machine.execute()?;
 
@@ -236,7 +240,8 @@ mod tests {
     #[test]
 
     fn test_minus_instruction() -> Result<(), Box<dyn Error>> {
-        let code = vec![BaseField::from(45), BaseField::from(45)]; // '--'
+        // '--'
+        let code = vec![BaseField::from(45), BaseField::from(45)];
         let (mut machine, _) = create_test_machine(code, &[]);
         machine.execute()?;
 
@@ -247,7 +252,8 @@ mod tests {
 
     #[test]
     fn test_read_write_char() -> Result<(), Box<dyn Error>> {
-        let code = vec![BaseField::from(44), BaseField::from(46)]; // ','
+        // ',.'
+        let code = vec![BaseField::from(44), BaseField::from(46)];
         let input = b"a";
         let (mut machine, output) = create_test_machine(code, input);
 
@@ -273,7 +279,6 @@ mod tests {
         let (mut machine, _) = create_test_machine(code, &[]);
         machine.execute()?;
 
-        // Since initial memory is zero, it should jump
         assert_eq!(machine.state.ram[0], BaseField::one());
         assert_eq!(machine.state.registers.mv, BaseField::one());
         Ok(())
@@ -295,7 +300,6 @@ mod tests {
         let (mut machine, _) = create_test_machine(code, &[]);
         machine.execute()?;
 
-        // Since initial memory is zero, it should jump
         assert_eq!(machine.state.ram[0], BaseField::from(2));
         assert_eq!(machine.state.registers.mp, BaseField::one());
         assert_eq!(machine.state.registers.mv, BaseField::zero());
@@ -303,12 +307,45 @@ mod tests {
     }
     #[test]
     fn test_get_trace() -> Result<(), Box<dyn Error>> {
+        // '++'
         let code = vec![BaseField::from(43), BaseField::from(43)];
         let (mut machine, _) = create_test_machine(code, &[]);
         machine.execute()?;
 
+        // Initial state + executed instructions
         let trace = machine.get_trace();
+        let initial_state = Registers {
+            clk: BaseField::zero(),
+            ip: BaseField::zero(),
+            ci: BaseField::from(43),
+            ni: BaseField::from(43),
+            mp: BaseField::zero(),
+            mv: BaseField::zero(),
+            mvi: BaseField::zero(),
+        };
+        let intermediate_state = Registers {
+            clk: BaseField::one(),
+            ip: BaseField::one(),
+            ci: BaseField::from(43),
+            ni: BaseField::zero(),
+            mp: BaseField::zero(),
+            mv: BaseField::one(),
+            mvi: BaseField::one(),
+        };
+        let final_state = Registers {
+            clk: BaseField::from(2),
+            ip: BaseField::from(2),
+            ci: BaseField::from(0),
+            ni: BaseField::from(0),
+            mp: BaseField::zero(),
+            mv: BaseField::from(2),
+            mvi: BaseField::from(2).inverse(),
+        };
         assert!(trace.len() == 3);
+
+        assert!(trace[0] == initial_state);
+        assert!(trace[1] == intermediate_state);
+        assert!(trace[2] == final_state);
         Ok(())
     }
 }
