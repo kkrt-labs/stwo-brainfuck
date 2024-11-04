@@ -2,7 +2,7 @@
 
 use std::{
     error::Error,
-    io::{Read, Stdin, Stdout, Write},
+    io::{Read, Write},
 };
 
 use num_traits::identities::{One, Zero};
@@ -33,7 +33,11 @@ pub struct Machine {
 }
 
 impl Machine {
-    pub fn new(code: Vec<BaseField>, input: Stdin, output: Stdout) -> Machine {
+    pub fn new<R, W>(code: Vec<BaseField>, input: R, output: W) -> Machine
+    where
+        R: Read + 'static,
+        W: Write + 'static,
+    {
         Machine {
             program: ProgramMemory { code },
             state: MutableState {
