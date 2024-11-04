@@ -53,22 +53,7 @@ impl Machine {
     }
 
     pub fn execute(&mut self) -> Result<(), Box<dyn Error>> {
-        // =============================
-        // First clock cycle
-        // =============================
-        self.state.registers.ci = self.program.code[self.state.registers.ip.0 as usize];
-        self.state.registers.ni =
-            self.program.code[(self.state.registers.ip + BaseField::one()).0 as usize];
-        let target_ci = self.state.registers.ci;
-        let ins_type = InstructionType::from_u8(target_ci.0 as u8);
-        self.write_trace();
-        self.execute_instruction(ins_type)?;
-
-        while self.state.registers.ip < BaseField::from(self.program.code.len() - 1) {
-            // ============================
-            // Middle clock cycles
-            // ============================
-            self.next_clock_cycle();
+        while self.state.registers.ip < BaseField::from(self.program.code.len()) {
             self.state.registers.ci = self.program.code[self.state.registers.ip.0 as usize];
             self.state.registers.ni =
                 if self.state.registers.ip == BaseField::from(self.program.code.len() - 1) {
@@ -79,12 +64,10 @@ impl Machine {
             self.write_trace();
             let ins_type = InstructionType::from_u8(self.state.registers.ci.0 as u8);
             self.execute_instruction(ins_type)?;
+            self.next_clock_cycle();
         }
 
-        // ============================
         // Last clock cycle
-        // ============================
-        self.next_clock_cycle();
         self.state.registers.ci = BaseField::zero();
         self.state.registers.ni = BaseField::zero();
         self.write_trace();
@@ -241,13 +224,13 @@ mod tests {
 
     #[test]
     fn test_plus_instruction() -> Result<(), Box<dyn Error>> {
-        // '++'
-        let code = vec![BaseField::from(43), BaseField::from(43)];
+        // '+'
+        let code = vec![BaseField::from(43)];
         let (mut machine, _) = create_test_machine(code, &[]);
         machine.execute()?;
 
-        assert_eq!(machine.state.ram[0], BaseField::from(2));
-        assert_eq!(machine.state.registers.mv, BaseField::from(2));
+        assert_eq!(machine.state.ram[0], BaseField::from(1));
+        assert_eq!(machine.state.registers.mv, BaseField::from(1));
         Ok(())
     }
     #[test]
