@@ -60,5 +60,12 @@ fn main() {
         for trace in traces {
             println!("{:?}", trace);
         }
+        println!("======================== ");
+        println!("Padded Execution trace:");
+        bf_vm.pad_trace();
+        let traces = bf_vm.get_trace();
+        for trace in traces {
+            println!("{:?}", trace);
+        }
     }
 }

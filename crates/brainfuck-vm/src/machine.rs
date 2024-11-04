@@ -171,6 +171,19 @@ impl Machine {
     pub fn get_trace(&self) -> Vec<Registers> {
         self.trace.clone()
     }
+
+    pub fn pad_trace(&mut self) {
+        let last_register = &self.state.registers;
+        let trace_len = self.trace.len() as u32;
+        let padding_offset = trace_len.next_power_of_two() + 1 - trace_len;
+        for i in 1..padding_offset {
+            let dummy = Registers {
+                clk: BaseField::from(last_register.clk.0 + i),
+                ..last_register.clone()
+            };
+            self.trace.push(dummy);
+        }
+    }
 }
 
 #[cfg(test)]
@@ -305,6 +318,7 @@ mod tests {
         assert_eq!(machine.state.registers.mv, BaseField::zero());
         Ok(())
     }
+
     #[test]
     fn test_get_trace() -> Result<(), Box<dyn Error>> {
         // '++'
@@ -341,11 +355,70 @@ mod tests {
             mv: BaseField::from(2),
             mvi: BaseField::from(2).inverse(),
         };
-        assert!(trace.len() == 3);
 
-        assert!(trace[0] == initial_state);
-        assert!(trace[1] == intermediate_state);
-        assert!(trace[2] == final_state);
+        assert_eq!(trace.len(), 3);
+        assert_eq!(trace[0], initial_state);
+        assert_eq!(trace[1], intermediate_state);
+        assert_eq!(trace[2], final_state);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_pad_trace() -> Result<(), Box<dyn Error>> {
+        // '++'
+        let code = vec![BaseField::from(43), BaseField::from(43)];
+        let (mut machine, _) = create_test_machine(code, &[]);
+        machine.execute()?;
+
+        // Initial state + executed instructions
+        let trace = machine.get_trace();
+        let initial_state = Registers {
+            clk: BaseField::zero(),
+            ip: BaseField::zero(),
+            ci: BaseField::from(43),
+            ni: BaseField::from(43),
+            mp: BaseField::zero(),
+            mv: BaseField::zero(),
+            mvi: BaseField::zero(),
+        };
+        let intermediate_state = Registers {
+            clk: BaseField::one(),
+            ip: BaseField::one(),
+            ci: BaseField::from(43),
+            ni: BaseField::zero(),
+            mp: BaseField::zero(),
+            mv: BaseField::one(),
+            mvi: BaseField::one(),
+        };
+        let final_state = Registers {
+            clk: BaseField::from(2),
+            ip: BaseField::from(2),
+            ci: BaseField::from(0),
+            ni: BaseField::from(0),
+            mp: BaseField::zero(),
+            mv: BaseField::from(2),
+            mvi: BaseField::from(2).inverse(),
+        };
+
+        assert_eq!(trace.len(), 3);
+        assert_eq!(trace[0], initial_state);
+        assert_eq!(trace[1], intermediate_state);
+        assert_eq!(trace[2], final_state);
+
+        machine.pad_trace();
+        let trace = machine.get_trace();
+        let dummy = Registers {
+            clk: final_state.clk + BaseField::one(),
+            ..final_state
+        };
+
+        assert_eq!(trace.len(), 4);
+        assert_eq!(trace[0], initial_state);
+        assert_eq!(trace[1], intermediate_state);
+        assert_eq!(trace[2], final_state);
+        assert_eq!(trace[3], dummy);
+
         Ok(())
     }
 }
