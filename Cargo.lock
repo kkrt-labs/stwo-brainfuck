@@ -177,11 +177,11 @@ dependencies = [
 ]
 
 [[package]]
-name = "brainfuck-prover"
+name = "brainfuck_prover"
 version = "0.1.0"
 
 [[package]]
-name = "brainfuck-vm"
+name = "brainfuck_vm"
 version = "0.1.0"
 dependencies = [
  "clap",

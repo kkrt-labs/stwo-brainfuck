@@ -1,11 +1,8 @@
 [package]
-name = "brainfuck-vm"
+name = "brainfuck_prover"
 version.workspace = true
 edition.workspace = true
 authors.workspace = true
 description.workspace = true
 
 [dependencies]
-stwo-prover.workspace = true
-clap = { workspace = true, features = ["derive"] }
-num-traits = "0.2.19"

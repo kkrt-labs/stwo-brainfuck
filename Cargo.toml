@@ -1,5 +1,5 @@
 [workspace]
-members = ["crates/brainfuck-vm", "crates/brainfuck-prover"]
+members = ["crates/brainfuck_vm", "crates/brainfuck_prover"]
 resolver = "2"
 
 [workspace.package]
