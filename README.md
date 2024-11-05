@@ -18,8 +18,9 @@ We try to follow these guidelines.
 
 - The memory cells take values in the Mersenne31 (M31) field: $[0..2^{31} - 1)$
 - Memory is fixed at 30,000 cells by default, but is configurable.
-- Overflow/Underflow works, can be used for memory value `mv`,
-but would usually panic for memory pointer `mp` as it is unlikely the memory array will be of size $2^{31} - 1$.
+- Memory wraps on overflow/underflow.
+  - It can be used for memory value `mv` and memory pointer `mp`,
+  but it will usually panic for `mp` as the memory size will be much smaller than $2^{31} - 1$.
 - Inputs are line-buffered (ends with the linefeed ASCII character `10`).
 - CLI uses Stdin and Stdout for IO.
 - For library use, input can be simulated by any reader (e.g. `Cursor`) and
