@@ -14,8 +14,10 @@ use brainfuck_vm::{compiler::Compiler, machine::Machine};
 struct Args {
     #[clap(value_parser, value_hint=ValueHint::FilePath)]
     filename: PathBuf,
-    #[structopt(long = "print_trace")]
+    #[clap(long)]
     print_trace: bool,
+    #[clap(long)]
+    ram_size: Option<usize>,
 }
 
 fn main() {
@@ -40,7 +42,10 @@ fn main() {
     println!("Brainfuck program execution");
     let stdin = stdin();
     let stdout = stdout();
-    let mut bf_vm = Machine::new(ins, stdin, stdout);
+    let mut bf_vm = match args.ram_size {
+        Some(size) => Machine::new_with_config(ins, stdin, stdout, size),
+        None => Machine::new(ins, stdin, stdout),
+    };
     println!("Input: ");
     bf_vm.execute().unwrap();
     println!();

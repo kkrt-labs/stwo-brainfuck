@@ -33,7 +33,14 @@ pub struct Machine {
 }
 
 impl Machine {
-    pub fn new<R, W>(code: Vec<BaseField>, input: R, output: W) -> Machine
+    pub const DEFAULT_RAM_SIZE: usize = 30000;
+
+    pub fn new_with_config<R, W>(
+        code: Vec<BaseField>,
+        input: R,
+        output: W,
+        ram_size: usize,
+    ) -> Machine
     where
         R: Read + 'static,
         W: Write + 'static,
@@ -41,7 +48,7 @@ impl Machine {
         Machine {
             program: ProgramMemory { code },
             state: MutableState {
-                ram: vec![BaseField::zero(); 30000],
+                ram: vec![BaseField::zero(); ram_size],
                 registers: Registers::new(),
             },
             io: IO {
@@ -50,6 +57,14 @@ impl Machine {
             },
             trace: vec![],
         }
+    }
+
+    pub fn new<R, W>(code: Vec<BaseField>, input: R, output: W) -> Machine
+    where
+        R: Read + 'static,
+        W: Write + 'static,
+    {
+        Self::new_with_config(code, input, output, Self::DEFAULT_RAM_SIZE)
     }
 
     pub fn execute(&mut self) -> Result<(), Box<dyn Error>> {
@@ -176,13 +191,25 @@ mod tests {
     use stwo_prover::core::fields::m31::P;
 
     #[test]
-    fn test_machine_initialization() {
-        // '+'
+    fn test_default_machine_initialization() {
         let code = vec![BaseField::from(43)];
         let (machine, _) = create_test_machine(code.clone(), &[]);
 
         assert_eq!(machine.program.code, code);
-        assert_eq!(machine.state.ram.len(), 30000);
+        assert_eq!(machine.state.ram.len(), Machine::DEFAULT_RAM_SIZE);
+        assert!(machine.state.ram.iter().all(|&x| x == BaseField::zero()));
+    }
+
+    #[test]
+    fn test_custom_ram_machine_initialization() {
+        let code = vec![BaseField::from(43)];
+        let input: &[u8] = &[];
+        let output = TestWriter::new();
+        let ram_size = 55000;
+        let machine = Machine::new_with_config(code.clone(), input, output, ram_size);
+
+        assert_eq!(machine.program.code, code);
+        assert_eq!(machine.state.ram.len(), ram_size);
         assert!(machine.state.ram.iter().all(|&x| x == BaseField::zero()));
     }
 
