@@ -31,8 +31,6 @@ The constraints used here relies on work made by Alan Szepieniec[^3]
 and sibling article from Neptune Cash[^4].
 The Brainfuck compiler and interpreter have been adapted from rkdud007[^5]
 
-## Resources
-
 [^1]: [Brainfuck Language](https://esolangs.org/wiki/Brainfuck)
 [^2]: [Stwo repository](https://github.com/starkware-libs/stwo)
 [^3]: [BrainSTARK - Alan Szepieniec](https://aszepieniec.github.io/stark-brainfuck/)
