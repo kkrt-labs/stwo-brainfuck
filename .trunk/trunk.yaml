@@ -2,7 +2,7 @@
 # To learn more about the format of this file, see https://docs.trunk.io/reference/trunk-yaml
 version: 0.1
 cli:
-  version: 1.22.7
+  version: 1.22.8
 plugins:
   sources:
     - id: trunk
@@ -15,10 +15,27 @@ actions:
   enabled:
     - trunk-fmt-pre-commit
     - trunk-upgrade-available
-lint:
+runtimes:
   enabled:
-    - actionlint@1.7.3
-    - checkov@3.2.277
+    - go@1.21.0
+    - node@18.12.1
+    - python@3.10.8
+downloads:
+  - name: rust
+    downloads:
+      - os: linux
+        url: https://static.rust-lang.org/dist/2024-01-04/rust-nightly-x86_64-unknown-linux-gnu.tar.gz
+        strip_components: 2
+lint:
+  definitions:
+    - name: clippy
+      commands:
+        - name: lint
+          run: cargo clippy --message-format json --locked --all-targets --all-features -- -D warnings
+  enabled:
+    - actionlint@1.7.4
+    - checkov@3.2.278
+    - clippy@1.65.0
     - git-diff-check
     - markdownlint@0.42.0
     - osv-scanner@1.9.1
