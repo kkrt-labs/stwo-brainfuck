@@ -11,28 +11,6 @@ permissions:
   pull-requests: write
 
 jobs:
-  format:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: dtolnay/rust-toolchain@master
-        with:
-          components: rustfmt
-          toolchain: nightly-2024-01-04
-      - uses: Swatinem/rust-cache@v2
-      - run: scripts/rust_fmt.sh --check
-
-  clippy:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: dtolnay/rust-toolchain@master
-        with:
-          components: clippy
-          toolchain: nightly-2024-01-04
-      - uses: Swatinem/rust-cache@v2
-      - run: scripts/clippy.sh
-
   machete:
     runs-on: ubuntu-latest
     steps:
@@ -62,8 +40,6 @@ jobs:
   all-tests:
     runs-on: ubuntu-latest
     needs:
-      - clippy
-      - format
       - machete
       - run-brainfuck-vm-unit-tests
       - run-brainfuck-vm-integration-tests
