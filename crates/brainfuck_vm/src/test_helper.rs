@@ -1,18 +1,19 @@
 use crate::machine::Machine;
-use std::cell::RefCell;
-use std::io::{Cursor, Write};
-use std::rc::Rc;
+use std::{
+    cell::RefCell,
+    io::{Cursor, Write},
+    rc::Rc,
+};
 use stwo_prover::core::fields::m31::BaseField;
 
+#[derive(Debug)]
 pub struct TestWriter {
     buffer: Rc<RefCell<Vec<u8>>>,
 }
 
 impl TestWriter {
     pub fn new() -> Self {
-        TestWriter {
-            buffer: Rc::new(RefCell::new(Vec::new())),
-        }
+        Self { buffer: Rc::new(RefCell::new(Vec::new())) }
     }
 
     pub fn get_output(&self) -> Vec<u8> {
@@ -39,7 +40,7 @@ impl Write for TestWriter {
 
 impl Clone for TestWriter {
     fn clone(&self) -> Self {
-        TestWriter {
+        Self {
             buffer: Rc::clone(&self.buffer), // This creates a new reference to the same buffer
         }
     }

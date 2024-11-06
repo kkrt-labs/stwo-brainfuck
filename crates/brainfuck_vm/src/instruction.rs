@@ -8,7 +8,7 @@ pub struct Instruction {
     pub argument: u8,
 }
 
-#[derive(PartialEq, Debug, Clone)]
+#[derive(PartialEq, Eq, Debug, Clone)]
 pub enum InstructionType {
     // '>': Increment the data pointer (to point to the next cell to the right).
     Right,
@@ -22,9 +22,13 @@ pub enum InstructionType {
     PutChar,
     // ',': Accept one byte of input, storing its value in the byte at the data pointer.
     ReadChar,
-    // '[': If the byte at the data pointer is zero, then instead of moving the instruction pointer forward to the next command, jump it forward to the command after the matching ']' command.
+    // '[': If the byte at the data pointer is zero, then instead of moving the instruction
+    // pointer forward to the next command, jump it forward to the command after the matching ']'
+    // command.
     JumpIfZero,
-    // ']': If the byte at the data pointer is nonzero, then instead of moving the instruction pointer forward to the next command, jump it back to the command after the matching '[' command.
+    // ']': If the byte at the data pointer is nonzero, then instead of moving the instruction
+    // pointer forward to the next command, jump it back to the command after the matching '['
+    // command.
     JumpIfNotZero,
 }
 
@@ -33,14 +37,14 @@ impl FromStr for InstructionType {
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         match s {
-            ">" => Ok(InstructionType::Right),
-            "<" => Ok(InstructionType::Left),
-            "+" => Ok(InstructionType::Plus),
-            "-" => Ok(InstructionType::Minus),
-            "." => Ok(InstructionType::PutChar),
-            "," => Ok(InstructionType::ReadChar),
-            "[" => Ok(InstructionType::JumpIfZero),
-            "]" => Ok(InstructionType::JumpIfNotZero),
+            ">" => Ok(Self::Right),
+            "<" => Ok(Self::Left),
+            "+" => Ok(Self::Plus),
+            "-" => Ok(Self::Minus),
+            "." => Ok(Self::PutChar),
+            "," => Ok(Self::ReadChar),
+            "[" => Ok(Self::JumpIfZero),
+            "]" => Ok(Self::JumpIfNotZero),
             _ => Err(()),
         }
     }
@@ -49,16 +53,16 @@ impl FromStr for InstructionType {
 impl Display for InstructionType {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let symbol = match self {
-            InstructionType::Right => ">",
-            InstructionType::Left => "<",
-            InstructionType::Plus => "+",
-            InstructionType::Minus => "-",
-            InstructionType::PutChar => ".",
-            InstructionType::ReadChar => ",",
-            InstructionType::JumpIfZero => "[",
-            InstructionType::JumpIfNotZero => "]",
+            Self::Right => ">",
+            Self::Left => "<",
+            Self::Plus => "+",
+            Self::Minus => "-",
+            Self::PutChar => ".",
+            Self::ReadChar => ",",
+            Self::JumpIfZero => "[",
+            Self::JumpIfNotZero => "]",
         };
-        write!(f, "{}", symbol)
+        write!(f, "{symbol}")
     }
 }
 
@@ -76,38 +80,14 @@ mod tests {
     #[test]
     fn test_instruction_type_from_str() {
         // Test valid instruction mappings
-        assert_eq!(
-            InstructionType::from_str(">").unwrap(),
-            InstructionType::Right
-        );
-        assert_eq!(
-            InstructionType::from_str("<").unwrap(),
-            InstructionType::Left
-        );
-        assert_eq!(
-            InstructionType::from_str("+").unwrap(),
-            InstructionType::Plus
-        );
-        assert_eq!(
-            InstructionType::from_str("-").unwrap(),
-            InstructionType::Minus
-        );
-        assert_eq!(
-            InstructionType::from_str(".").unwrap(),
-            InstructionType::PutChar
-        );
-        assert_eq!(
-            InstructionType::from_str(",").unwrap(),
-            InstructionType::ReadChar
-        );
-        assert_eq!(
-            InstructionType::from_str("[").unwrap(),
-            InstructionType::JumpIfZero
-        );
-        assert_eq!(
-            InstructionType::from_str("]").unwrap(),
-            InstructionType::JumpIfNotZero
-        );
+        assert_eq!(InstructionType::from_str(">").unwrap(), InstructionType::Right);
+        assert_eq!(InstructionType::from_str("<").unwrap(), InstructionType::Left);
+        assert_eq!(InstructionType::from_str("+").unwrap(), InstructionType::Plus);
+        assert_eq!(InstructionType::from_str("-").unwrap(), InstructionType::Minus);
+        assert_eq!(InstructionType::from_str(".").unwrap(), InstructionType::PutChar);
+        assert_eq!(InstructionType::from_str(",").unwrap(), InstructionType::ReadChar);
+        assert_eq!(InstructionType::from_str("[").unwrap(), InstructionType::JumpIfZero);
+        assert_eq!(InstructionType::from_str("]").unwrap(), InstructionType::JumpIfNotZero);
     }
 
     // Test invalid input for FromStr
@@ -141,10 +121,7 @@ mod tests {
         assert_eq!(InstructionType::from_u8(b'.'), InstructionType::PutChar);
         assert_eq!(InstructionType::from_u8(b','), InstructionType::ReadChar);
         assert_eq!(InstructionType::from_u8(b'['), InstructionType::JumpIfZero);
-        assert_eq!(
-            InstructionType::from_u8(b']'),
-            InstructionType::JumpIfNotZero
-        );
+        assert_eq!(InstructionType::from_u8(b']'), InstructionType::JumpIfNotZero);
     }
 
     // Test from_u8 with invalid input (should panic)
@@ -157,10 +134,7 @@ mod tests {
     // Test Instruction struct creation
     #[test]
     fn test_instruction_creation() {
-        let instruction = Instruction {
-            ins_type: InstructionType::Right,
-            argument: 42,
-        };
+        let instruction = Instruction { ins_type: InstructionType::Right, argument: 42 };
 
         assert_eq!(instruction.ins_type, InstructionType::Right);
         assert_eq!(instruction.argument, 42);

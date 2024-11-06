@@ -30,12 +30,9 @@ fn main() {
     tracing_subscriber::fmt().with_env_filter(args.log).init();
 
     let code = fs::read_to_string(&args.filename).expect("Failed to read file");
-    let mut bf_compiler = Compiler::new(code);
+    let mut bf_compiler = Compiler::new(&code);
     let ins = bf_compiler.compile();
-    tracing::info!(
-        "Assembled instructions: {:?}",
-        ins.iter().map(|x| x.0).collect::<Vec<u32>>()
-    );
+    tracing::info!("Assembled instructions: {:?}", ins.iter().map(|x| x.0).collect::<Vec<u32>>());
     tracing::info!("Program execution");
     let stdin = stdin();
     let stdout = stdout();
