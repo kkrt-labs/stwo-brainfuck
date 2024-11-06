@@ -47,7 +47,7 @@ impl Clone for TestWriter {
 }
 
 // Helper function to create a test machine
-pub fn create_test_machine(code: Vec<BaseField>, input: &[u8]) -> (Machine, TestWriter) {
+pub fn create_test_machine(code: &[BaseField], input: &[u8]) -> (Machine, TestWriter) {
     let input = Cursor::new(input.to_vec());
     let output = TestWriter::new();
     let test_output = output.clone();
