@@ -6,7 +6,6 @@ use std::{
     io::{stdin, stdout},
     path::PathBuf,
 };
-use tracing_subscriber::{fmt, EnvFilter};
 
 use brainfuck_vm::{compiler::Compiler, machine::Machine};
 
@@ -15,6 +14,8 @@ use brainfuck_vm::{compiler::Compiler, machine::Machine};
 struct Args {
     #[clap(value_parser, value_hint=ValueHint::FilePath)]
     filename: PathBuf,
+    #[clap(long, default_value = "info")]
+    log: String,
     #[clap(long)]
     trace: bool,
     #[clap(long)]
@@ -26,10 +27,9 @@ struct Args {
 fn main() {
     let args = Args::parse();
 
-    // Constructs a subscriber whose severity level is filtered by `RUST_LOG`
-    fmt().with_env_filter(EnvFilter::from_default_env()).init();
+    tracing_subscriber::fmt().with_env_filter(args.log).init();
 
-    let code = fs::read_to_string(&args.filename).expect("Failed to read file").replace(' ', "");
+    let code = fs::read_to_string(&args.filename).expect("Failed to read file");
     let mut bf_compiler = Compiler::new(&code);
     let ins = bf_compiler.compile();
     tracing::info!("Assembled instructions: {:?}", ins.iter().map(|x| x.0).collect::<Vec<u32>>());

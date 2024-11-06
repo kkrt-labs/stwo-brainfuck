@@ -47,7 +47,16 @@ mod tests {
         let compiler = Compiler::new(code);
         let expected_trimmed_code =
             vec!['+', '+', '>', ',', '<', '[', '>', '+', '.', '<', '-', ']'];
-        assert_eq!(expected_trimmed_code, compiler.code,);
+        assert_eq!(expected_trimmed_code, compiler.code);
+    }
+
+    #[test]
+    fn test_whitespace() {
+        let code = " +  +> , < [> + .< - ]  ".to_string();
+        let compiler = Compiler::new(code);
+        let expected_trimmed_code =
+            vec!['+', '+', '>', ',', '<', '[', '>', '+', '.', '<', '-', ']'];
+        assert_eq!(expected_trimmed_code, compiler.code);
     }
 
     #[test]
