@@ -6,7 +6,6 @@ use std::{
     io::{stdin, stdout},
     path::PathBuf,
 };
-use tracing_subscriber;
 
 use brainfuck_vm::{compiler::Compiler, machine::Machine};
 
