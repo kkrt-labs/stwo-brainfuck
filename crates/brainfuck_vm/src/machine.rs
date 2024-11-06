@@ -35,31 +35,23 @@ pub struct Machine {
 impl Machine {
     pub const DEFAULT_RAM_SIZE: usize = 30000;
 
-    pub fn new_with_config<R, W>(
-        code: Vec<BaseField>,
-        input: R,
-        output: W,
-        ram_size: usize,
-    ) -> Machine
+    pub fn new_with_config<R, W>(code: Vec<BaseField>, input: R, output: W, ram_size: usize) -> Self
     where
         R: Read + 'static,
         W: Write + 'static,
     {
-        Machine {
+        Self {
             program: ProgramMemory { code },
             state: MutableState {
                 ram: vec![BaseField::zero(); ram_size],
                 registers: Registers::new(),
             },
-            io: IO {
-                input: Box::new(input),
-                output: Box::new(output),
-            },
+            io: IO { input: Box::new(input), output: Box::new(output) },
             trace: vec![],
         }
     }
 
-    pub fn new<R, W>(code: Vec<BaseField>, input: R, output: W) -> Machine
+    pub fn new<R, W>(code: Vec<BaseField>, input: R, output: W) -> Self
     where
         R: Read + 'static,
         W: Write + 'static,
@@ -78,7 +70,7 @@ impl Machine {
                 };
             self.write_trace();
             let ins_type = InstructionType::from_u8(self.state.registers.ci.0 as u8);
-            self.execute_instruction(ins_type)?;
+            self.execute_instruction(&ins_type)?;
             self.next_clock_cycle();
         }
 
@@ -103,7 +95,7 @@ impl Machine {
         Ok(())
     }
 
-    fn execute_instruction(&mut self, ins: InstructionType) -> Result<(), Box<dyn Error>> {
+    fn execute_instruction(&mut self, ins: &InstructionType) -> Result<(), Box<dyn Error>> {
         match ins {
             InstructionType::Right => {
                 self.state.registers.mp += BaseField::one();
@@ -227,11 +219,7 @@ mod tests {
     #[test]
     fn test_left_instruction() -> Result<(), Box<dyn Error>> {
         // '>><'
-        let code = vec![
-            BaseField::from(62),
-            BaseField::from(62),
-            BaseField::from(60),
-        ];
+        let code = vec![BaseField::from(62), BaseField::from(62), BaseField::from(60)];
         let (mut machine, _) = create_test_machine(code, &[]);
         machine.execute()?;
 
@@ -250,8 +238,8 @@ mod tests {
         assert_eq!(machine.state.registers.mv, BaseField::from(1));
         Ok(())
     }
-    #[test]
 
+    #[test]
     fn test_minus_instruction() -> Result<(), Box<dyn Error>> {
         // '--'
         let code = vec![BaseField::from(45), BaseField::from(45)];
@@ -408,10 +396,7 @@ mod tests {
 
         machine.pad_trace();
         let trace = machine.get_trace();
-        let dummy = Registers {
-            clk: final_state.clk + BaseField::one(),
-            ..final_state
-        };
+        let dummy = Registers { clk: final_state.clk + BaseField::one(), ..final_state };
 
         assert_eq!(trace.len(), 4);
         assert_eq!(trace[0], initial_state);

@@ -3,7 +3,7 @@
 use num_traits::identities::Zero;
 use stwo_prover::core::fields::m31::BaseField;
 
-#[derive(PartialEq, Clone)]
+#[derive(PartialEq, Eq, Clone)]
 pub struct Registers {
     /// Clock Cycle Counter
     pub clk: BaseField,
@@ -28,8 +28,8 @@ impl Default for Registers {
 }
 
 impl Registers {
-    pub fn new() -> Registers {
-        Registers {
+    pub fn new() -> Self {
+        Self {
             clk: BaseField::zero(),
             ip: BaseField::zero(),
             ci: BaseField::zero(),
@@ -76,34 +76,13 @@ mod tests {
         let new_registers = Registers::new();
 
         // Check that all fields are zero
-        assert!(
-            default_registers.clk.is_zero(),
-            "Clock cycle should be zero"
-        );
-        assert!(
-            default_registers.ip.is_zero(),
-            "Instruction pointer should be zero"
-        );
-        assert!(
-            default_registers.ci.is_zero(),
-            "Current instruction should be zero"
-        );
-        assert!(
-            default_registers.ni.is_zero(),
-            "Next instruction should be zero"
-        );
-        assert!(
-            default_registers.mp.is_zero(),
-            "Memory pointer should be zero"
-        );
-        assert!(
-            default_registers.mv.is_zero(),
-            "Memory value should be zero"
-        );
-        assert!(
-            default_registers.mvi.is_zero(),
-            "Memory value inverse should be zero"
-        );
+        assert!(default_registers.clk.is_zero(), "Clock cycle should be zero");
+        assert!(default_registers.ip.is_zero(), "Instruction pointer should be zero");
+        assert!(default_registers.ci.is_zero(), "Current instruction should be zero");
+        assert!(default_registers.ni.is_zero(), "Next instruction should be zero");
+        assert!(default_registers.mp.is_zero(), "Memory pointer should be zero");
+        assert!(default_registers.mv.is_zero(), "Memory value should be zero");
+        assert!(default_registers.mvi.is_zero(), "Memory value inverse should be zero");
 
         // Ensure default() and new() produce identical results
         assert_eq!(default_registers.clk, new_registers.clk);
@@ -128,7 +107,7 @@ mod tests {
             mvi: BaseField::from(7),
         };
 
-        let display_string = format!("{}", registers);
+        let display_string = format!("{registers}");
         assert_eq!(
             display_string, "clk:1, ip:2, ci:3, ni:4, mp:5, mv:6, mvi:7",
             "Display format should match expected output"

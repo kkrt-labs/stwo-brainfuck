@@ -5,4 +5,7 @@ edition.workspace = true
 authors.workspace = true
 description.workspace = true
 
+[lints]
+workspace = true
+
 [dependencies]

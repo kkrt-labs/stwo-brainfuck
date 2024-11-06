@@ -35,12 +35,12 @@ lint:
   enabled:
     - actionlint@1.7.4
     - checkov@3.2.278
-    - clippy@1.65.0
+    - rustfmt@2024-01-04
+    - clippy@2024-01-04
     - git-diff-check
     - markdownlint@0.42.0
     - osv-scanner@1.9.1
     - prettier@3.3.3
-    - rustfmt@1.65.0
     - shellcheck@0.10.0
     - shfmt@3.6.0
     - taplo@0.9.3

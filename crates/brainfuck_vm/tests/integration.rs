@@ -3,10 +3,9 @@ use std::fs;
 use stwo_prover::core::fields::m31::BaseField;
 
 fn compile_from_path(path: &str) -> Vec<BaseField> {
-    let code = fs::read_to_string(path)
-        .unwrap_or_else(|_| panic!("Failed to read file"))
-        .replace(' ', "");
-    let mut bf_compiler = Compiler::new(code);
+    let code =
+        fs::read_to_string(path).unwrap_or_else(|_| panic!("Failed to read file")).replace(' ', "");
+    let mut bf_compiler = Compiler::new(&code);
     bf_compiler.compile()
 }
 
