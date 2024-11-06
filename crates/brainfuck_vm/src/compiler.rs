@@ -55,6 +55,15 @@ mod tests {
     }
 
     #[test]
+    fn test_whitespace() {
+        let code = " +  +> , < [> + .< - ]  ".to_string();
+        let compiler = Compiler::new(code);
+        let expected_trimmed_code =
+            vec!['+', '+', '>', ',', '<', '[', '>', '+', '.', '<', '-', ']'];
+        assert_eq!(expected_trimmed_code, compiler.code,);
+    }
+
+    #[test]
     fn test_compile() {
         let code = "++>,<[>+.<-]".to_string();
         let mut compiler = Compiler::new(code);
