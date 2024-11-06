@@ -1,0 +1,48 @@
+# This file controls the behavior of Trunk: https://docs.trunk.io/cli
+# To learn more about the format of this file, see https://docs.trunk.io/reference/trunk-yaml
+version: 0.1
+cli:
+  version: 1.22.8
+plugins:
+  sources:
+    - id: trunk
+      ref: v1.6.4
+      uri: https://github.com/trunk-io/plugins
+actions:
+  disabled:
+    - trunk-announce
+    - trunk-check-pre-push
+  enabled:
+    - trunk-fmt-pre-commit
+    - trunk-upgrade-available
+runtimes:
+  enabled:
+    - go@1.21.0
+    - node@18.12.1
+    - python@3.10.8
+downloads:
+  - name: rust
+    downloads:
+      - os: linux
+        url: https://static.rust-lang.org/dist/2024-01-04/rust-nightly-x86_64-unknown-linux-gnu.tar.gz
+        strip_components: 2
+lint:
+  definitions:
+    - name: clippy
+      commands:
+        - name: lint
+          run: cargo clippy --message-format json --locked --all-targets --all-features -- -D warnings
+  enabled:
+    - actionlint@1.7.4
+    - checkov@3.2.278
+    - clippy@1.65.0
+    - git-diff-check
+    - markdownlint@0.42.0
+    - osv-scanner@1.9.1
+    - prettier@3.3.3
+    - rustfmt@1.65.0
+    - shellcheck@0.10.0
+    - shfmt@3.6.0
+    - taplo@0.9.3
+    - trufflehog@3.83.2
+    - yamllint@1.35.1
