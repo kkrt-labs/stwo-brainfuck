@@ -30,7 +30,7 @@ fn main() {
     fmt().with_env_filter(EnvFilter::from_default_env()).init();
 
     let code = fs::read_to_string(&args.filename)
-        .unwrap_or_else(|_| panic!("Failed to read file"))
+        .expect("Failed to read file")
         .replace(' ', "");
     let mut bf_compiler = Compiler::new(code);
     let ins = bf_compiler.compile();
