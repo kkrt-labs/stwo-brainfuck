@@ -10,25 +10,25 @@ pub struct Instruction {
 
 #[derive(PartialEq, Eq, Debug, Clone)]
 pub enum InstructionType {
-    // '>': Increment the data pointer (to point to the next cell to the right).
+    /// '>': Increment the data pointer (to point to the next cell to the right).
     Right,
-    // '<': Decrement the data pointer (to point to the next cell to the left).
+    /// '<': Decrement the data pointer (to point to the next cell to the left).
     Left,
-    // '+': Increment (increase by one) the byte at the data pointer.
+    /// '+': Increment (increase by one) the byte at the data pointer.
     Plus,
-    // '-': Decrement (decrease by one) the byte at the data pointer.
+    /// '-': Decrement (decrease by one) the byte at the data pointer.
     Minus,
-    // '.': Output the byte at the data pointer.
+    /// '.': Output the byte at the data pointer.
     PutChar,
-    // ',': Accept one byte of input, storing its value in the byte at the data pointer.
+    /// ',': Accept one byte of input, storing its value in the byte at the data pointer.
     ReadChar,
-    // '[': If the byte at the data pointer is zero, then instead of moving the instruction
-    // pointer forward to the next command, jump it forward to the command after the matching ']'
-    // command.
+    /// '[': If the byte at the data pointer is zero, then instead of moving the instruction
+    /// pointer forward to the next command, jump it forward to the command after the matching ']'
+    /// command.
     JumpIfZero,
-    // ']': If the byte at the data pointer is nonzero, then instead of moving the instruction
-    // pointer forward to the next command, jump it back to the command after the matching '['
-    // command.
+    /// ']': If the byte at the data pointer is nonzero, then instead of moving the instruction
+    /// pointer forward to the next command, jump it back to the command after the matching '['
+    /// command.
     JumpIfNotZero,
 }
 
