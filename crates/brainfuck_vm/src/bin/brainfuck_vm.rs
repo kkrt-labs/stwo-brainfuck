@@ -16,7 +16,9 @@ struct Args {
     #[clap(value_parser, value_hint=ValueHint::FilePath)]
     filename: PathBuf,
     #[clap(long)]
-    print_trace: bool,
+    trace: bool,
+    #[clap(long)]
+    pad_trace: bool,
     #[clap(long)]
     ram_size: Option<usize>,
 }
@@ -45,12 +47,12 @@ fn main() {
     };
     tracing::info!("Provide inputs separated by linefeeds: ");
     bf_vm.execute().unwrap();
-    let trace = bf_vm.get_trace();
-    if args.print_trace {
-        tracing::info!("Execution trace: {:#?}", trace);
-        bf_vm.pad_trace();
+    if args.trace {
+        if args.pad_trace {
+            bf_vm.pad_trace();
+        };
         let trace = bf_vm.get_trace();
-        tracing::info!("Padded execution trace: {:#?}", trace);
+        tracing::info!("Execution trace: {:#?}", trace);
     }
     // Ok(())
 }
