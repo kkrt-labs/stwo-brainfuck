@@ -17,8 +17,8 @@ pub struct MachineBuilder {
 
 impl MachineBuilder {
     /// Creates a new [`MachineBuilder`] with the specified code.
-    pub fn new(code: Vec<BaseField>) -> Self {
-        Self { code, input: None, output: None, ram_size: Machine::DEFAULT_RAM_SIZE }
+    pub fn new(code: &[BaseField]) -> Self {
+        Self { code: code.to_vec(), input: None, output: None, ram_size: Machine::DEFAULT_RAM_SIZE }
     }
 
     /// Sets the input stream for the machine.
@@ -84,7 +84,7 @@ pub struct Machine {
 impl Machine {
     pub const DEFAULT_RAM_SIZE: usize = 30000;
 
-    pub fn new_with_config<R, W>(code: Vec<BaseField>, input: R, output: W, ram_size: usize) -> Self
+    pub fn new_with_config<R, W>(code: &[BaseField], input: R, output: W, ram_size: usize) -> Self
     where
         R: Read + 'static,
         W: Write + 'static,
@@ -102,7 +102,7 @@ impl Machine {
         R: Read + 'static,
         W: Write + 'static,
     {
-        MachineBuilder::new(code.to_vec())
+        MachineBuilder::new(code)
             .with_input(input)
             .with_output(output)
             .build()
@@ -248,7 +248,7 @@ mod tests {
         let input: &[u8] = &[];
         let output = TestWriter::new();
         let ram_size = 55000;
-        let machine = Machine::new_with_config(code.clone(), input, output, ram_size);
+        let machine = Machine::new_with_config(&code, input, output, ram_size);
 
         assert_eq!(machine.program.code, code);
         assert_eq!(machine.state.ram.len(), ram_size);

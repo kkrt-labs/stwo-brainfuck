@@ -36,7 +36,7 @@ fn main() {
     let stdin = stdin();
     let stdout = stdout();
     let mut bf_vm = match args.ram_size {
-        Some(size) => Machine::new_with_config(ins, stdin, stdout, size),
+        Some(size) => Machine::new_with_config(&ins, stdin, stdout, size),
         None => Machine::new(&ins, stdin, stdout),
     };
     tracing::info!("Provide inputs separated by linefeeds: ");
