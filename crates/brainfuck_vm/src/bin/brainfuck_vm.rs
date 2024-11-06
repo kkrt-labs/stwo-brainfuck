@@ -6,6 +6,7 @@ use std::{
     io::{stdin, stdout},
     path::PathBuf,
 };
+use tracing_subscriber::{fmt, EnvFilter};
 
 use brainfuck_vm::{compiler::Compiler, machine::Machine};
 
@@ -23,45 +24,33 @@ struct Args {
 fn main() {
     let args = Args::parse();
 
+    // Constructs a subscriber whose severity level is filtered by `RUST_LOG`
+    fmt().with_env_filter(EnvFilter::from_default_env()).init();
+
     let code = fs::read_to_string(&args.filename)
         .unwrap_or_else(|_| panic!("Failed to read file"))
         .replace(' ', "");
     let mut bf_compiler = Compiler::new(code);
     let ins = bf_compiler.compile();
-    print!("Assembled Instructions: ");
-    print!("[");
-    for (index, ins) in ins.iter().enumerate() {
-        if index > 0 {
-            print!(", ");
-        }
-        print!("{}", ins);
-    }
-    println!("]");
-
-    println!("======================== ");
-    println!("Brainfuck program execution");
+    tracing::info!(
+        "Assembled instructions: {:?}",
+        ins.iter().map(|x| x.0).collect::<Vec<u32>>()
+    );
+    tracing::info!("Program execution");
     let stdin = stdin();
     let stdout = stdout();
     let mut bf_vm = match args.ram_size {
         Some(size) => Machine::new_with_config(ins, stdin, stdout, size),
         None => Machine::new(ins, stdin, stdout),
     };
-    println!("Input: ");
+    tracing::info!("Provide inputs separated by linefeeds: ");
     bf_vm.execute().unwrap();
-    println!();
-    let traces = bf_vm.get_trace();
+    let trace = bf_vm.get_trace();
     if args.print_trace {
-        println!("======================== ");
-        println!("Execution trace:");
-        for trace in traces {
-            println!("{:?}", trace);
-        }
-        println!("======================== ");
-        println!("Padded Execution trace:");
+        tracing::info!("Execution trace: {:#?}", trace);
         bf_vm.pad_trace();
-        let traces = bf_vm.get_trace();
-        for trace in traces {
-            println!("{:?}", trace);
-        }
+        let trace = bf_vm.get_trace();
+        tracing::info!("Padded execution trace: {:#?}", trace);
     }
+    // Ok(())
 }
