@@ -52,7 +52,7 @@ mod tests {
 
     #[test]
     fn test_whitespace() {
-        let code = " +  +> , < [> + .< - ]  ".to_string();
+        let code = " +  +> , < [> + .< - ]  ";
         let compiler = Compiler::new(code);
         let expected_trimmed_code =
             vec!['+', '+', '>', ',', '<', '[', '>', '+', '.', '<', '-', ']'];
