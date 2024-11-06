@@ -1,13 +1,12 @@
 // Adapted from rkdud007 brainfuck-zkvm https://github.com/rkdud007/brainfuck-zkvm/blob/main/src/main.rs
 
+use brainfuck_vm::{compiler::Compiler, machine::Machine};
 use clap::{Parser, ValueHint};
 use std::{
     fs,
     io::{stdin, stdout},
     path::PathBuf,
 };
-
-use brainfuck_vm::{compiler::Compiler, machine::Machine};
 
 #[derive(Parser)]
 #[clap(author, version, about, long_about = None)]
@@ -38,7 +37,7 @@ fn main() {
     let stdout = stdout();
     let mut bf_vm = match args.ram_size {
         Some(size) => Machine::new_with_config(ins, stdin, stdout, size),
-        None => Machine::new(ins, stdin, stdout),
+        None => Machine::new(&ins, stdin, stdout),
     };
     tracing::info!("Provide inputs separated by linefeeds: ");
     bf_vm.execute().unwrap();

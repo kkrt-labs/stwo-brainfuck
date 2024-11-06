@@ -1,15 +1,64 @@
 // Adapted from rkdud007 brainfuck-zkvm https://github.com/rkdud007/brainfuck-zkvm/blob/main/src/machine.rs
 
+use crate::{instruction::InstructionType, registers::Registers};
+use num_traits::identities::{One, Zero};
 use std::{
     error::Error,
     io::{Read, Write},
 };
-
-use num_traits::identities::{One, Zero};
-
 use stwo_prover::core::fields::{m31::BaseField, FieldExpOps};
 
-use crate::{instruction::InstructionType, registers::Registers};
+pub struct MachineBuilder {
+    code: Vec<BaseField>,
+    input: Option<Box<dyn Read>>,
+    output: Option<Box<dyn Write>>,
+    ram_size: usize,
+}
+
+impl MachineBuilder {
+    /// Creates a new [`MachineBuilder`] with the specified code.
+    pub fn new(code: Vec<BaseField>) -> Self {
+        Self { code, input: None, output: None, ram_size: Machine::DEFAULT_RAM_SIZE }
+    }
+
+    /// Sets the input stream for the machine.
+    #[must_use]
+    pub fn with_input<R: Read + 'static>(mut self, input: R) -> Self {
+        self.input = Some(Box::new(input));
+        self
+    }
+
+    /// Sets the output stream for the machine.
+    #[must_use]
+    pub fn with_output<W: Write + 'static>(mut self, output: W) -> Self {
+        self.output = Some(Box::new(output));
+        self
+    }
+
+    /// Sets the RAM size for the machine.
+    #[must_use]
+    pub const fn with_ram_size(mut self, ram_size: usize) -> Self {
+        self.ram_size = ram_size;
+        self
+    }
+
+    /// Builds the [`Machine`] instance with the provided configuration.
+    pub fn build(self) -> Result<Machine, &'static str> {
+        if self.input.is_none() || self.output.is_none() {
+            return Err("Input and output streams must be provided");
+        }
+
+        Ok(Machine {
+            program: ProgramMemory { code: self.code },
+            state: MutableState {
+                ram: vec![BaseField::zero(); self.ram_size],
+                registers: Registers::new(),
+            },
+            io: IO { input: self.input.unwrap(), output: self.output.unwrap() },
+            trace: vec![],
+        })
+    }
+}
 
 pub struct ProgramMemory {
     code: Vec<BaseField>,
@@ -40,23 +89,24 @@ impl Machine {
         R: Read + 'static,
         W: Write + 'static,
     {
-        Self {
-            program: ProgramMemory { code },
-            state: MutableState {
-                ram: vec![BaseField::zero(); ram_size],
-                registers: Registers::new(),
-            },
-            io: IO { input: Box::new(input), output: Box::new(output) },
-            trace: vec![],
-        }
+        MachineBuilder::new(code)
+            .with_input(input)
+            .with_output(output)
+            .with_ram_size(ram_size)
+            .build()
+            .expect("Failed to build Machine")
     }
 
-    pub fn new<R, W>(code: Vec<BaseField>, input: R, output: W) -> Self
+    pub fn new<R, W>(code: &[BaseField], input: R, output: W) -> Self
     where
         R: Read + 'static,
         W: Write + 'static,
     {
-        Self::new_with_config(code, input, output, Self::DEFAULT_RAM_SIZE)
+        MachineBuilder::new(code.to_vec())
+            .with_input(input)
+            .with_output(output)
+            .build()
+            .expect("Failed to build Machine")
     }
 
     pub fn execute(&mut self) -> Result<(), Box<dyn Error>> {
@@ -185,7 +235,7 @@ mod tests {
     #[test]
     fn test_default_machine_initialization() {
         let code = vec![BaseField::from(43)];
-        let (machine, _) = create_test_machine(code.clone(), &[]);
+        let (machine, _) = create_test_machine(&code, &[]);
 
         assert_eq!(machine.program.code, code);
         assert_eq!(machine.state.ram.len(), Machine::DEFAULT_RAM_SIZE);
@@ -209,7 +259,7 @@ mod tests {
     fn test_right_instruction() -> Result<(), Box<dyn Error>> {
         // '>>'
         let code = vec![BaseField::from(62), BaseField::from(62)];
-        let (mut machine, _) = create_test_machine(code, &[]);
+        let (mut machine, _) = create_test_machine(&code, &[]);
         machine.execute()?;
 
         assert_eq!(machine.state.registers.mp, BaseField::from(2));
@@ -220,7 +270,7 @@ mod tests {
     fn test_left_instruction() -> Result<(), Box<dyn Error>> {
         // '>><'
         let code = vec![BaseField::from(62), BaseField::from(62), BaseField::from(60)];
-        let (mut machine, _) = create_test_machine(code, &[]);
+        let (mut machine, _) = create_test_machine(&code, &[]);
         machine.execute()?;
 
         assert_eq!(machine.state.registers.mp, BaseField::from(1));
@@ -231,7 +281,7 @@ mod tests {
     fn test_plus_instruction() -> Result<(), Box<dyn Error>> {
         // '+'
         let code = vec![BaseField::from(43)];
-        let (mut machine, _) = create_test_machine(code, &[]);
+        let (mut machine, _) = create_test_machine(&code, &[]);
         machine.execute()?;
 
         assert_eq!(machine.state.ram[0], BaseField::from(1));
@@ -243,7 +293,7 @@ mod tests {
     fn test_minus_instruction() -> Result<(), Box<dyn Error>> {
         // '--'
         let code = vec![BaseField::from(45), BaseField::from(45)];
-        let (mut machine, _) = create_test_machine(code, &[]);
+        let (mut machine, _) = create_test_machine(&code, &[]);
         machine.execute()?;
 
         assert_eq!(machine.state.ram[0], BaseField::from(P - 2));
@@ -256,7 +306,7 @@ mod tests {
         // ',.'
         let code = vec![BaseField::from(44), BaseField::from(46)];
         let input = b"a";
-        let (mut machine, output) = create_test_machine(code, input);
+        let (mut machine, output) = create_test_machine(&code, input);
 
         machine.execute()?;
 
@@ -277,7 +327,7 @@ mod tests {
             BaseField::from(2),
             BaseField::from(43),
         ];
-        let (mut machine, _) = create_test_machine(code, &[]);
+        let (mut machine, _) = create_test_machine(&code, &[]);
         machine.execute()?;
 
         assert_eq!(machine.state.ram[0], BaseField::one());
@@ -298,7 +348,7 @@ mod tests {
             BaseField::from(93),
             BaseField::from(3),
         ];
-        let (mut machine, _) = create_test_machine(code, &[]);
+        let (mut machine, _) = create_test_machine(&code, &[]);
         machine.execute()?;
 
         assert_eq!(machine.state.ram[0], BaseField::from(2));
@@ -311,7 +361,7 @@ mod tests {
     fn test_get_trace() -> Result<(), Box<dyn Error>> {
         // '++'
         let code = vec![BaseField::from(43), BaseField::from(43)];
-        let (mut machine, _) = create_test_machine(code, &[]);
+        let (mut machine, _) = create_test_machine(&code, &[]);
         machine.execute()?;
 
         // Initial state + executed instructions
@@ -356,7 +406,7 @@ mod tests {
     fn test_pad_trace() -> Result<(), Box<dyn Error>> {
         // '++'
         let code = vec![BaseField::from(43), BaseField::from(43)];
-        let (mut machine, _) = create_test_machine(code, &[]);
+        let (mut machine, _) = create_test_machine(&code, &[]);
         machine.execute()?;
 
         // Initial state + executed instructions
