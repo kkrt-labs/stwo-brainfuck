@@ -66,9 +66,9 @@ impl Display for InstructionType {
     }
 }
 
-impl InstructionType {
-    pub fn from_u8(ins: u8) -> Self {
-        Self::from_str(&(ins as char).to_string()).expect("Invalid instruction")
+impl From<u8> for InstructionType {
+    fn from(value: u8) -> Self {
+        Self::from_str(&(value as char).to_string()).expect("Invalid instruction")
     }
 }
 
@@ -114,21 +114,21 @@ mod tests {
     // Test from_u8 implementation
     #[test]
     fn test_instruction_type_from_u8() {
-        assert_eq!(InstructionType::from_u8(b'>'), InstructionType::Right);
-        assert_eq!(InstructionType::from_u8(b'<'), InstructionType::Left);
-        assert_eq!(InstructionType::from_u8(b'+'), InstructionType::Plus);
-        assert_eq!(InstructionType::from_u8(b'-'), InstructionType::Minus);
-        assert_eq!(InstructionType::from_u8(b'.'), InstructionType::PutChar);
-        assert_eq!(InstructionType::from_u8(b','), InstructionType::ReadChar);
-        assert_eq!(InstructionType::from_u8(b'['), InstructionType::JumpIfZero);
-        assert_eq!(InstructionType::from_u8(b']'), InstructionType::JumpIfNotZero);
+        assert_eq!(InstructionType::from(b'>'), InstructionType::Right);
+        assert_eq!(InstructionType::from(b'<'), InstructionType::Left);
+        assert_eq!(InstructionType::from(b'+'), InstructionType::Plus);
+        assert_eq!(InstructionType::from(b'-'), InstructionType::Minus);
+        assert_eq!(InstructionType::from(b'.'), InstructionType::PutChar);
+        assert_eq!(InstructionType::from(b','), InstructionType::ReadChar);
+        assert_eq!(InstructionType::from(b'['), InstructionType::JumpIfZero);
+        assert_eq!(InstructionType::from(b']'), InstructionType::JumpIfNotZero);
     }
 
     // Test from_u8 with invalid input (should panic)
     #[test]
     #[should_panic(expected = "Invalid instruction")]
     fn test_instruction_type_from_u8_invalid() {
-        InstructionType::from_u8(b'x');
+        let _ = InstructionType::from(b'x');
     }
 
     // Test Instruction struct creation
