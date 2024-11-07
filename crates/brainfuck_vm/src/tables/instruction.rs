@@ -36,7 +36,7 @@ impl InstructionTable {
     ///
     /// # Returns
     /// A new instance of [`InstructionTable`] with an empty table.
-    pub fn new() -> Self {
+    pub const fn new() -> Self {
         Self { table: Vec::new() }
     }
 
@@ -80,8 +80,8 @@ impl InstructionTable {
     /// # Returns
     /// An `Option` containing a reference to the matching row if found,
     /// or `None` if the row does not exist in the table.
-    pub fn get_row(&self, row: InstructionTableRow) -> Option<&InstructionTableRow> {
-        self.table.iter().find(|r| *r == &row)
+    pub fn get_row(&self, row: &InstructionTableRow) -> Option<&InstructionTableRow> {
+        self.table.iter().find(|r| *r == row)
     }
 }
 
@@ -142,7 +142,7 @@ mod tests {
         // Add the rows to the table
         instruction_table.add_rows(rows.clone());
         // Check that the table contains the added rows
-        assert_eq!(instruction_table, InstructionTable { table: rows.clone() });
+        assert_eq!(instruction_table, InstructionTable { table: rows });
     }
 
     #[test]
@@ -157,7 +157,7 @@ mod tests {
         // Add the row to the table
         instruction_table.add_row(row.clone());
         // Retrieve the row from the table
-        let retrieved = instruction_table.get_row(row.clone());
+        let retrieved = instruction_table.get_row(&row);
         // Check that the retrieved row matches the added row
         assert_eq!(retrieved.unwrap(), &row, "Retrieved row should match the added row.");
     }
@@ -172,7 +172,7 @@ mod tests {
             ni: BaseField::from(91),
         };
         // Try to retrieve the non-existing row from the table
-        let retrieved = instruction_table.get_row(row);
+        let retrieved = instruction_table.get_row(&row);
         // Check that the retrieved row is None
         assert!(retrieved.is_none(), "Should return None for a non-existing row.");
     }
