@@ -2,9 +2,9 @@ use stwo_prover::core::{
     air::{Component, ComponentProver},
     backend::simd::SimdBackend,
     channel::{Blake2sChannel, Channel},
-    pcs::{CommitmentSchemeProver, PcsConfig, TreeVec},
+    pcs::{CommitmentSchemeProver, CommitmentSchemeVerifier, PcsConfig, TreeVec},
     poly::circle::{CanonicCoset, PolyOps},
-    prover::{self, ProvingError, StarkProof},
+    prover::{self, verify, ProvingError, StarkProof, VerificationError},
     vcs::{
         blake2_merkle::{Blake2sMerkleChannel, Blake2sMerkleHasher},
         ops::MerkleHasher,
@@ -55,6 +55,15 @@ impl BrainfuckInteractionClaim {
     pub fn mix_into(&self, _channel: &mut impl Channel) {
         todo!();
     }
+}
+
+/// Verify that the claims (i.e. Statement) are valid.
+pub fn lookup_sum_valid(
+    _claim: &BrainfuckClaim,
+    _interaction_elements: &BrainfuckInteractionElements,
+    _interaction_claim: &BrainfuckInteractionClaim,
+) -> bool {
+    todo!();
 }
 
 /// All the components that constitute the Brainfuck ZK-VM.
@@ -148,4 +157,51 @@ pub fn prove_brainfuck() -> Result<BrainfuckProof<Blake2sMerkleHasher>, ProvingE
 
     // Ok(BrainfuckProof { claim, interaction_claim, proof })
     todo!();
+}
+
+/// Verify a given STARK proof of a Brainfuck program execution with corresponding claim.
+pub fn verify_brainfuck(
+    BrainfuckProof { claim, interaction_claim, proof }: BrainfuckProof<Blake2sMerkleHasher>,
+) -> Result<(), VerificationError> {
+    // ┌──────────────────────────┐
+    // │     Protocol Setup       │
+    // └──────────────────────────┘
+    let config = PcsConfig::default();
+    let channel = &mut Blake2sChannel::default();
+    let commitment_scheme_verifier =
+        &mut CommitmentSchemeVerifier::<Blake2sMerkleChannel>::new(config);
+    let sizes = &claim.log_sizes();
+
+    // ┌──────────────────────────┐
+    // │   Interaction Phase 0    │
+    // └──────────────────────────┘
+    claim.mix_into(channel);
+    commitment_scheme_verifier.commit(proof.commitments[0], &sizes[0], channel);
+
+    // ┌──────────────────────────┐
+    // │   Interaction Phase 1    │
+    // └──────────────────────────┘
+    let interaction_elements = BrainfuckInteractionElements::draw(channel);
+    // Check that the lookup sum is valid, otherwise throw
+    // TODO: panic! should be replaced by custom error
+    if !lookup_sum_valid(&claim, &interaction_elements, &interaction_claim) {
+        panic!();
+    }
+    interaction_claim.mix_into(channel);
+    commitment_scheme_verifier.commit(proof.commitments[1], &sizes[1], channel);
+
+    // ┌──────────────────────────┐
+    // │   Interaction Phase 2    │
+    // └──────────────────────────┘
+    commitment_scheme_verifier.commit(proof.commitments[2], &sizes[2], channel);
+
+    // ┌──────────────────────────┐
+    // │    Proof Verification    │
+    // └──────────────────────────┘
+
+    let component_builder =
+        BrainfuckComponents::new(&claim, &interaction_elements, &interaction_claim);
+    let components = component_builder.components();
+
+    verify(&components, channel, commitment_scheme_verifier, proof)
 }
