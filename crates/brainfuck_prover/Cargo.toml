@@ -10,3 +10,4 @@ workspace = true
 
 [dependencies]
 stwo-prover.workspace = true
+thiserror.workspace = true
