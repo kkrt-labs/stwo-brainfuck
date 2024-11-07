@@ -119,7 +119,7 @@ impl Machine {
                     self.program.code[(self.state.registers.ip + BaseField::one()).0 as usize]
                 };
             self.write_trace();
-            let ins_type = InstructionType::from_u8(self.state.registers.ci.0 as u8);
+            let ins_type = InstructionType::from(self.state.registers.ci.0 as u8);
             self.execute_instruction(&ins_type)?;
             self.next_clock_cycle();
         }
