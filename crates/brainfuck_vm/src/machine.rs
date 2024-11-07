@@ -60,10 +60,12 @@ impl MachineBuilder {
     }
 }
 
+#[derive(Debug, Default, PartialEq, Eq)]
 pub struct ProgramMemory {
     code: Vec<BaseField>,
 }
 
+#[derive(Debug, Default, PartialEq, Eq)]
 pub struct MutableState {
     ram: Vec<BaseField>,
     registers: Registers,
@@ -237,9 +239,14 @@ mod tests {
         let code = vec![BaseField::from(43)];
         let (machine, _) = create_test_machine(&code, &[]);
 
-        assert_eq!(machine.program.code, code);
-        assert_eq!(machine.state.ram.len(), Machine::DEFAULT_RAM_SIZE);
-        assert!(machine.state.ram.iter().all(|&x| x == BaseField::zero()));
+        assert_eq!(machine.program, ProgramMemory { code });
+        assert_eq!(
+            machine.state,
+            MutableState {
+                ram: vec![BaseField::zero(); Machine::DEFAULT_RAM_SIZE],
+                ..Default::default()
+            }
+        );
     }
 
     #[test]
@@ -250,9 +257,11 @@ mod tests {
         let ram_size = 55000;
         let machine = Machine::new_with_config(&code, input, output, ram_size);
 
-        assert_eq!(machine.program.code, code);
-        assert_eq!(machine.state.ram.len(), ram_size);
-        assert!(machine.state.ram.iter().all(|&x| x == BaseField::zero()));
+        assert_eq!(machine.program, ProgramMemory { code });
+        assert_eq!(
+            machine.state,
+            MutableState { ram: vec![BaseField::zero(); ram_size], ..Default::default() }
+        );
     }
 
     #[test]
@@ -262,6 +271,7 @@ mod tests {
         let (mut machine, _) = create_test_machine(&code, &[]);
         machine.execute()?;
 
+        assert_eq!(machine.program, ProgramMemory { code });
         assert_eq!(machine.state.registers.mp, BaseField::from(2));
         Ok(())
     }
@@ -394,11 +404,7 @@ mod tests {
             mvi: BaseField::from(2).inverse(),
         };
 
-        assert_eq!(trace.len(), 3);
-        assert_eq!(trace[0], initial_state);
-        assert_eq!(trace[1], intermediate_state);
-        assert_eq!(trace[2], final_state);
-
+        assert_eq!(trace, vec![initial_state, intermediate_state, final_state]);
         Ok(())
     }
 
