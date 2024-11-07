@@ -188,6 +188,9 @@ dependencies = [
 [[package]]
 name = "brainfuck_prover"
 version = "0.1.0"
+dependencies = [
+ "stwo-prover",
+]
 
 [[package]]
 name = "brainfuck_vm"
