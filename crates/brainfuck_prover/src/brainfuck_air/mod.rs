@@ -24,7 +24,7 @@ pub struct BrainfuckProof<H: MerkleHasher> {
 ///
 /// It includes the common claim values such as the initial and final states
 /// and the claim of each component.
-pub struct BrainfuckClaim {}
+pub struct BrainfuckClaim;
 
 impl BrainfuckClaim {
     pub fn mix_into(&self, _channel: &mut impl Channel) {
@@ -38,10 +38,10 @@ impl BrainfuckClaim {
 
 /// All the interaction elements (drawn from the channel)
 /// required by the various components during the interaction phase.
-pub struct BrainfuckInteractionElements {}
+pub struct BrainfuckInteractionElements;
 
 impl BrainfuckInteractionElements {
-    pub fn draw(_channel: &mut impl Channel) -> BrainfuckInteractionElements {
+    pub fn draw(_channel: &mut impl Channel) -> Self {
         todo!();
     }
 }
@@ -49,7 +49,7 @@ impl BrainfuckInteractionElements {
 /// All the claims from the second phase (interaction phase 1).
 ///
 /// Mainly the claims on global relations (lookup, permutation, evaluation).
-pub struct BrainfuckInteractionClaim {}
+pub struct BrainfuckInteractionClaim;
 
 impl BrainfuckInteractionClaim {
     pub fn mix_into(&self, _channel: &mut impl Channel) {
@@ -61,7 +61,7 @@ impl BrainfuckInteractionClaim {
 ///
 /// Components are used by the prover as a `ComponentProver`,
 /// and by the verifier as a `Component`.
-pub struct BrainfuckComponents {}
+pub struct BrainfuckComponents;
 
 impl BrainfuckComponents {
     /// Initializes all the Brainfuck components from the claims generated from the trace.
@@ -84,7 +84,7 @@ impl BrainfuckComponents {
     }
 }
 
-/// LOG_MAX_ROWS = log2(MAX_ROWS) ?
+/// `LOG_MAX_ROWS = log2(MAX_ROWS)` ?
 ///
 /// Means that the ZK-VM does not accept programs with more than 2^20 steps (1M steps).
 const LOG_MAX_ROWS: u32 = 20;
