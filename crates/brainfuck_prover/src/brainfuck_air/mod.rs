@@ -10,21 +10,6 @@ use stwo_prover::core::{
         ops::MerkleHasher,
     },
 };
-use thiserror::Error;
-
-/// Represents errors that can occur when verifying
-/// a Brainfuck proof.
-#[derive(Error, Debug)]
-pub enum BrainfuckVerificationError {
-    /// Error variant indicating that the sum from the LogUp protocol
-    /// is not valid compared to the given claims.
-    #[error("Invalid lookup sum")]
-    InvalidLogupSum,
-    /// Error variant indicating that something went wrong during
-    /// the CSTARK verification `stwo_prover::prover::verify()`.
-    #[error("Stark verification error: {0}")]
-    Stark(#[from] VerificationError),
-}
 
 /// The STARK proof of the execution of a given Brainfuck program.
 ///
@@ -177,7 +162,7 @@ pub fn prove_brainfuck() -> Result<BrainfuckProof<Blake2sMerkleHasher>, ProvingE
 /// Verify a given STARK proof of a Brainfuck program execution with corresponding claim.
 pub fn verify_brainfuck(
     BrainfuckProof { claim, interaction_claim, proof }: BrainfuckProof<Blake2sMerkleHasher>,
-) -> Result<(), BrainfuckVerificationError> {
+) -> Result<(), VerificationError> {
     // ┌──────────────────────────┐
     // │     Protocol Setup       │
     // └──────────────────────────┘
@@ -200,7 +185,7 @@ pub fn verify_brainfuck(
     // Check that the lookup sum is valid, otherwise throw
     // TODO: panic! should be replaced by custom error
     if !lookup_sum_valid(&claim, &interaction_elements, &interaction_claim) {
-        return Err(BrainfuckVerificationError::InvalidLogupSum);
+        return Err(VerificationError::InvalidLookup("Invalid logup sum".to_string()));
     };
     interaction_claim.mix_into(channel);
     commitment_scheme_verifier.commit(proof.commitments[1], &sizes[1], channel);
@@ -219,5 +204,4 @@ pub fn verify_brainfuck(
     let components = component_builder.components();
 
     verify(&components, channel, commitment_scheme_verifier, proof)
-        .map_err(BrainfuckVerificationError::Stark)
 }

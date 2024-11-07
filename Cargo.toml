@@ -38,6 +38,5 @@ module_name_repetitions = "allow"
 [workspace.dependencies]
 clap = { version = "4.3.10", features = ["derive"] }
 stwo-prover = { git = "https://github.com/starkware-libs/stwo", rev = "f6214d1" }
-thiserror = "2.0.0"
 tracing = "0.1"
 tracing-subscriber = "0.3"
