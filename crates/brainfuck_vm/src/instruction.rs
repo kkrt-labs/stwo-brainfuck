@@ -80,7 +80,7 @@ impl TryFrom<u8> for InstructionType {
 
     fn try_from(value: u8) -> Result<Self, Self::Error> {
         Self::from_str(&(value as char).to_string())
-            .map_err(|_| InstructionError::Conversion(value as char))
+            .map_err(|()| InstructionError::Conversion(value as char))
     }
 }
 
