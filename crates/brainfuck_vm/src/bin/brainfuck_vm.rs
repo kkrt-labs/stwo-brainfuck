@@ -1,6 +1,9 @@
 // Adapted from rkdud007 brainfuck-zkvm https://github.com/rkdud007/brainfuck-zkvm/blob/main/src/main.rs
 
-use brainfuck_vm::{compiler::Compiler, machine::Machine};
+use brainfuck_vm::{
+    compiler::Compiler,
+    machine::{Machine, MachineError},
+};
 use clap::{Parser, ValueHint};
 use std::{
     fs,
@@ -23,7 +26,7 @@ struct Args {
     ram_size: Option<usize>,
 }
 
-fn main() {
+fn main() -> Result<(), MachineError> {
     let args = Args::parse();
 
     tracing_subscriber::fmt().with_env_filter(args.log).init();
@@ -36,10 +39,8 @@ fn main() {
     let stdin = stdin();
     let stdout = stdout();
     let mut bf_vm = match args.ram_size {
-        Some(size) => {
-            Machine::new_with_config(&ins, stdin, stdout, size).expect("Failed to create machine")
-        }
-        None => Machine::new(&ins, stdin, stdout).expect("Failed to create machine"),
+        Some(size) => Machine::new_with_config(&ins, stdin, stdout, size)?,
+        None => Machine::new(&ins, stdin, stdout)?,
     };
     tracing::info!("Provide inputs separated by linefeeds: ");
     bf_vm.execute().unwrap();
@@ -50,5 +51,5 @@ fn main() {
         let trace = bf_vm.get_trace();
         tracing::info!("Execution trace: {:#?}", trace);
     }
-    // Ok(())
+    Ok(())
 }

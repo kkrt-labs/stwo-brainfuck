@@ -12,10 +12,6 @@ use thiserror::Error;
 /// Custom error type for the Machine.
 #[derive(Debug, Error)]
 pub enum MachineError {
-    /// Missing input and output streams for the machine constructor.
-    #[error("Input and output streams must be provided")]
-    MissingIOStreams,
-
     /// I/O operation failed.
     #[error("I/O operation failed: {0}")]
     IoError(#[from] std::io::Error),
@@ -62,7 +58,11 @@ impl MachineBuilder {
     /// Builds the [`Machine`] instance with the provided configuration.
     pub fn build(self) -> Result<Machine, MachineError> {
         if self.input.is_none() || self.output.is_none() {
-            return Err(MachineError::MissingIOStreams);
+            return Err(std::io::Error::new(
+                std::io::ErrorKind::Other,
+                "Input and output streams must be provided",
+            )
+            .into());
         }
 
         Ok(Machine {
