@@ -9,3 +9,4 @@ description.workspace = true
 workspace = true
 
 [dependencies]
+stwo-prover.workspace = true
