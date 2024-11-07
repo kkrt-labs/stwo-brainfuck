@@ -184,9 +184,10 @@ pub fn verify_brainfuck(
     let interaction_elements = BrainfuckInteractionElements::draw(channel);
     // Check that the lookup sum is valid, otherwise throw
     // TODO: panic! should be replaced by custom error
-    if !lookup_sum_valid(&claim, &interaction_elements, &interaction_claim) {
-        panic!();
-    }
+    assert!(
+        !lookup_sum_valid(&claim, &interaction_elements, &interaction_claim),
+        "Invalid lookup sum."
+    );
     interaction_claim.mix_into(channel);
     commitment_scheme_verifier.commit(proof.commitments[1], &sizes[1], channel);
 
