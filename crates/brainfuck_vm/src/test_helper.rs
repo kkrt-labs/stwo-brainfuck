@@ -51,6 +51,6 @@ pub fn create_test_machine(code: &[BaseField], input: &[u8]) -> (Machine, TestWr
     let input = Cursor::new(input.to_vec());
     let output = TestWriter::new();
     let test_output = output.clone();
-    let machine = Machine::new(code, input, output);
+    let machine = Machine::new(code, input, output).expect("Failed to create machine");
     (machine, test_output)
 }

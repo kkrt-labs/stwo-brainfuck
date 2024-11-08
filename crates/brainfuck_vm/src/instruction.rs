@@ -1,6 +1,15 @@
 // Taken from rkdud007 brainfuck-zkvm https://github.com/rkdud007/brainfuck-zkvm/blob/main/src/instruction.rs
 
 use std::{fmt::Display, str::FromStr};
+use thiserror::Error;
+
+/// Custom error type for instructions
+#[derive(Debug, Error, PartialEq, Eq)]
+pub enum InstructionError {
+    /// Error when converting a character to an instruction
+    #[error("Value `{0}` is not a valid instruction")]
+    Conversion(char),
+}
 
 #[derive(Debug, Clone)]
 pub struct Instruction {
@@ -66,9 +75,12 @@ impl Display for InstructionType {
     }
 }
 
-impl From<u8> for InstructionType {
-    fn from(value: u8) -> Self {
-        Self::from_str(&(value as char).to_string()).expect("Invalid instruction")
+impl TryFrom<u8> for InstructionType {
+    type Error = InstructionError;
+
+    fn try_from(value: u8) -> Result<Self, Self::Error> {
+        Self::from_str(&(value as char).to_string())
+            .map_err(|()| InstructionError::Conversion(value as char))
     }
 }
 
@@ -114,21 +126,21 @@ mod tests {
     // Test from_u8 implementation
     #[test]
     fn test_instruction_type_from_u8() {
-        assert_eq!(InstructionType::from(b'>'), InstructionType::Right);
-        assert_eq!(InstructionType::from(b'<'), InstructionType::Left);
-        assert_eq!(InstructionType::from(b'+'), InstructionType::Plus);
-        assert_eq!(InstructionType::from(b'-'), InstructionType::Minus);
-        assert_eq!(InstructionType::from(b'.'), InstructionType::PutChar);
-        assert_eq!(InstructionType::from(b','), InstructionType::ReadChar);
-        assert_eq!(InstructionType::from(b'['), InstructionType::JumpIfZero);
-        assert_eq!(InstructionType::from(b']'), InstructionType::JumpIfNotZero);
+        assert_eq!(InstructionType::try_from(b'>').unwrap(), InstructionType::Right);
+        assert_eq!(InstructionType::try_from(b'<').unwrap(), InstructionType::Left);
+        assert_eq!(InstructionType::try_from(b'+').unwrap(), InstructionType::Plus);
+        assert_eq!(InstructionType::try_from(b'-').unwrap(), InstructionType::Minus);
+        assert_eq!(InstructionType::try_from(b'.').unwrap(), InstructionType::PutChar);
+        assert_eq!(InstructionType::try_from(b',').unwrap(), InstructionType::ReadChar);
+        assert_eq!(InstructionType::try_from(b'[').unwrap(), InstructionType::JumpIfZero);
+        assert_eq!(InstructionType::try_from(b']').unwrap(), InstructionType::JumpIfNotZero);
     }
 
-    // Test from_u8 with invalid input (should panic)
+    // Test to ensure invalid input as u8 returns an error
     #[test]
-    #[should_panic(expected = "Invalid instruction")]
     fn test_instruction_type_from_u8_invalid() {
-        let _ = InstructionType::from(b'x');
+        let result = InstructionType::try_from(b'x');
+        assert_eq!(result, Err(InstructionError::Conversion('x')));
     }
 
     // Test Instruction struct creation

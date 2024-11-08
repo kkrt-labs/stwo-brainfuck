@@ -1,12 +1,25 @@
 // Adapted from rkdud007 brainfuck-zkvm https://github.com/rkdud007/brainfuck-zkvm/blob/main/src/machine.rs
 
-use crate::{instruction::InstructionType, registers::Registers};
-use num_traits::identities::{One, Zero};
-use std::{
-    error::Error,
-    io::{Read, Write},
+use crate::{
+    instruction::{InstructionError, InstructionType},
+    registers::Registers,
 };
+use num_traits::identities::{One, Zero};
+use std::io::{Read, Write};
 use stwo_prover::core::fields::{m31::BaseField, FieldExpOps};
+use thiserror::Error;
+
+/// Custom error type for the Machine.
+#[derive(Debug, Error)]
+pub enum MachineError {
+    /// I/O operation failed.
+    #[error("I/O operation failed: {0}")]
+    IoError(#[from] std::io::Error),
+
+    /// Instructions related error.
+    #[error("Instruction error: {0}")]
+    Instruction(#[from] InstructionError),
+}
 
 pub struct MachineBuilder {
     code: Vec<BaseField>,
@@ -43,9 +56,13 @@ impl MachineBuilder {
     }
 
     /// Builds the [`Machine`] instance with the provided configuration.
-    pub fn build(self) -> Result<Machine, &'static str> {
+    pub fn build(self) -> Result<Machine, MachineError> {
         if self.input.is_none() || self.output.is_none() {
-            return Err("Input and output streams must be provided");
+            return Err(std::io::Error::new(
+                std::io::ErrorKind::Other,
+                "Input and output streams must be provided",
+            )
+            .into());
         }
 
         Ok(Machine {
@@ -86,7 +103,12 @@ pub struct Machine {
 impl Machine {
     pub const DEFAULT_RAM_SIZE: usize = 30000;
 
-    pub fn new_with_config<R, W>(code: &[BaseField], input: R, output: W, ram_size: usize) -> Self
+    pub fn new_with_config<R, W>(
+        code: &[BaseField],
+        input: R,
+        output: W,
+        ram_size: usize,
+    ) -> Result<Self, MachineError>
     where
         R: Read + 'static,
         W: Write + 'static,
@@ -96,22 +118,17 @@ impl Machine {
             .with_output(output)
             .with_ram_size(ram_size)
             .build()
-            .expect("Failed to build Machine")
     }
 
-    pub fn new<R, W>(code: &[BaseField], input: R, output: W) -> Self
+    pub fn new<R, W>(code: &[BaseField], input: R, output: W) -> Result<Self, MachineError>
     where
         R: Read + 'static,
         W: Write + 'static,
     {
-        MachineBuilder::new(code)
-            .with_input(input)
-            .with_output(output)
-            .build()
-            .expect("Failed to build Machine")
+        MachineBuilder::new(code).with_input(input).with_output(output).build()
     }
 
-    pub fn execute(&mut self) -> Result<(), Box<dyn Error>> {
+    pub fn execute(&mut self) -> Result<(), MachineError> {
         while self.state.registers.ip < BaseField::from(self.program.code.len()) {
             self.state.registers.ci = self.program.code[self.state.registers.ip.0 as usize];
             self.state.registers.ni =
@@ -121,7 +138,7 @@ impl Machine {
                     self.program.code[(self.state.registers.ip + BaseField::one()).0 as usize]
                 };
             self.write_trace();
-            let ins_type = InstructionType::from(self.state.registers.ci.0 as u8);
+            let ins_type = InstructionType::try_from(self.state.registers.ci.0 as u8)?;
             self.execute_instruction(&ins_type)?;
             self.next_clock_cycle();
         }
@@ -133,7 +150,7 @@ impl Machine {
         Ok(())
     }
 
-    fn read_char(&mut self) -> Result<(), std::io::Error> {
+    fn read_char(&mut self) -> Result<(), MachineError> {
         let mut buf = [0; 1];
         self.io.input.read_exact(&mut buf)?;
         let input_char = buf[0] as usize;
@@ -141,13 +158,13 @@ impl Machine {
         Ok(())
     }
 
-    fn write_char(&mut self) -> Result<(), std::io::Error> {
+    fn write_char(&mut self) -> Result<(), MachineError> {
         let char_to_write = self.state.ram[self.state.registers.mp.0 as usize].0 as u8;
         self.io.output.write_all(&[char_to_write])?;
         Ok(())
     }
 
-    fn execute_instruction(&mut self, ins: &InstructionType) -> Result<(), Box<dyn Error>> {
+    fn execute_instruction(&mut self, ins: &InstructionType) -> Result<(), MachineError> {
         match ins {
             InstructionType::Right => {
                 self.state.registers.mp += BaseField::one();
@@ -255,7 +272,8 @@ mod tests {
         let input: &[u8] = &[];
         let output = TestWriter::new();
         let ram_size = 55000;
-        let machine = Machine::new_with_config(&code, input, output, ram_size);
+        let machine = Machine::new_with_config(&code, input, output, ram_size)
+            .expect("Machine creation failed");
 
         assert_eq!(machine.program, ProgramMemory { code });
         assert_eq!(
@@ -265,7 +283,7 @@ mod tests {
     }
 
     #[test]
-    fn test_right_instruction() -> Result<(), Box<dyn Error>> {
+    fn test_right_instruction() -> Result<(), MachineError> {
         // '>>'
         let code = vec![BaseField::from(62), BaseField::from(62)];
         let (mut machine, _) = create_test_machine(&code, &[]);
@@ -277,7 +295,7 @@ mod tests {
     }
 
     #[test]
-    fn test_left_instruction() -> Result<(), Box<dyn Error>> {
+    fn test_left_instruction() -> Result<(), MachineError> {
         // '>><'
         let code = vec![BaseField::from(62), BaseField::from(62), BaseField::from(60)];
         let (mut machine, _) = create_test_machine(&code, &[]);
@@ -288,7 +306,7 @@ mod tests {
     }
 
     #[test]
-    fn test_plus_instruction() -> Result<(), Box<dyn Error>> {
+    fn test_plus_instruction() -> Result<(), MachineError> {
         // '+'
         let code = vec![BaseField::from(43)];
         let (mut machine, _) = create_test_machine(&code, &[]);
@@ -300,7 +318,7 @@ mod tests {
     }
 
     #[test]
-    fn test_minus_instruction() -> Result<(), Box<dyn Error>> {
+    fn test_minus_instruction() -> Result<(), MachineError> {
         // '--'
         let code = vec![BaseField::from(45), BaseField::from(45)];
         let (mut machine, _) = create_test_machine(&code, &[]);
@@ -312,7 +330,7 @@ mod tests {
     }
 
     #[test]
-    fn test_read_write_char() -> Result<(), Box<dyn Error>> {
+    fn test_read_write_char() -> Result<(), MachineError> {
         // ',.'
         let code = vec![BaseField::from(44), BaseField::from(46)];
         let input = b"a";
@@ -326,7 +344,7 @@ mod tests {
     }
 
     #[test]
-    fn test_skip_loop() -> Result<(), Box<dyn Error>> {
+    fn test_skip_loop() -> Result<(), MachineError> {
         // Skip the loop
         // '[-]+'
         let code = vec![
@@ -346,7 +364,7 @@ mod tests {
     }
 
     #[test]
-    fn test_enter_loop() -> Result<(), Box<dyn Error>> {
+    fn test_enter_loop() -> Result<(), MachineError> {
         // Enter the loop
         // '+[+>]'
         let code = vec![
@@ -368,7 +386,7 @@ mod tests {
     }
 
     #[test]
-    fn test_get_trace() -> Result<(), Box<dyn Error>> {
+    fn test_get_trace() -> Result<(), MachineError> {
         // '++'
         let code = vec![BaseField::from(43), BaseField::from(43)];
         let (mut machine, _) = create_test_machine(&code, &[]);
@@ -409,7 +427,7 @@ mod tests {
     }
 
     #[test]
-    fn test_pad_trace() -> Result<(), Box<dyn Error>> {
+    fn test_pad_trace() -> Result<(), MachineError> {
         // '++'
         let code = vec![BaseField::from(43), BaseField::from(43)];
         let (mut machine, _) = create_test_machine(&code, &[]);

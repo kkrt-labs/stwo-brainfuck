@@ -14,3 +14,4 @@ num-traits = "0.2.19"
 stwo-prover.workspace = true
 tracing.workspace = true
 tracing-subscriber = { workspace = true, features = ["env-filter"] }
+thiserror.workspace = true
