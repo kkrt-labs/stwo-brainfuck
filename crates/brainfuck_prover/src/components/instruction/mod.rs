@@ -1,1 +1,1 @@
-pub mod instruction;
+pub mod table;
