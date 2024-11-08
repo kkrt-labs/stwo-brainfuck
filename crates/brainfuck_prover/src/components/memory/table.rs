@@ -113,6 +113,31 @@ mod tests {
     use num_traits::Zero;
 
     #[test]
+    fn test_memory_row_new() {
+        let row = MemoryTableRow::new(BaseField::zero(), BaseField::from(43), BaseField::from(91));
+        let expected_row = MemoryTableRow {
+            clk: BaseField::zero(),
+            mp: BaseField::from(43),
+            mv: BaseField::from(91),
+            d: BaseField::zero(),
+        };
+        assert_eq!(row, expected_row);
+    }
+
+    #[test]
+    fn test_memory_row_new_dummy() {
+        let row =
+            MemoryTableRow::new_dummy(BaseField::zero(), BaseField::from(43), BaseField::from(91));
+        let expected_row = MemoryTableRow {
+            clk: BaseField::zero(),
+            mp: BaseField::from(43),
+            mv: BaseField::from(91),
+            d: BaseField::one(),
+        };
+        assert_eq!(row, expected_row);
+    }
+
+    #[test]
     fn test_memory_table_new() {
         let memory_table = MemoryTable::new();
         assert!(memory_table.table.is_empty(), "Memory table should be empty upon initialization.");
