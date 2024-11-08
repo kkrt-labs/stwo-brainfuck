@@ -36,6 +36,8 @@ default_trait_access = "allow"
 module_name_repetitions = "allow"
 
 [workspace.dependencies]
+brainfuck_vm = { path = "crates/brainfuck_vm" }
+brainfuck_prover = { path = "crates/brainfuck_prover" }
 clap = { version = "4.3.10", features = ["derive"] }
 stwo-prover = { git = "https://github.com/starkware-libs/stwo", rev = "f6214d1" }
 tracing = "0.1"
