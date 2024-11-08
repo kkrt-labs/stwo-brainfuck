@@ -119,6 +119,21 @@ mod tests {
     }
 
     #[test]
+    fn test_add_row() {
+        let mut instruction_table = InstructionTable::new();
+        // Create a row to add to the table
+        let row = InstructionTableRow {
+            ip: BaseField::zero(),
+            ci: BaseField::from(43),
+            ni: BaseField::from(91),
+        };
+        // Add the row to the table
+        instruction_table.add_row(row.clone());
+        // Check that the table contains the added row
+        assert_eq!(instruction_table.table, vec![row], "Added row should match the expected row.");
+    }
+
+    #[test]
     fn test_add_multiple_rows() {
         let mut instruction_table = InstructionTable::new();
         // Create a vector of rows to add to the table
