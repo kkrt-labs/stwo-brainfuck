@@ -100,7 +100,7 @@ mod tests {
     }
 
     #[test]
-    fn test_add_row() {
+    fn test_add_row_front_registers() {
         let mut instruction_table = InstructionTable::new();
         // Create a row to add to the table
         let row = InstructionTableRow {
@@ -114,6 +114,21 @@ mod tests {
             BaseField::from(43),
             BaseField::from(91),
         );
+        // Check that the table contains the added row
+        assert_eq!(instruction_table.table, vec![row], "Added row should match the expected row.");
+    }
+
+    #[test]
+    fn test_add_row() {
+        let mut instruction_table = InstructionTable::new();
+        // Create a row to add to the table
+        let row = InstructionTableRow {
+            ip: BaseField::zero(),
+            ci: BaseField::from(43),
+            ni: BaseField::from(91),
+        };
+        // Add the row to the table
+        instruction_table.add_row(row.clone());
         // Check that the table contains the added row
         assert_eq!(instruction_table.table, vec![row], "Added row should match the expected row.");
     }
