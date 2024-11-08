@@ -189,6 +189,7 @@ dependencies = [
 name = "brainfuck_prover"
 version = "0.1.0"
 dependencies = [
+ "num-traits",
  "stwo-prover",
 ]
 
