@@ -100,7 +100,7 @@ mod tests {
     }
 
     #[test]
-    fn test_add_row() {
+    fn test_add_row_front_registers() {
         let mut instruction_table = InstructionTable::new();
         // Create a row to add to the table
         let row = InstructionTableRow {
