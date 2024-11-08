@@ -105,6 +105,11 @@ impl MemoryTable {
     pub fn get_row(&self, row: &MemoryTableRow) -> Option<&MemoryTableRow> {
         self.table.iter().find(|r| *r == row)
     }
+
+    /// Sorts in-place the existing [`MemoryTableRow`] rows in the Memory Table by `mp`.
+    pub fn sort(&mut self) {
+        self.table.sort_by_key(|x| (x.mp, x.clk));
+    }
 }
 
 #[cfg(test)]
@@ -246,5 +251,21 @@ mod tests {
         let retrieved = memory_table.get_row(&row);
         // Check that the retrieved row is None
         assert!(retrieved.is_none(), "Should return None for a non-existing row.");
+    }
+
+    #[test]
+    fn test_sort() {
+        let mut memory_table = MemoryTable::new();
+        let row1 = MemoryTableRow::new(BaseField::zero(), BaseField::zero(), BaseField::zero());
+        let row2 = MemoryTableRow::new(BaseField::one(), BaseField::zero(), BaseField::zero());
+        let row3 = MemoryTableRow::new(BaseField::zero(), BaseField::one(), BaseField::zero());
+        memory_table.add_rows(vec![row3.clone(), row1.clone(), row2.clone()]);
+
+        let mut expected_memory_table = MemoryTable::new();
+        expected_memory_table.add_rows(vec![row1, row2, row3]);
+
+        memory_table.sort();
+
+        assert_eq!(memory_table, expected_memory_table);
     }
 }
