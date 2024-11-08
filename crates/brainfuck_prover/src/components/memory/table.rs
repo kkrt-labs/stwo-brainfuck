@@ -22,7 +22,7 @@ pub struct MemoryTableRow {
 
 impl MemoryTableRow {
     pub fn new(clk: BaseField, mp: BaseField, mv: BaseField) -> Self {
-        Self { clk, mp, mv, d: BaseField::zero() }
+        Self { clk, mp, mv, ..Default::default() }
     }
 
     pub fn new_dummy(clk: BaseField, mp: BaseField, mv: BaseField) -> Self {
