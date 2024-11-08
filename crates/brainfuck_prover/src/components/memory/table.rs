@@ -50,8 +50,8 @@ impl MemoryTable {
     ///
     /// # Returns
     /// A new instance of [`MemoryTable`] with an empty table.
-    pub const fn new() -> Self {
-        Self { table: Vec::new() }
+    pub fn new() -> Self {
+        Self::default()
     }
 
     /// Adds a new row to the Memory Table from the provided registers.
