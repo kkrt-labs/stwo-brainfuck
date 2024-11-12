@@ -83,7 +83,7 @@ mod tests {
     #[test]
     fn test_registers_display() {
         let registers = Registers {
-            clk: BaseField::from(1),
+            clk: BaseField::one(),
             ip: BaseField::from(2),
             ci: BaseField::from(3),
             ni: BaseField::from(4),
