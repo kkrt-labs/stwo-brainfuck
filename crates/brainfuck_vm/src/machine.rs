@@ -129,7 +129,6 @@ impl Machine {
     }
 
     pub fn execute(&mut self) -> Result<(), MachineError> {
-        println!("ciiiiiiiiiiiic");
         while self.state.registers.ip < BaseField::from(self.program.code.len()) {
             self.state.registers.ci = self.program.code[self.state.registers.ip.0 as usize];
             self.state.registers.ni =
