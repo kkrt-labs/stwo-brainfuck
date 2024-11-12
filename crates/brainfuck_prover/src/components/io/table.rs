@@ -92,7 +92,16 @@ impl<const N: u32> From<Vec<Registers>> for IOTable<N> {
     }
 }
 
+/// Input table (trace) for the Input component.
+///
+/// This table is made of the memory values (`mv` register) corresponding to
+/// inputs (when the current instruction `ci` equals ',').
 pub type InputTable = IOTable<INPUT_INSTRUCTION>;
+
+/// Output table (trace) for the Output component.
+///
+/// This table is made of the memory values (`mv` register) corresponding to
+/// outputs (when the current instruction `ci` equals '.').
 pub type OutputTable = IOTable<OUTPUT_INSTRUCTION>;
 
 #[cfg(test)]
