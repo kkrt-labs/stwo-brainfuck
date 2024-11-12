@@ -1,4 +1,4 @@
-use brainfuck_vm::registers::Registers;
+use brainfuck_vm::{machine::ProgramMemory, registers::Registers};
 use num_traits::Zero;
 use stwo_prover::core::fields::m31::BaseField;
 
@@ -96,11 +96,50 @@ impl InstructionTable {
     }
 }
 
-impl From<Vec<Registers>> for InstructionTable {
-    fn from(registers: Vec<Registers>) -> Self {
-        // Create a mutable copy of the input `registers` to sort it.
-        let mut sorted_registers = registers;
-        // Sort `sorted_registers` by
+impl From<(Vec<Registers>, &ProgramMemory)> for InstructionTable {
+    fn from(input: (Vec<Registers>, &ProgramMemory)) -> Self {
+        // Create an empty vector to store the program instructions.
+        let mut program = Vec::new();
+
+        // Extract the program's code from the `ProgramMemory`.
+        let code = input.1.code();
+
+        // Define valid Brainfuck instructions to process.
+        // TODO: to be moved somewhere else in a follow-up PR.
+        let valid_instructions = [
+            BaseField::from(b'>' as u32),
+            BaseField::from(b'<' as u32),
+            BaseField::from(b'+' as u32),
+            BaseField::from(b'-' as u32),
+            BaseField::from(b'.' as u32),
+            BaseField::from(b',' as u32),
+            BaseField::from(b'[' as u32),
+            BaseField::from(b']' as u32),
+        ];
+
+        // Iterate over the code and collect valid instructions.
+        for (index, ci) in code.iter().enumerate() {
+            // Skip invalid instructions.
+            if !valid_instructions.contains(ci) {
+                continue;
+            }
+
+            // Create a `Registers` object for each valid instruction and its next instruction.
+            program.push(Registers {
+                ip: BaseField::from(index as u32),
+                ci: *ci,
+                ni: if index == code.len() - 1 {
+                    BaseField::zero()
+                } else {
+                    BaseField::from(code[index + 1])
+                },
+                ..Default::default()
+            });
+        }
+
+        // Concatenate the program's instructions with the provided execution trace.
+        let mut sorted_registers = [program, input.0].concat();
+        // Sort the registers by:
         // 1. `ip` (instruction pointer)
         // 2. `clk` (clock cycle)
         sorted_registers.sort_by(|a, b| a.ip.cmp(&b.ip).then_with(|| a.clk.cmp(&b.clk)));
@@ -108,31 +147,7 @@ impl From<Vec<Registers>> for InstructionTable {
         // Initialize a new instruction table to store the sorted and processed rows.
         let mut instruction_table = Self::new();
 
-        // Use `current_ip` to track the current instruction pointer and group elements.
-        let mut current_ip = None;
-
         for register in &sorted_registers {
-            // Check if the current register marks the end of the program with:
-            // - `ci` = 0 and `ni` = 0
-            // If so, stop adding rows and break out of the loop.
-            if register.ci == BaseField::zero() && register.ni == BaseField::zero() {
-                break;
-            }
-
-            // If the instruction pointer (`ip`) changes:
-            // - Add an extra row to ensure each instruction appears `m + 1` times, where `m` is the
-            //   number of occurrences.
-            if Some(register.ip) != current_ip {
-                current_ip = Some(register.ip);
-                if let Some(last_row) = instruction_table.last_row() {
-                    instruction_table.add_row(InstructionTableRow {
-                        ip: last_row.ip,
-                        ci: last_row.ci,
-                        ni: last_row.ni,
-                    });
-                }
-            }
-
             // Add the current register to the instruction table.
             instruction_table.add_row(InstructionTableRow {
                 ip: register.ip,
@@ -141,9 +156,12 @@ impl From<Vec<Registers>> for InstructionTable {
             });
         }
 
-        // Ensure the last row is duplicated one final time to maintain the `m + 1` requirement.
+        // If the last row marks the end of the program, remove it:
+        // - `ci` = 0 and `ni` = 0
         if let Some(last_row) = instruction_table.last_row() {
-            instruction_table.add_row(last_row.clone());
+            if last_row.ci == BaseField::zero() && last_row.ni == BaseField::zero() {
+                instruction_table.table.pop();
+            }
         }
 
         // Return the fully constructed and populated instruction table.
@@ -303,81 +321,10 @@ mod tests {
         let registers = vec![];
 
         // Convert to InstructionTable and ensure sorting
-        let instruction_table = InstructionTable::from(registers);
+        let instruction_table = InstructionTable::from((registers, &Default::default()));
 
         // Check that the table is empty
         assert!(instruction_table.table.is_empty());
-    }
-
-    #[test]
-    fn test_instruction_table_from_registers() {
-        // Create Registers in unsorted order
-        let registers = vec![
-            Registers {
-                ip: BaseField::from(1),
-                clk: BaseField::from(3),
-                ci: BaseField::from(30),
-                ni: BaseField::from(40),
-                mp: BaseField::zero(),
-                mv: BaseField::zero(),
-                mvi: BaseField::zero(),
-            },
-            Registers {
-                ip: BaseField::from(2),
-                clk: BaseField::from(1),
-                ci: BaseField::from(10),
-                ni: BaseField::from(20),
-                mp: BaseField::zero(),
-                mv: BaseField::zero(),
-                mvi: BaseField::zero(),
-            },
-            Registers {
-                ip: BaseField::from(1),
-                clk: BaseField::from(2),
-                ci: BaseField::from(30),
-                ni: BaseField::from(40),
-                mp: BaseField::zero(),
-                mv: BaseField::zero(),
-                mvi: BaseField::zero(),
-            },
-        ];
-
-        // Convert to InstructionTable and ensure sorting
-        let instruction_table = InstructionTable::from(registers);
-
-        // Check the order of the rows
-        assert_eq!(
-            instruction_table,
-            InstructionTable {
-                table: vec![
-                    InstructionTableRow {
-                        ip: BaseField::from(1),
-                        ci: BaseField::from(30),
-                        ni: BaseField::from(40)
-                    },
-                    InstructionTableRow {
-                        ip: BaseField::from(1),
-                        ci: BaseField::from(30),
-                        ni: BaseField::from(40)
-                    },
-                    InstructionTableRow {
-                        ip: BaseField::from(1),
-                        ci: BaseField::from(30),
-                        ni: BaseField::from(40)
-                    },
-                    InstructionTableRow {
-                        ip: BaseField::from(2),
-                        ci: BaseField::from(10),
-                        ni: BaseField::from(20)
-                    },
-                    InstructionTableRow {
-                        ip: BaseField::from(2),
-                        ci: BaseField::from(10),
-                        ni: BaseField::from(20)
-                    },
-                ]
-            }
-        );
     }
 
     #[test]
@@ -396,7 +343,7 @@ mod tests {
         let trace = machine.get_trace();
 
         // Convert the trace to an `InstructionTable`
-        let instruction_table: InstructionTable = trace.into();
+        let instruction_table: InstructionTable = (trace, machine.program()).into();
 
         // Create the expected `InstructionTable`
         let expected_instruction_table = InstructionTable {
@@ -550,6 +497,57 @@ mod tests {
                     ip: BaseField::from(12),
                     ci: BaseField::from(b']' as u32),
                     ni: BaseField::from(7),
+                },
+            ],
+        };
+
+        // Verify that the instruction table is correct
+        assert_eq!(instruction_table, expected_instruction_table);
+    }
+
+    #[test]
+    #[allow(clippy::cast_lossless)]
+    fn test_instruction_table_program_unused_instruction() {
+        // We chose a simple program that has unused instructions
+        // The goal is to verify that the merge between the trace and the program is correct
+        let code = "[-]";
+        let mut compiler = Compiler::new(code);
+        let instructions = compiler.compile();
+        // Create a machine and execute the program
+        let (mut machine, _) = create_test_machine(&instructions, &[]);
+        let () = machine.execute().expect("Failed to execute machine");
+
+        // Get the trace of the executed program
+        let trace = machine.get_trace();
+
+        // Convert the trace to an `InstructionTable`
+        let instruction_table: InstructionTable = (trace.clone(), machine.program()).into();
+
+        println!("trace: {:?}", trace);
+        println!("program {:?}", machine.program());
+        println!("instruction_table: {:?}", instruction_table);
+
+        let expected_instruction_table = InstructionTable {
+            table: vec![
+                InstructionTableRow {
+                    ip: BaseField::from(0),
+                    ci: BaseField::from(b'[' as u32),
+                    ni: BaseField::from(4),
+                },
+                InstructionTableRow {
+                    ip: BaseField::from(0),
+                    ci: BaseField::from(b'[' as u32),
+                    ni: BaseField::from(4),
+                },
+                InstructionTableRow {
+                    ip: BaseField::from(2),
+                    ci: BaseField::from(b'-' as u32),
+                    ni: BaseField::from(b']' as u32),
+                },
+                InstructionTableRow {
+                    ip: BaseField::from(3),
+                    ci: BaseField::from(b']' as u32),
+                    ni: BaseField::from(2),
                 },
             ],
         };
