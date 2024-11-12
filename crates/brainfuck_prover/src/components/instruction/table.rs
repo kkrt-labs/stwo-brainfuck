@@ -329,8 +329,7 @@ mod tests {
     #[allow(clippy::cast_lossless, clippy::too_many_lines)]
     fn test_instruction_table_from_registers_example_program() {
         // Create a small program and compile it
-        // Reference: https://neptune.cash/learn/brainfuck-tutorial/
-        let code = "++>,<[>+.<-]";
+        let code = "+>,<[>+.<-]";
         let mut compiler = Compiler::new(code);
         let instructions = compiler.compile();
         // Create a machine and execute the program
@@ -347,154 +346,114 @@ mod tests {
         let expected_instruction_table = InstructionTable {
             table: vec![
                 InstructionTableRow {
-                    ip: BaseField::zero(),
-                    ci: INCREMENT_INSTRUCTION_BF,
-                    ni: INCREMENT_INSTRUCTION_BF,
-                },
-                InstructionTableRow {
-                    ip: BaseField::zero(),
-                    ci: INCREMENT_INSTRUCTION_BF,
-                    ni: INCREMENT_INSTRUCTION_BF,
-                },
-                InstructionTableRow {
-                    ip: BaseField::one(),
+                    ip: BaseField::from(0),
                     ci: INCREMENT_INSTRUCTION_BF,
                     ni: SHIFT_RIGHT_INSTRUCTION_BF,
                 },
                 InstructionTableRow {
-                    ip: BaseField::one(),
+                    ip: BaseField::from(0),
                     ci: INCREMENT_INSTRUCTION_BF,
                     ni: SHIFT_RIGHT_INSTRUCTION_BF,
                 },
                 InstructionTableRow {
-                    ip: BaseField::from(2),
+                    ip: BaseField::from(1),
+                    ci: SHIFT_RIGHT_INSTRUCTION_BF,
+                    ni: INPUT_INSTRUCTION_BF,
+                },
+                InstructionTableRow {
+                    ip: BaseField::from(1),
                     ci: SHIFT_RIGHT_INSTRUCTION_BF,
                     ni: INPUT_INSTRUCTION_BF,
                 },
                 InstructionTableRow {
                     ip: BaseField::from(2),
-                    ci: SHIFT_RIGHT_INSTRUCTION_BF,
-                    ni: INPUT_INSTRUCTION_BF,
+                    ci: INPUT_INSTRUCTION_BF,
+                    ni: SHIFT_LEFT_INSTRUCTION_BF,
                 },
                 InstructionTableRow {
-                    ip: BaseField::from(3),
+                    ip: BaseField::from(2),
                     ci: INPUT_INSTRUCTION_BF,
                     ni: SHIFT_LEFT_INSTRUCTION_BF,
                 },
                 InstructionTableRow {
                     ip: BaseField::from(3),
-                    ci: INPUT_INSTRUCTION_BF,
-                    ni: SHIFT_LEFT_INSTRUCTION_BF,
+                    ci: SHIFT_LEFT_INSTRUCTION_BF,
+                    ni: JUMP_IF_ZERO_INSTRUCTION_BF,
                 },
                 InstructionTableRow {
-                    ip: BaseField::from(4),
+                    ip: BaseField::from(3),
                     ci: SHIFT_LEFT_INSTRUCTION_BF,
                     ni: JUMP_IF_ZERO_INSTRUCTION_BF,
                 },
                 InstructionTableRow {
                     ip: BaseField::from(4),
-                    ci: SHIFT_LEFT_INSTRUCTION_BF,
-                    ni: JUMP_IF_ZERO_INSTRUCTION_BF,
-                },
-                InstructionTableRow {
-                    ip: BaseField::from(5),
                     ci: JUMP_IF_ZERO_INSTRUCTION_BF,
-                    ni: BaseField::from(13),
+                    ni: BaseField::from(12),
                 },
                 InstructionTableRow {
-                    ip: BaseField::from(5),
+                    ip: BaseField::from(4),
                     ci: JUMP_IF_ZERO_INSTRUCTION_BF,
-                    ni: BaseField::from(13),
+                    ni: BaseField::from(12),
                 },
                 InstructionTableRow {
-                    ip: BaseField::from(7),
+                    ip: BaseField::from(6),
+                    ci: SHIFT_RIGHT_INSTRUCTION_BF,
+                    ni: INCREMENT_INSTRUCTION_BF,
+                },
+                InstructionTableRow {
+                    ip: BaseField::from(6),
                     ci: SHIFT_RIGHT_INSTRUCTION_BF,
                     ni: INCREMENT_INSTRUCTION_BF,
                 },
                 InstructionTableRow {
                     ip: BaseField::from(7),
-                    ci: SHIFT_RIGHT_INSTRUCTION_BF,
-                    ni: INCREMENT_INSTRUCTION_BF,
+                    ci: INCREMENT_INSTRUCTION_BF,
+                    ni: OUTPUT_INSTRUCTION_BF,
                 },
                 InstructionTableRow {
                     ip: BaseField::from(7),
-                    ci: SHIFT_RIGHT_INSTRUCTION_BF,
-                    ni: INCREMENT_INSTRUCTION_BF,
-                },
-                InstructionTableRow {
-                    ip: BaseField::from(8),
                     ci: INCREMENT_INSTRUCTION_BF,
                     ni: OUTPUT_INSTRUCTION_BF,
                 },
                 InstructionTableRow {
                     ip: BaseField::from(8),
-                    ci: INCREMENT_INSTRUCTION_BF,
-                    ni: OUTPUT_INSTRUCTION_BF,
+                    ci: OUTPUT_INSTRUCTION_BF,
+                    ni: SHIFT_LEFT_INSTRUCTION_BF,
                 },
                 InstructionTableRow {
                     ip: BaseField::from(8),
-                    ci: INCREMENT_INSTRUCTION_BF,
-                    ni: OUTPUT_INSTRUCTION_BF,
-                },
-                InstructionTableRow {
-                    ip: BaseField::from(9),
                     ci: OUTPUT_INSTRUCTION_BF,
                     ni: SHIFT_LEFT_INSTRUCTION_BF,
                 },
                 InstructionTableRow {
                     ip: BaseField::from(9),
-                    ci: OUTPUT_INSTRUCTION_BF,
-                    ni: SHIFT_LEFT_INSTRUCTION_BF,
+                    ci: SHIFT_LEFT_INSTRUCTION_BF,
+                    ni: DECREMENT_INSTRUCTION_BF,
                 },
                 InstructionTableRow {
                     ip: BaseField::from(9),
-                    ci: OUTPUT_INSTRUCTION_BF,
-                    ni: SHIFT_LEFT_INSTRUCTION_BF,
-                },
-                InstructionTableRow {
-                    ip: BaseField::from(10),
                     ci: SHIFT_LEFT_INSTRUCTION_BF,
                     ni: DECREMENT_INSTRUCTION_BF,
                 },
                 InstructionTableRow {
                     ip: BaseField::from(10),
-                    ci: SHIFT_LEFT_INSTRUCTION_BF,
-                    ni: DECREMENT_INSTRUCTION_BF,
+                    ci: DECREMENT_INSTRUCTION_BF,
+                    ni: JUMP_IF_NON_ZERO_INSTRUCTION_BF,
                 },
                 InstructionTableRow {
                     ip: BaseField::from(10),
-                    ci: SHIFT_LEFT_INSTRUCTION_BF,
-                    ni: DECREMENT_INSTRUCTION_BF,
-                },
-                InstructionTableRow {
-                    ip: BaseField::from(11),
                     ci: DECREMENT_INSTRUCTION_BF,
                     ni: JUMP_IF_NON_ZERO_INSTRUCTION_BF,
                 },
                 InstructionTableRow {
                     ip: BaseField::from(11),
-                    ci: DECREMENT_INSTRUCTION_BF,
-                    ni: JUMP_IF_NON_ZERO_INSTRUCTION_BF,
+                    ci: JUMP_IF_NON_ZERO_INSTRUCTION_BF,
+                    ni: BaseField::from(6),
                 },
                 InstructionTableRow {
                     ip: BaseField::from(11),
-                    ci: DECREMENT_INSTRUCTION_BF,
-                    ni: JUMP_IF_NON_ZERO_INSTRUCTION_BF,
-                },
-                InstructionTableRow {
-                    ip: BaseField::from(12),
                     ci: JUMP_IF_NON_ZERO_INSTRUCTION_BF,
-                    ni: BaseField::from(7),
-                },
-                InstructionTableRow {
-                    ip: BaseField::from(12),
-                    ci: JUMP_IF_NON_ZERO_INSTRUCTION_BF,
-                    ni: BaseField::from(7),
-                },
-                InstructionTableRow {
-                    ip: BaseField::from(12),
-                    ci: JUMP_IF_NON_ZERO_INSTRUCTION_BF,
-                    ni: BaseField::from(7),
+                    ni: BaseField::from(6),
                 },
             ],
         };
