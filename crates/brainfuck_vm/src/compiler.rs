@@ -2,6 +2,7 @@
 
 use stwo_prover::core::fields::m31::BaseField;
 
+#[derive(Debug, Clone, Default)]
 pub struct Compiler {
     code: Vec<char>,
     instructions: Vec<BaseField>,
@@ -9,8 +10,7 @@ pub struct Compiler {
 
 impl Compiler {
     pub fn new(code: &str) -> Self {
-        let trimmed_code = code.chars().filter(|c| !c.is_whitespace()).collect();
-        Self { code: trimmed_code, instructions: vec![] }
+        Self { code: code.chars().filter(|c| !c.is_whitespace()).collect(), ..Default::default() }
     }
 
     pub fn compile(&mut self) -> Vec<BaseField> {
@@ -25,9 +25,8 @@ impl Compiler {
                 }
                 ']' => {
                     let start_pos = loop_stack.pop().unwrap();
-                    let loop_end_pos = self.instructions.len() + 1;
-                    self.instructions[start_pos] = BaseField::from((loop_end_pos - 1) as u32);
-                    self.instructions.push(BaseField::from((start_pos + 1) as u32));
+                    self.instructions[start_pos] = BaseField::from(self.instructions.len());
+                    self.instructions.push(BaseField::from(start_pos + 1));
                 }
                 _ => (),
             }
