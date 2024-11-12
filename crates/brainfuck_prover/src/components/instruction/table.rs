@@ -2,6 +2,8 @@ use brainfuck_vm::{machine::ProgramMemory, registers::Registers};
 use num_traits::Zero;
 use stwo_prover::core::fields::m31::BaseField;
 
+use crate::utils::VALID_INSTRUCTIONS;
+
 /// Represents a single row in the Instruction Table.
 ///
 /// The Instruction Table stores:
@@ -105,23 +107,10 @@ impl From<(Vec<Registers>, &ProgramMemory)> for InstructionTable {
         // Extract the program's code from the `ProgramMemory`.
         let code = program_memory.code();
 
-        // Define valid Brainfuck instructions to process.
-        // TODO: to be moved somewhere else in a follow-up PR.
-        let valid_instructions = [
-            BaseField::from(b'>' as u32),
-            BaseField::from(b'<' as u32),
-            BaseField::from(b'+' as u32),
-            BaseField::from(b'-' as u32),
-            BaseField::from(b'.' as u32),
-            BaseField::from(b',' as u32),
-            BaseField::from(b'[' as u32),
-            BaseField::from(b']' as u32),
-        ];
-
         // Iterate over the code and collect valid instructions.
         for (index, ci) in code.iter().enumerate() {
             // Skip invalid instructions.
-            if !valid_instructions.contains(ci) {
+            if !VALID_INSTRUCTIONS.contains(ci) {
                 continue;
             }
 
