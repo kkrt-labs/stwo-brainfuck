@@ -88,7 +88,7 @@ impl InstructionTable {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use num_traits::Zero;
+    use num_traits::{One, Zero};
 
     #[test]
     fn test_instruction_table_new() {
