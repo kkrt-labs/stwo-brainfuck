@@ -163,9 +163,11 @@ impl From<(Vec<Registers>, &ProgramMemory)> for InstructionTable {
 
 #[cfg(test)]
 mod tests {
+    use crate::utils::JUMP_IF_NON_ZERO_INSTRUCTION_BF;
+
     use super::*;
     use brainfuck_vm::{compiler::Compiler, test_helper::create_test_machine};
-    use num_traits::Zero;
+    use num_traits::{One, Zero};
 
     #[test]
     fn test_instruction_table_new() {
@@ -216,12 +218,12 @@ mod tests {
         // Create a vector of rows to add to the table
         let rows = vec![
             InstructionTableRow {
-                ip: BaseField::from(0),
+                ip: BaseField::zero(),
                 ci: BaseField::from(43),
                 ni: BaseField::from(91),
             },
             InstructionTableRow {
-                ip: BaseField::from(1),
+                ip: BaseField::one(),
                 ci: BaseField::from(91),
                 ni: BaseField::from(9),
             },
@@ -242,7 +244,7 @@ mod tests {
         let mut instruction_table = InstructionTable::new();
         // Create a row to add to the table
         let row = InstructionTableRow {
-            ip: BaseField::from(0),
+            ip: BaseField::zero(),
             ci: BaseField::from(43),
             ni: BaseField::from(91),
         };
@@ -259,7 +261,7 @@ mod tests {
         let instruction_table = InstructionTable::new();
         // Create a row to search for in the table
         let row = InstructionTableRow {
-            ip: BaseField::from(0),
+            ip: BaseField::zero(),
             ci: BaseField::from(43),
             ni: BaseField::from(91),
         };
@@ -278,7 +280,7 @@ mod tests {
 
         // Add a row to the table
         let row = InstructionTableRow {
-            ip: BaseField::from(1),
+            ip: BaseField::one(),
             ci: BaseField::from(2),
             ni: BaseField::from(3),
         };
@@ -341,22 +343,22 @@ mod tests {
         let expected_instruction_table = InstructionTable {
             table: vec![
                 InstructionTableRow {
-                    ip: BaseField::from(0),
+                    ip: BaseField::zero(),
                     ci: BaseField::from(b'+' as u32),
                     ni: BaseField::from(b'+' as u32),
                 },
                 InstructionTableRow {
-                    ip: BaseField::from(0),
+                    ip: BaseField::zero(),
                     ci: BaseField::from(b'+' as u32),
                     ni: BaseField::from(b'+' as u32),
                 },
                 InstructionTableRow {
-                    ip: BaseField::from(1),
+                    ip: BaseField::one(),
                     ci: BaseField::from(b'+' as u32),
                     ni: BaseField::from(b'>' as u32),
                 },
                 InstructionTableRow {
-                    ip: BaseField::from(1),
+                    ip: BaseField::one(),
                     ci: BaseField::from(b'+' as u32),
                     ni: BaseField::from(b'>' as u32),
                 },
@@ -463,31 +465,31 @@ mod tests {
                 InstructionTableRow {
                     ip: BaseField::from(11),
                     ci: BaseField::from(b'-' as u32),
-                    ni: BaseField::from(b']' as u32),
+                    ni: JUMP_IF_NON_ZERO_INSTRUCTION_BF,
                 },
                 InstructionTableRow {
                     ip: BaseField::from(11),
                     ci: BaseField::from(b'-' as u32),
-                    ni: BaseField::from(b']' as u32),
+                    ni: JUMP_IF_NON_ZERO_INSTRUCTION_BF,
                 },
                 InstructionTableRow {
                     ip: BaseField::from(11),
                     ci: BaseField::from(b'-' as u32),
-                    ni: BaseField::from(b']' as u32),
+                    ni: JUMP_IF_NON_ZERO_INSTRUCTION_BF,
                 },
                 InstructionTableRow {
                     ip: BaseField::from(12),
-                    ci: BaseField::from(b']' as u32),
+                    ci: JUMP_IF_NON_ZERO_INSTRUCTION_BF,
                     ni: BaseField::from(7),
                 },
                 InstructionTableRow {
                     ip: BaseField::from(12),
-                    ci: BaseField::from(b']' as u32),
+                    ci: JUMP_IF_NON_ZERO_INSTRUCTION_BF,
                     ni: BaseField::from(7),
                 },
                 InstructionTableRow {
                     ip: BaseField::from(12),
-                    ci: BaseField::from(b']' as u32),
+                    ci: JUMP_IF_NON_ZERO_INSTRUCTION_BF,
                     ni: BaseField::from(7),
                 },
             ],
@@ -518,23 +520,23 @@ mod tests {
         let expected_instruction_table = InstructionTable {
             table: vec![
                 InstructionTableRow {
-                    ip: BaseField::from(0),
+                    ip: BaseField::zero(),
                     ci: BaseField::from(b'[' as u32),
                     ni: BaseField::from(4),
                 },
                 InstructionTableRow {
-                    ip: BaseField::from(0),
+                    ip: BaseField::zero(),
                     ci: BaseField::from(b'[' as u32),
                     ni: BaseField::from(4),
                 },
                 InstructionTableRow {
                     ip: BaseField::from(2),
                     ci: BaseField::from(b'-' as u32),
-                    ni: BaseField::from(b']' as u32),
+                    ni: JUMP_IF_NON_ZERO_INSTRUCTION_BF,
                 },
                 InstructionTableRow {
                     ip: BaseField::from(3),
-                    ci: BaseField::from(b']' as u32),
+                    ci: JUMP_IF_NON_ZERO_INSTRUCTION_BF,
                     ni: BaseField::from(2),
                 },
             ],

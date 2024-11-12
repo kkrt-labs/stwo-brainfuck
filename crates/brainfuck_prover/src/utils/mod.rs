@@ -9,6 +9,21 @@ pub const OUTPUT_INSTRUCTION: u32 = b'.' as u32;
 pub const JUMP_IF_ZERO_INSTRUCTION: u32 = b'[' as u32;
 pub const JUMP_IF_NON_ZERO_INSTRUCTION: u32 = b']' as u32;
 
+pub const SHIFT_RIGHT_INSTRUCTION_BF: BaseField =
+    BaseField::from_u32_unchecked(SHIFT_RIGHT_INSTRUCTION);
+pub const SHIFT_LEFT_INSTRUCTION_BF: BaseField =
+    BaseField::from_u32_unchecked(SHIFT_LEFT_INSTRUCTION);
+pub const INCREMENT_INSTRUCTION_BF: BaseField =
+    BaseField::from_u32_unchecked(INCREMENT_INSTRUCTION);
+pub const DECREMENT_INSTRUCTION_BF: BaseField =
+    BaseField::from_u32_unchecked(DECREMENT_INSTRUCTION);
+pub const INPUT_INSTRUCTION_BF: BaseField = BaseField::from_u32_unchecked(INPUT_INSTRUCTION);
+pub const OUTPUT_INSTRUCTION_BF: BaseField = BaseField::from_u32_unchecked(OUTPUT_INSTRUCTION);
+pub const JUMP_IF_ZERO_INSTRUCTION_BF: BaseField =
+    BaseField::from_u32_unchecked(JUMP_IF_ZERO_INSTRUCTION);
+pub const JUMP_IF_NON_ZERO_INSTRUCTION_BF: BaseField =
+    BaseField::from_u32_unchecked(JUMP_IF_NON_ZERO_INSTRUCTION);
+
 pub const VALID_INSTRUCTIONS: [BaseField; 8] = [
     BaseField::from_u32_unchecked(SHIFT_RIGHT_INSTRUCTION),
     BaseField::from_u32_unchecked(SHIFT_LEFT_INSTRUCTION),
