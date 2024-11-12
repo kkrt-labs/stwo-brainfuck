@@ -164,8 +164,9 @@ impl From<(Vec<Registers>, &ProgramMemory)> for InstructionTable {
 #[cfg(test)]
 mod tests {
     use crate::utils::{
-        DECREMENT_INSTRUCTION_BF, JUMP_IF_NON_ZERO_INSTRUCTION_BF, OUTPUT_INSTRUCTION_BF,
-        SHIFT_LEFT_INSTRUCTION_BF,
+        DECREMENT_INSTRUCTION_BF, INCREMENT_INSTRUCTION_BF, INPUT_INSTRUCTION_BF,
+        JUMP_IF_NON_ZERO_INSTRUCTION_BF, JUMP_IF_ZERO_INSTRUCTION_BF, OUTPUT_INSTRUCTION_BF,
+        SHIFT_LEFT_INSTRUCTION_BF, SHIFT_RIGHT_INSTRUCTION_BF,
     };
 
     use super::*;
@@ -347,92 +348,92 @@ mod tests {
             table: vec![
                 InstructionTableRow {
                     ip: BaseField::zero(),
-                    ci: BaseField::from(b'+' as u32),
-                    ni: BaseField::from(b'+' as u32),
+                    ci: INCREMENT_INSTRUCTION_BF,
+                    ni: INCREMENT_INSTRUCTION_BF,
                 },
                 InstructionTableRow {
                     ip: BaseField::zero(),
-                    ci: BaseField::from(b'+' as u32),
-                    ni: BaseField::from(b'+' as u32),
+                    ci: INCREMENT_INSTRUCTION_BF,
+                    ni: INCREMENT_INSTRUCTION_BF,
                 },
                 InstructionTableRow {
                     ip: BaseField::one(),
-                    ci: BaseField::from(b'+' as u32),
-                    ni: BaseField::from(b'>' as u32),
+                    ci: INCREMENT_INSTRUCTION_BF,
+                    ni: SHIFT_RIGHT_INSTRUCTION_BF,
                 },
                 InstructionTableRow {
                     ip: BaseField::one(),
-                    ci: BaseField::from(b'+' as u32),
-                    ni: BaseField::from(b'>' as u32),
+                    ci: INCREMENT_INSTRUCTION_BF,
+                    ni: SHIFT_RIGHT_INSTRUCTION_BF,
                 },
                 InstructionTableRow {
                     ip: BaseField::from(2),
-                    ci: BaseField::from(b'>' as u32),
-                    ni: BaseField::from(b',' as u32),
+                    ci: SHIFT_RIGHT_INSTRUCTION_BF,
+                    ni: INPUT_INSTRUCTION_BF,
                 },
                 InstructionTableRow {
                     ip: BaseField::from(2),
-                    ci: BaseField::from(b'>' as u32),
-                    ni: BaseField::from(b',' as u32),
+                    ci: SHIFT_RIGHT_INSTRUCTION_BF,
+                    ni: INPUT_INSTRUCTION_BF,
                 },
                 InstructionTableRow {
                     ip: BaseField::from(3),
-                    ci: BaseField::from(b',' as u32),
+                    ci: INPUT_INSTRUCTION_BF,
                     ni: SHIFT_LEFT_INSTRUCTION_BF,
                 },
                 InstructionTableRow {
                     ip: BaseField::from(3),
-                    ci: BaseField::from(b',' as u32),
+                    ci: INPUT_INSTRUCTION_BF,
                     ni: SHIFT_LEFT_INSTRUCTION_BF,
                 },
                 InstructionTableRow {
                     ip: BaseField::from(4),
                     ci: SHIFT_LEFT_INSTRUCTION_BF,
-                    ni: BaseField::from(b'[' as u32),
+                    ni: JUMP_IF_ZERO_INSTRUCTION_BF,
                 },
                 InstructionTableRow {
                     ip: BaseField::from(4),
                     ci: SHIFT_LEFT_INSTRUCTION_BF,
-                    ni: BaseField::from(b'[' as u32),
+                    ni: JUMP_IF_ZERO_INSTRUCTION_BF,
                 },
                 InstructionTableRow {
                     ip: BaseField::from(5),
-                    ci: BaseField::from(b'[' as u32),
+                    ci: JUMP_IF_ZERO_INSTRUCTION_BF,
                     ni: BaseField::from(13),
                 },
                 InstructionTableRow {
                     ip: BaseField::from(5),
-                    ci: BaseField::from(b'[' as u32),
+                    ci: JUMP_IF_ZERO_INSTRUCTION_BF,
                     ni: BaseField::from(13),
                 },
                 InstructionTableRow {
                     ip: BaseField::from(7),
-                    ci: BaseField::from(b'>' as u32),
-                    ni: BaseField::from(b'+' as u32),
+                    ci: SHIFT_RIGHT_INSTRUCTION_BF,
+                    ni: INCREMENT_INSTRUCTION_BF,
                 },
                 InstructionTableRow {
                     ip: BaseField::from(7),
-                    ci: BaseField::from(b'>' as u32),
-                    ni: BaseField::from(b'+' as u32),
+                    ci: SHIFT_RIGHT_INSTRUCTION_BF,
+                    ni: INCREMENT_INSTRUCTION_BF,
                 },
                 InstructionTableRow {
                     ip: BaseField::from(7),
-                    ci: BaseField::from(b'>' as u32),
-                    ni: BaseField::from(b'+' as u32),
+                    ci: SHIFT_RIGHT_INSTRUCTION_BF,
+                    ni: INCREMENT_INSTRUCTION_BF,
                 },
                 InstructionTableRow {
                     ip: BaseField::from(8),
-                    ci: BaseField::from(b'+' as u32),
+                    ci: INCREMENT_INSTRUCTION_BF,
                     ni: OUTPUT_INSTRUCTION_BF,
                 },
                 InstructionTableRow {
                     ip: BaseField::from(8),
-                    ci: BaseField::from(b'+' as u32),
+                    ci: INCREMENT_INSTRUCTION_BF,
                     ni: OUTPUT_INSTRUCTION_BF,
                 },
                 InstructionTableRow {
                     ip: BaseField::from(8),
-                    ci: BaseField::from(b'+' as u32),
+                    ci: INCREMENT_INSTRUCTION_BF,
                     ni: OUTPUT_INSTRUCTION_BF,
                 },
                 InstructionTableRow {
@@ -524,12 +525,12 @@ mod tests {
             table: vec![
                 InstructionTableRow {
                     ip: BaseField::zero(),
-                    ci: BaseField::from(b'[' as u32),
+                    ci: JUMP_IF_ZERO_INSTRUCTION_BF,
                     ni: BaseField::from(4),
                 },
                 InstructionTableRow {
                     ip: BaseField::zero(),
-                    ci: BaseField::from(b'[' as u32),
+                    ci: JUMP_IF_ZERO_INSTRUCTION_BF,
                     ni: BaseField::from(4),
                 },
                 InstructionTableRow {
