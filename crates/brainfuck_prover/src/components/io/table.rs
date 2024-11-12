@@ -17,7 +17,7 @@ pub struct IOTableRow {
 }
 
 impl IOTableRow {
-    pub fn new(mv: BaseField) -> Self {
+    pub const fn new(mv: BaseField) -> Self {
         Self { mv }
     }
 }
