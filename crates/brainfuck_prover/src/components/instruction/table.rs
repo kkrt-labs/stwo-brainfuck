@@ -98,12 +98,12 @@ impl InstructionTable {
 
 impl From<(Vec<Registers>, &ProgramMemory)> for InstructionTable {
     #[allow(clippy::cast_lossless)]
-    fn from(input: (Vec<Registers>, &ProgramMemory)) -> Self {
+    fn from((execution_trace, program_memory): (Vec<Registers>, &ProgramMemory)) -> Self {
         // Create an empty vector to store the program instructions.
         let mut program = Vec::new();
 
         // Extract the program's code from the `ProgramMemory`.
-        let code = input.1.code();
+        let code = program_memory.code();
 
         // Define valid Brainfuck instructions to process.
         // TODO: to be moved somewhere else in a follow-up PR.
@@ -139,11 +139,11 @@ impl From<(Vec<Registers>, &ProgramMemory)> for InstructionTable {
         }
 
         // Concatenate the program's instructions with the provided execution trace.
-        let mut sorted_registers = [program, input.0].concat();
+        let mut sorted_registers = [program, execution_trace].concat();
         // Sort the registers by:
         // 1. `ip` (instruction pointer)
         // 2. `clk` (clock cycle)
-        sorted_registers.sort_by(|a, b| a.ip.cmp(&b.ip).then_with(|| a.clk.cmp(&b.clk)));
+        sorted_registers.sort_by_key(|r| (r.ip, r.clk));
 
         // Initialize a new instruction table to store the sorted and processed rows.
         let mut instruction_table = Self::new();
@@ -159,6 +159,8 @@ impl From<(Vec<Registers>, &ProgramMemory)> for InstructionTable {
 
         // If the last row marks the end of the program, remove it:
         // - `ci` = 0 and `ni` = 0
+        // TODO: execution trace may be padded with empty registers, so we need to check this case
+        // in the future.
         if let Some(last_row) = instruction_table.last_row() {
             if last_row.ci == BaseField::zero() && last_row.ni == BaseField::zero() {
                 instruction_table.table.pop();
