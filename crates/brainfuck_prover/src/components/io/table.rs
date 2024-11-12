@@ -1,10 +1,6 @@
+use crate::utils::{INPUT_INSTRUCTION, OUTPUT_INSTRUCTION};
 use brainfuck_vm::registers::Registers;
 use stwo_prover::core::fields::m31::BaseField;
-
-/// Decimal ASCII value of the Brainfuck input instruction  ','.
-const INPUT_INSTRUCTION: u32 = 44;
-/// Decimal ASCII value of the Brainfuck output instruction  '.'.
-const OUTPUT_INSTRUCTION: u32 = 46;
 
 /// Represents a single row in the I/O Table.
 ///
