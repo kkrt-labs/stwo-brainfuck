@@ -254,7 +254,7 @@ impl Machine {
         }
     }
 
-    pub fn program(&self) -> &ProgramMemory {
+    pub const fn program(&self) -> &ProgramMemory {
         &self.program
     }
 }

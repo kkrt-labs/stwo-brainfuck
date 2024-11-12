@@ -97,6 +97,7 @@ impl InstructionTable {
 }
 
 impl From<(Vec<Registers>, &ProgramMemory)> for InstructionTable {
+    #[allow(clippy::cast_lossless)]
     fn from(input: (Vec<Registers>, &ProgramMemory)) -> Self {
         // Create an empty vector to store the program instructions.
         let mut program = Vec::new();
@@ -521,11 +522,7 @@ mod tests {
         let trace = machine.get_trace();
 
         // Convert the trace to an `InstructionTable`
-        let instruction_table: InstructionTable = (trace.clone(), machine.program()).into();
-
-        println!("trace: {:?}", trace);
-        println!("program {:?}", machine.program());
-        println!("instruction_table: {:?}", instruction_table);
+        let instruction_table: InstructionTable = (trace, machine.program()).into();
 
         let expected_instruction_table = InstructionTable {
             table: vec![
