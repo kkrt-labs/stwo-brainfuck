@@ -81,7 +81,7 @@ impl<const N: u32> IOTable<N> {
 impl<const N: u32> From<Vec<Registers>> for IOTable<N> {
     fn from(registers: Vec<Registers>) -> Self {
         let mut io_table = Self::new();
-        let rows: Vec<IOTableRow> = registers
+        let rows = registers
             .into_iter()
             .filter(|register| register.ci == BaseField::from_u32_unchecked(N))
             .map(|x| IOTableRow { mv: x.mv })
