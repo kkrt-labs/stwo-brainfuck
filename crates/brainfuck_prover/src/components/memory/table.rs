@@ -1,3 +1,4 @@
+use brainfuck_vm::registers::Registers;
 use num_traits::{One, Zero};
 use stwo_prover::core::fields::m31::BaseField;
 
@@ -129,7 +130,7 @@ impl MemoryTable {
     /// Fills the jumps in `clk` with dummy rows.
     ///
     /// Required to ensure the correct sorting of the [`MemoryTable`] in the constraints.
-    pub fn complete_with_dummy_rows(&mut self) {
+    fn complete_with_dummy_rows(&mut self) {
         let mut new_table = Vec::with_capacity(self.table.len());
         let mut prev_row = self.get_row_from_index(0).unwrap();
 
@@ -147,6 +148,21 @@ impl MemoryTable {
         }
         new_table.shrink_to_fit();
         self.table = new_table;
+    }
+}
+
+impl From<Vec<Registers>> for MemoryTable {
+    fn from(registers: Vec<Registers>) -> Self {
+        let mut memory_table = Self::new();
+
+        for register in registers {
+            memory_table.add_row_from_registers(register.clk, register.mp, register.mv, false);
+        }
+
+        memory_table.sort();
+        memory_table.complete_with_dummy_rows();
+
+        memory_table
     }
 }
 
@@ -329,5 +345,34 @@ mod tests {
         ]);
 
         assert_eq!(memory_table, expected_memory_table);
+    }
+
+    #[test]
+    fn test_from_registers() {
+        let reg1 = Registers::default();
+        let reg2 = Registers { clk: BaseField::one(), mp: BaseField::one(), ..Default::default() };
+        let reg3 = Registers {
+            clk: BaseField::from(5),
+            mp: BaseField::one(),
+            mv: BaseField::one(),
+            ..Default::default()
+        };
+        let registers: Vec<Registers> = vec![reg3, reg1, reg2];
+
+        let row1 = MemoryTableRow::default();
+        let row2 = MemoryTableRow::new(BaseField::one(), BaseField::one(), BaseField::zero());
+        let row3 = MemoryTableRow::new(BaseField::from(5), BaseField::one(), BaseField::one());
+
+        let mut expected_memory_table = MemoryTable::new();
+        expected_memory_table.add_rows(vec![
+            row1,
+            row2,
+            MemoryTableRow::new_dummy(BaseField::from(2), BaseField::one(), BaseField::zero()),
+            MemoryTableRow::new_dummy(BaseField::from(3), BaseField::one(), BaseField::zero()),
+            MemoryTableRow::new_dummy(BaseField::from(4), BaseField::one(), BaseField::zero()),
+            row3,
+        ]);
+
+        assert_eq!(MemoryTable::from(registers), expected_memory_table);
     }
 }
