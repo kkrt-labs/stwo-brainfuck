@@ -1,9 +1,8 @@
 // Adapted from rkdud007 brainfuck-zkvm https://github.com/rkdud007/brainfuck-zkvm/blob/main/src/registers.rs
 
-use num_traits::identities::Zero;
 use stwo_prover::core::fields::m31::BaseField;
 
-#[derive(PartialEq, Eq, Clone)]
+#[derive(PartialEq, Eq, Clone, Default)]
 pub struct Registers {
     /// Clock Cycle Counter
     pub clk: BaseField,
@@ -21,23 +20,9 @@ pub struct Registers {
     pub mvi: BaseField,
 }
 
-impl Default for Registers {
-    fn default() -> Self {
-        Self::new()
-    }
-}
-
 impl Registers {
     pub fn new() -> Self {
-        Self {
-            clk: BaseField::zero(),
-            ip: BaseField::zero(),
-            ci: BaseField::zero(),
-            ni: BaseField::zero(),
-            mp: BaseField::zero(),
-            mv: BaseField::zero(),
-            mvi: BaseField::zero(),
-        }
+        Self::default()
     }
 }
 

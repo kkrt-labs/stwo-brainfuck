@@ -1,3 +1,4 @@
+use brainfuck_vm::registers::Registers;
 use num_traits::{One, Zero};
 use stwo_prover::core::fields::m31::BaseField;
 
@@ -104,6 +105,64 @@ impl MemoryTable {
     /// or `None` if the row does not exist in the table.
     pub fn get_row(&self, row: &MemoryTableRow) -> Option<&MemoryTableRow> {
         self.table.iter().find(|r| *r == row)
+    }
+
+    /// Returns a reference to a row in the Memory Table given its index.
+    ///
+    /// # Arguments
+    /// * `index` - The [`usize`] index to search for in the table.
+    ///
+    /// # Returns
+    /// An `Option` containing a reference to the matching row if found,
+    /// or `None` if the row does not exist in the table.
+    pub fn get_row_from_index(&self, index: usize) -> Option<&MemoryTableRow> {
+        self.table.get(index)
+    }
+
+    /// Sorts in-place the existing [`MemoryTableRow`] rows in the Memory Table by `mp`, then `clk`.
+    ///
+    /// Having the rows sorted is required to ensure a correct proof generation (such that the
+    /// constraints can be verified).
+    pub fn sort(&mut self) {
+        self.table.sort_by_key(|x| (x.mp, x.clk));
+    }
+
+    /// Fills the jumps in `clk` with dummy rows.
+    ///
+    /// Required to ensure the correct sorting of the [`MemoryTable`] in the constraints.
+    fn complete_with_dummy_rows(&mut self) {
+        let mut new_table = Vec::with_capacity(self.table.len());
+        let mut prev_row = self.get_row_from_index(0).unwrap();
+
+        for row in &self.table {
+            let next_clk = prev_row.clk + BaseField::one();
+            if row.mp == prev_row.mp && row.clk > next_clk {
+                let mut clk = next_clk;
+                while clk < row.clk {
+                    new_table.push(MemoryTableRow::new_dummy(clk, prev_row.mp, prev_row.mv));
+                    clk += BaseField::one();
+                }
+            }
+            new_table.push(row.clone());
+            prev_row = row;
+        }
+        new_table.shrink_to_fit();
+        self.table = new_table;
+    }
+}
+
+impl From<Vec<Registers>> for MemoryTable {
+    fn from(registers: Vec<Registers>) -> Self {
+        let mut memory_table = Self::new();
+
+        for register in registers {
+            memory_table.add_row_from_registers(register.clk, register.mp, register.mv, false);
+        }
+
+        memory_table.sort();
+        memory_table.complete_with_dummy_rows();
+
+        memory_table
     }
 }
 
@@ -246,5 +305,74 @@ mod tests {
         let retrieved = memory_table.get_row(&row);
         // Check that the retrieved row is None
         assert!(retrieved.is_none(), "Should return None for a non-existing row.");
+    }
+
+    #[test]
+    fn test_sort() {
+        let mut memory_table = MemoryTable::new();
+        let row1 = MemoryTableRow::new(BaseField::zero(), BaseField::zero(), BaseField::zero());
+        let row2 = MemoryTableRow::new(BaseField::one(), BaseField::zero(), BaseField::zero());
+        let row3 = MemoryTableRow::new(BaseField::zero(), BaseField::one(), BaseField::zero());
+        memory_table.add_rows(vec![row3.clone(), row1.clone(), row2.clone()]);
+
+        let mut expected_memory_table = MemoryTable::new();
+        expected_memory_table.add_rows(vec![row1, row2, row3]);
+
+        memory_table.sort();
+
+        assert_eq!(memory_table, expected_memory_table);
+    }
+
+    #[test]
+    fn test_complete_wih_dummy_rows() {
+        let mut memory_table = MemoryTable::new();
+        let row1 = MemoryTableRow::new(BaseField::zero(), BaseField::zero(), BaseField::zero());
+        let row2 = MemoryTableRow::new(BaseField::zero(), BaseField::one(), BaseField::zero());
+        let row3 = MemoryTableRow::new(BaseField::from(5), BaseField::one(), BaseField::one());
+        memory_table.add_rows(vec![row3.clone(), row1.clone(), row2.clone()]);
+        memory_table.sort();
+        memory_table.complete_with_dummy_rows();
+
+        let mut expected_memory_table = MemoryTable::new();
+        expected_memory_table.add_rows(vec![
+            row1,
+            row2,
+            MemoryTableRow::new_dummy(BaseField::from(1), BaseField::one(), BaseField::zero()),
+            MemoryTableRow::new_dummy(BaseField::from(2), BaseField::one(), BaseField::zero()),
+            MemoryTableRow::new_dummy(BaseField::from(3), BaseField::one(), BaseField::zero()),
+            MemoryTableRow::new_dummy(BaseField::from(4), BaseField::one(), BaseField::zero()),
+            row3,
+        ]);
+
+        assert_eq!(memory_table, expected_memory_table);
+    }
+
+    #[test]
+    fn test_from_registers() {
+        let reg1 = Registers::default();
+        let reg2 = Registers { clk: BaseField::one(), mp: BaseField::one(), ..Default::default() };
+        let reg3 = Registers {
+            clk: BaseField::from(5),
+            mp: BaseField::one(),
+            mv: BaseField::one(),
+            ..Default::default()
+        };
+        let registers: Vec<Registers> = vec![reg3, reg1, reg2];
+
+        let row1 = MemoryTableRow::default();
+        let row2 = MemoryTableRow::new(BaseField::one(), BaseField::one(), BaseField::zero());
+        let row3 = MemoryTableRow::new(BaseField::from(5), BaseField::one(), BaseField::one());
+
+        let mut expected_memory_table = MemoryTable::new();
+        expected_memory_table.add_rows(vec![
+            row1,
+            row2,
+            MemoryTableRow::new_dummy(BaseField::from(2), BaseField::one(), BaseField::zero()),
+            MemoryTableRow::new_dummy(BaseField::from(3), BaseField::one(), BaseField::zero()),
+            MemoryTableRow::new_dummy(BaseField::from(4), BaseField::one(), BaseField::zero()),
+            row3,
+        ]);
+
+        assert_eq!(MemoryTable::from(registers), expected_memory_table);
     }
 }
