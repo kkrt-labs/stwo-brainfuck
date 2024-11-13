@@ -133,15 +133,13 @@ impl From<(Vec<Registers>, &ProgramMemory)> for InstructionTable {
         let mut sorted_registers = [program, execution_trace].concat();
         sorted_registers.sort_by_key(|r| (r.ip, r.clk));
 
-        let mut instruction_table = Self::new();
+        let instruction_rows: Vec<InstructionTableRow> = sorted_registers
+            .iter()
+            .map(|reg| InstructionTableRow { ip: reg.ip, ci: reg.ci, ni: reg.ni })
+            .collect();
 
-        for register in &sorted_registers {
-            instruction_table.add_row(InstructionTableRow {
-                ip: register.ip,
-                ci: register.ci,
-                ni: register.ni,
-            });
-        }
+        let mut instruction_table = Self::new();
+        instruction_table.add_rows(instruction_rows);
 
         instruction_table.pad();
 
@@ -291,8 +289,17 @@ mod tests {
         // Convert the trace to an `InstructionTable`
         let instruction_table: InstructionTable = (trace, machine.program()).into();
 
+        let padded_rows = vec![
+            InstructionTableRow {
+                ip: BaseField::from(13),
+                ci: BaseField::zero(),
+                ni: BaseField::zero(),
+            };
+            10
+        ];
+
         // Create the expected `InstructionTable`
-        let expected_instruction_table = InstructionTable {
+        let mut expected_instruction_table = InstructionTable {
             table: vec![
                 InstructionTableRow {
                     ip: BaseField::from(0),
@@ -406,6 +413,8 @@ mod tests {
                 },
             ],
         };
+
+        expected_instruction_table.add_rows(padded_rows);
 
         // Verify that the instruction table is correct
         assert_eq!(instruction_table, expected_instruction_table);
@@ -429,7 +438,15 @@ mod tests {
         // Convert the trace to an `InstructionTable`
         let instruction_table: InstructionTable = (trace, machine.program()).into();
 
-        let expected_instruction_table = InstructionTable {
+        let padded_rows = vec![
+            InstructionTableRow {
+                ip: BaseField::from(5),
+                ci: BaseField::zero(),
+                ni: BaseField::zero(),
+            };
+            4
+        ];
+        let mut expected_instruction_table = InstructionTable {
             table: vec![
                 InstructionTableRow {
                     ip: BaseField::zero(),
@@ -453,6 +470,8 @@ mod tests {
                 },
             ],
         };
+
+        expected_instruction_table.add_rows(padded_rows);
 
         // Verify that the instruction table is correct
         assert_eq!(instruction_table, expected_instruction_table);
