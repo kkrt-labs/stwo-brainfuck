@@ -1,5 +1,6 @@
 // Adapted from rkdud007 brainfuck-zkvm https://github.com/rkdud007/brainfuck-zkvm/blob/main/src/compiler.rs
 
+use num_traits::Zero;
 use stwo_prover::core::fields::m31::BaseField;
 
 #[derive(Debug, Clone, Default)]
@@ -20,7 +21,7 @@ impl Compiler {
 
             match *symbol {
                 '[' => {
-                    self.instructions.push(BaseField::from(0));
+                    self.instructions.push(BaseField::zero());
                     loop_stack.push(self.instructions.len() - 1);
                 }
                 ']' => {

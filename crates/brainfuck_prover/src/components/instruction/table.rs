@@ -88,7 +88,7 @@ impl InstructionTable {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use num_traits::Zero;
+    use num_traits::{One, Zero};
 
     #[test]
     fn test_instruction_table_new() {
@@ -139,12 +139,12 @@ mod tests {
         // Create a vector of rows to add to the table
         let rows = vec![
             InstructionTableRow {
-                ip: BaseField::from(0),
+                ip: BaseField::zero(),
                 ci: BaseField::from(43),
                 ni: BaseField::from(91),
             },
             InstructionTableRow {
-                ip: BaseField::from(1),
+                ip: BaseField::one(),
                 ci: BaseField::from(91),
                 ni: BaseField::from(9),
             },
@@ -165,7 +165,7 @@ mod tests {
         let mut instruction_table = InstructionTable::new();
         // Create a row to add to the table
         let row = InstructionTableRow {
-            ip: BaseField::from(0),
+            ip: BaseField::zero(),
             ci: BaseField::from(43),
             ni: BaseField::from(91),
         };
@@ -182,7 +182,7 @@ mod tests {
         let instruction_table = InstructionTable::new();
         // Create a row to search for in the table
         let row = InstructionTableRow {
-            ip: BaseField::from(0),
+            ip: BaseField::zero(),
             ci: BaseField::from(43),
             ni: BaseField::from(91),
         };
