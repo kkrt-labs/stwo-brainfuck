@@ -87,6 +87,22 @@ impl InstructionTable {
     pub fn get_row(&self, row: &InstructionTableRow) -> Option<&InstructionTableRow> {
         self.table.iter().find(|r| *r == row)
     }
+
+    /// Pads the instruction table with dummy rows up to the next power of two length.
+    ///
+    /// Each dummy row preserves the last instruction pointer
+    /// with current and next instructions `ci` and `ni` set to zero.
+    ///
+    /// Does nothing if the table is empty.
+    fn pad(&mut self) {
+        if let Some(last_row) = self.table.last().cloned() {
+            let trace_len = self.table.len();
+            let padding_offset = (trace_len.next_power_of_two() - trace_len) as u32;
+            for _ in 1..=padding_offset {
+                self.add_row(InstructionTableRow { ip: last_row.ip, ..Default::default() });
+            }
+        }
+    }
 }
 
 impl From<(Vec<Registers>, &ProgramMemory)> for InstructionTable {
@@ -137,15 +153,7 @@ impl From<(Vec<Registers>, &ProgramMemory)> for InstructionTable {
             });
         }
 
-        // If the last row marks the end of the program, remove it:
-        // - `ci` = 0 and `ni` = 0
-        // TODO: execution trace may be padded with empty registers, so we need to check this case
-        // in the future.
-        if let Some(last_row) = instruction_table.table.last() {
-            if last_row.ci == BaseField::zero() && last_row.ni == BaseField::zero() {
-                instruction_table.table.pop();
-            }
-        }
+        instruction_table.pad();
 
         // Return the fully constructed and populated instruction table.
         instruction_table
