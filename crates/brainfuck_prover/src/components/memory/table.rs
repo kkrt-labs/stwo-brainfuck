@@ -123,7 +123,7 @@ impl MemoryTable {
     ///
     /// Having the rows sorted is required to ensure a correct proof generation (such that the
     /// constraints can be verified).
-    pub fn sort(&mut self) {
+    fn sort(&mut self) {
         self.table.sort_by_key(|x| (x.mp, x.clk));
     }
 
@@ -149,6 +149,30 @@ impl MemoryTable {
         new_table.shrink_to_fit();
         self.table = new_table;
     }
+
+    /// Pads the memory table with dummy rows up to the next power of two length.
+    ///
+    /// Each dummy row preserves the last memory pointer and value while incrementing the clock.
+    ///
+    /// Does nothing if the table is empty.
+    fn pad(&mut self) {
+        let (last_clk, last_mem_pointer, last_mem_value) = if let Some(last_row) = self.table.last()
+        {
+            (last_row.clk, last_row.mp, last_row.mv)
+        } else {
+            return;
+        };
+        let trace_len = self.table.len();
+        let padding_offset = (trace_len.next_power_of_two() - trace_len) as u32;
+        for i in 0..padding_offset {
+            let dummy_row = MemoryTableRow::new_dummy(
+                last_clk + BaseField::from(i + 1),
+                last_mem_pointer,
+                last_mem_value,
+            );
+            self.add_row(dummy_row);
+        }
+    }
 }
 
 impl From<Vec<Registers>> for MemoryTable {
@@ -161,6 +185,7 @@ impl From<Vec<Registers>> for MemoryTable {
 
         memory_table.sort();
         memory_table.complete_with_dummy_rows();
+        memory_table.pad();
 
         memory_table
     }
@@ -348,6 +373,31 @@ mod tests {
     }
 
     #[test]
+    fn test_pad_empty() {
+        let mut memory_table = MemoryTable::new();
+        memory_table.pad();
+        assert_eq!(memory_table, MemoryTable::new());
+    }
+
+    #[test]
+    fn test_pad() {
+        let mut memory_table = MemoryTable::new();
+        let row1 = MemoryTableRow::new(BaseField::zero(), BaseField::zero(), BaseField::zero());
+        let row2 = MemoryTableRow::new(BaseField::one(), BaseField::one(), BaseField::zero());
+        let row3 = MemoryTableRow::new(BaseField::from(2), BaseField::one(), BaseField::one());
+        memory_table.add_rows(vec![row1.clone(), row2.clone(), row3.clone()]);
+
+        memory_table.pad();
+
+        let dummy_row =
+            MemoryTableRow::new_dummy(BaseField::from(3), BaseField::one(), BaseField::one());
+        let mut expected_memory_table = MemoryTable::new();
+        expected_memory_table.add_rows(vec![row1, row2, row3, dummy_row]);
+
+        assert_eq!(memory_table, expected_memory_table);
+    }
+
+    #[test]
     fn test_from_registers() {
         let reg1 = Registers::default();
         let reg2 = Registers { clk: BaseField::one(), mp: BaseField::one(), ..Default::default() };
@@ -363,6 +413,10 @@ mod tests {
         let row2 = MemoryTableRow::new(BaseField::one(), BaseField::one(), BaseField::zero());
         let row3 = MemoryTableRow::new(BaseField::from(5), BaseField::one(), BaseField::one());
 
+        let dummy_row1 =
+            MemoryTableRow::new_dummy(BaseField::from(6), BaseField::one(), BaseField::one());
+        let dummy_row2 =
+            MemoryTableRow::new_dummy(BaseField::from(7), BaseField::one(), BaseField::one());
         let mut expected_memory_table = MemoryTable::new();
         expected_memory_table.add_rows(vec![
             row1,
@@ -371,6 +425,8 @@ mod tests {
             MemoryTableRow::new_dummy(BaseField::from(3), BaseField::one(), BaseField::zero()),
             MemoryTableRow::new_dummy(BaseField::from(4), BaseField::one(), BaseField::zero()),
             row3,
+            dummy_row1,
+            dummy_row2,
         ]);
 
         assert_eq!(MemoryTable::from(registers), expected_memory_table);
