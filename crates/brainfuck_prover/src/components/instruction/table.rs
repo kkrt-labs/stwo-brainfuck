@@ -13,13 +13,13 @@ use crate::utils::VALID_INSTRUCTIONS;
 #[derive(Debug, Default, PartialEq, Eq, Clone)]
 pub struct InstructionTableRow {
     /// Instruction pointer: points to the current instruction in the program.
-    pub ip: BaseField,
+    ip: BaseField,
     /// Current instruction: the instruction at the current instruction pointer.
-    pub ci: BaseField,
+    ci: BaseField,
     /// Next instruction:
     /// - The instruction that follows `ci` in the program,
     /// - 0 if out of bounds.
-    pub ni: BaseField,
+    ni: BaseField,
 }
 
 /// Represents the Instruction Table, which holds the instruction sequence
@@ -32,7 +32,7 @@ pub struct InstructionTableRow {
 #[derive(Debug, Default, PartialEq, Eq, Clone)]
 pub struct InstructionTable {
     /// A vector of [`InstructionTableRow`] representing the table rows.
-    pub table: Vec<InstructionTableRow>,
+    table: Vec<InstructionTableRow>,
 }
 
 impl InstructionTable {
@@ -62,7 +62,7 @@ impl InstructionTable {
     /// * `row` - The [`InstructionTableRow`] to add to the table.
     ///
     /// This method pushes a new [`InstructionTableRow`] onto the `table` vector.
-    pub fn add_row(&mut self, row: InstructionTableRow) {
+    fn add_row(&mut self, row: InstructionTableRow) {
         self.table.push(row);
     }
 
@@ -93,7 +93,7 @@ impl InstructionTable {
     /// # Returns
     /// An `Option` containing a reference to the last [`InstructionTableRow`] in the table,
     /// or `None` if the table is empty.
-    pub fn last_row(&self) -> Option<&InstructionTableRow> {
+    fn last_row(&self) -> Option<&InstructionTableRow> {
         self.table.last()
     }
 }
