@@ -22,6 +22,12 @@ pub struct InstructionTableRow {
     ni: BaseField,
 }
 
+impl From<&Registers> for InstructionTableRow {
+    fn from(registers: &Registers) -> Self {
+        Self { ip: registers.ip, ci: registers.ci, ni: registers.ni }
+    }
+}
+
 /// Represents the Instruction Table, which holds the instruction sequence
 /// for the Brainfuck virtual machine.
 ///
@@ -44,18 +50,6 @@ impl InstructionTable {
         Self { table: Vec::new() }
     }
 
-    /// Adds a new row to the Instruction Table from the provided registers.
-    ///
-    /// # Arguments
-    /// * `ip` - The instruction pointer for the new row.
-    /// * `ci` - The current instruction for the new row.
-    /// * `ni` - The next instruction for the new row.
-    ///
-    /// This method pushes a new [`InstructionTableRow`] onto the `table` vector.
-    pub fn add_row_from_registers(&mut self, ip: BaseField, ci: BaseField, ni: BaseField) {
-        self.table.push(InstructionTableRow { ip, ci, ni });
-    }
-
     /// Adds a new row to the Instruction Table.
     ///
     /// # Arguments
@@ -72,20 +66,8 @@ impl InstructionTable {
     /// * `rows` - A vector of [`InstructionTableRow`] to add to the table.
     ///
     /// This method extends the `table` vector with the provided rows.
-    pub fn add_rows(&mut self, rows: Vec<InstructionTableRow>) {
+    fn add_rows(&mut self, rows: Vec<InstructionTableRow>) {
         self.table.extend(rows);
-    }
-
-    /// Retrieves a reference to a specific row in the Instruction Table.
-    ///
-    /// # Arguments
-    /// * `row` - The [`InstructionTableRow`] to search for in the table.
-    ///
-    /// # Returns
-    /// An `Option` containing a reference to the matching row if found,
-    /// or `None` if the row does not exist in the table.
-    pub fn get_row(&self, row: &InstructionTableRow) -> Option<&InstructionTableRow> {
-        self.table.iter().find(|r| *r == row)
     }
 
     /// Pads the instruction table with dummy rows up to the next power of two length.
@@ -132,10 +114,7 @@ impl From<(Vec<Registers>, &ProgramMemory)> for InstructionTable {
         let mut sorted_registers = [program, execution_trace].concat();
         sorted_registers.sort_by_key(|r| (r.ip, r.clk));
 
-        let instruction_rows: Vec<InstructionTableRow> = sorted_registers
-            .iter()
-            .map(|reg| InstructionTableRow { ip: reg.ip, ci: reg.ci, ni: reg.ni })
-            .collect();
+        let instruction_rows = sorted_registers.iter().map(Into::into).collect();
 
         let mut instruction_table = Self::new();
         instruction_table.add_rows(instruction_rows);
@@ -164,25 +143,6 @@ mod tests {
             instruction_table.table.is_empty(),
             "Instruction table should be empty upon initialization."
         );
-    }
-
-    #[test]
-    fn test_add_row_front_registers() {
-        let mut instruction_table = InstructionTable::new();
-        // Create a row to add to the table
-        let row = InstructionTableRow {
-            ip: BaseField::zero(),
-            ci: BaseField::from(43),
-            ni: BaseField::from(91),
-        };
-        // Add the row to the table
-        instruction_table.add_row_from_registers(
-            BaseField::zero(),
-            BaseField::from(43),
-            BaseField::from(91),
-        );
-        // Check that the table contains the added row
-        assert_eq!(instruction_table.table, vec![row], "Added row should match the expected row.");
     }
 
     #[test]
@@ -225,38 +185,6 @@ mod tests {
         instruction_table.add_rows(rows.clone());
         // Check that the table contains the added rows
         assert_eq!(instruction_table, InstructionTable { table: rows });
-    }
-
-    #[test]
-    fn test_get_existing_row() {
-        let mut instruction_table = InstructionTable::new();
-        // Create a row to add to the table
-        let row = InstructionTableRow {
-            ip: BaseField::zero(),
-            ci: BaseField::from(43),
-            ni: BaseField::from(91),
-        };
-        // Add the row to the table
-        instruction_table.add_row(row.clone());
-        // Retrieve the row from the table
-        let retrieved = instruction_table.get_row(&row);
-        // Check that the retrieved row matches the added row
-        assert_eq!(retrieved.unwrap(), &row, "Retrieved row should match the added row.");
-    }
-
-    #[test]
-    fn test_get_non_existing_row() {
-        let instruction_table = InstructionTable::new();
-        // Create a row to search for in the table
-        let row = InstructionTableRow {
-            ip: BaseField::zero(),
-            ci: BaseField::from(43),
-            ni: BaseField::from(91),
-        };
-        // Try to retrieve the non-existing row from the table
-        let retrieved = instruction_table.get_row(&row);
-        // Check that the retrieved row is None
-        assert!(retrieved.is_none(), "Should return None for a non-existing row.");
     }
 
     #[test]
