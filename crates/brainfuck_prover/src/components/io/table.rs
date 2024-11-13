@@ -76,6 +76,15 @@ impl<const N: u32> IOTable<N> {
     pub fn get_row(&self, row: &IOTableRow) -> Option<&IOTableRow> {
         self.table.iter().find(|r| *r == row)
     }
+
+    fn pad(&mut self) {
+        let trace_len = self.table.len();
+        let padding_offset = (trace_len.next_power_of_two() - trace_len) as u32;
+        for _ in 0..padding_offset {
+            let dummy_row = IOTableRow::default();
+            self.add_row(dummy_row);
+        }
+    }
 }
 
 impl<const N: u32> From<Vec<Registers>> for IOTable<N> {
@@ -87,6 +96,8 @@ impl<const N: u32> From<Vec<Registers>> for IOTable<N> {
             .map(|x| IOTableRow { mv: x.mv })
             .collect();
         io_table.add_rows(rows);
+
+        io_table.pad();
 
         io_table
     }
