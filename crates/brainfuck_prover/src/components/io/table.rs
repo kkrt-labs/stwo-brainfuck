@@ -77,6 +77,11 @@ impl<const N: u32> IOTable<N> {
         self.table.iter().find(|r| *r == row)
     }
 
+    /// Pads the I/O table with dummy rows up to the next power of two length.
+    ///
+    /// Each dummy row sets the memory value register `mv` to zero.
+    ///
+    /// Does nothing if the table is empty.
     fn pad(&mut self) {
         let trace_len = self.table.len();
         let padding_offset = (trace_len.next_power_of_two() - trace_len) as u32;
