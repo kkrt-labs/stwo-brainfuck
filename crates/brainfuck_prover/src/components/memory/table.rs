@@ -1,5 +1,5 @@
 use brainfuck_vm::registers::Registers;
-use num_traits::{One, Zero};
+use num_traits::One;
 use stwo_prover::core::fields::m31::BaseField;
 
 /// Represents a single row in the Memory Table.
@@ -31,6 +31,16 @@ impl MemoryTableRow {
     }
 }
 
+impl From<(&Registers, bool)> for MemoryTableRow {
+    fn from((registers, is_dummy): (&Registers, bool)) -> Self {
+        if is_dummy {
+            Self::new_dummy(registers.clk, registers.mp, registers.mv)
+        } else {
+            Self::new(registers.clk, registers.mp, registers.mv)
+        }
+    }
+}
+
 /// Represents the Memory Table, which holds the required registers
 /// for the Memory component.
 ///
@@ -53,26 +63,6 @@ impl MemoryTable {
     /// A new instance of [`MemoryTable`] with an empty table.
     pub fn new() -> Self {
         Self::default()
-    }
-
-    /// Adds a new row to the Memory Table from the provided registers.
-    ///
-    /// # Arguments
-    /// * `clk` - The clock cycle counter for the new row.
-    /// * `mp` - The memory pointer for the new row.
-    /// * `mv` - The memory value for the new row.
-    /// * `is_dummy` - Flag whether the new row is dummy.
-    ///
-    /// This method pushes a new [`MemoryTableRow`] onto the `table` vector.
-    pub fn add_row_from_registers(
-        &mut self,
-        clk: BaseField,
-        mp: BaseField,
-        mv: BaseField,
-        is_dummy: bool,
-    ) {
-        let d = if is_dummy { BaseField::one() } else { BaseField::zero() };
-        self.table.push(MemoryTableRow { clk, mp, mv, d });
     }
 
     /// Adds a new row to the Memory Table.
@@ -152,9 +142,9 @@ impl From<Vec<Registers>> for MemoryTable {
     fn from(registers: Vec<Registers>) -> Self {
         let mut memory_table = Self::new();
 
-        for register in registers {
-            memory_table.add_row_from_registers(register.clk, register.mp, register.mv, false);
-        }
+        let memory_rows: Vec<MemoryTableRow> =
+            registers.iter().map(|reg| MemoryTableRow::from((reg, false))).collect();
+        memory_table.add_rows(memory_rows);
 
         memory_table.sort();
         memory_table.complete_with_dummy_rows();
@@ -198,39 +188,6 @@ mod tests {
     fn test_memory_table_new() {
         let memory_table = MemoryTable::new();
         assert!(memory_table.table.is_empty(), "Memory table should be empty upon initialization.");
-    }
-
-    #[test]
-    fn test_add_row_from_registers() {
-        let mut memory_table = MemoryTable::new();
-        // Create a row to add to the table
-        let row = MemoryTableRow::new(BaseField::zero(), BaseField::from(43), BaseField::from(91));
-        // Add the row to the table
-        memory_table.add_row_from_registers(
-            BaseField::zero(),
-            BaseField::from(43),
-            BaseField::from(91),
-            false,
-        );
-        // Check that the table contains the added row
-        assert_eq!(memory_table.table, vec![row], "Added row should match the expected row.");
-    }
-
-    #[test]
-    fn test_add_dummy_row_from_registers() {
-        let mut memory_table = MemoryTable::new();
-        // Create a row to add to the table
-        let row =
-            MemoryTableRow::new_dummy(BaseField::zero(), BaseField::from(43), BaseField::from(91));
-        // Add the row to the table
-        memory_table.add_row_from_registers(
-            BaseField::zero(),
-            BaseField::from(43),
-            BaseField::from(91),
-            true,
-        );
-        // Check that the table contains the added row
-        assert_eq!(memory_table.table, vec![row], "Added row should match the expected row.");
     }
 
     #[test]
