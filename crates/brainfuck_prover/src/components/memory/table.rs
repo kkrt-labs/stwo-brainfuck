@@ -118,6 +118,8 @@ impl MemoryTable {
     /// Fills the jumps in `clk` with dummy rows.
     ///
     /// Required to ensure the correct sorting of the [`MemoryTable`] in the constraints.
+    ///
+    /// Does nothing if the table is empty.
     fn complete_with_dummy_rows(&mut self) {
         let mut new_table = Vec::with_capacity(self.table.len());
         if let Some(mut prev_row) = self.table.first() {
