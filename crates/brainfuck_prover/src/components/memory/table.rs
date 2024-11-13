@@ -95,18 +95,6 @@ impl MemoryTable {
         self.table.extend(rows);
     }
 
-    /// Retrieves a reference to a specific row in the Memory Table.
-    ///
-    /// # Arguments
-    /// * `row` - The [`MemoryTableRow`] to search for in the table.
-    ///
-    /// # Returns
-    /// An `Option` containing a reference to the matching row if found,
-    /// or `None` if the row does not exist in the table.
-    pub fn get_row(&self, row: &MemoryTableRow) -> Option<&MemoryTableRow> {
-        self.table.iter().find(|r| *r == row)
-    }
-
     /// Sorts in-place the existing [`MemoryTableRow`] rows in the Memory Table by `mp`, then `clk`.
     ///
     /// Having the rows sorted is required to ensure a correct proof generation (such that the
@@ -281,40 +269,6 @@ mod tests {
         memory_table.add_rows(rows.clone());
         // Check that the table contains the added rows
         assert_eq!(memory_table, MemoryTable { table: rows });
-    }
-
-    #[test]
-    fn test_get_existing_row() {
-        let mut memory_table = MemoryTable::new();
-        // Create a row to add to the table
-        let row = MemoryTableRow {
-            clk: BaseField::zero(),
-            mp: BaseField::from(43),
-            mv: BaseField::from(91),
-            d: BaseField::zero(),
-        };
-        // Add the row to the table
-        memory_table.add_row(row.clone());
-        // Retrieve the row from the table
-        let retrieved = memory_table.get_row(&row);
-        // Check that the retrieved row matches the added row
-        assert_eq!(retrieved.unwrap(), &row, "Retrieved row should match the added row.");
-    }
-
-    #[test]
-    fn test_get_non_existing_row() {
-        let memory_table = MemoryTable::new();
-        // Create a row to search for in the table
-        let row = MemoryTableRow {
-            clk: BaseField::zero(),
-            mp: BaseField::from(43),
-            mv: BaseField::from(91),
-            d: BaseField::zero(),
-        };
-        // Try to retrieve the non-existing row from the table
-        let retrieved = memory_table.get_row(&row);
-        // Check that the retrieved row is None
-        assert!(retrieved.is_none(), "Should return None for a non-existing row.");
     }
 
     #[test]
