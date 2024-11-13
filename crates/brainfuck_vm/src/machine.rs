@@ -82,6 +82,16 @@ pub struct ProgramMemory {
     code: Vec<BaseField>,
 }
 
+impl ProgramMemory {
+    pub fn new(code: Vec<BaseField>) -> Self {
+        Self { code }
+    }
+
+    pub fn code(&self) -> &[BaseField] {
+        &self.code
+    }
+}
+
 #[derive(Debug, Default, PartialEq, Eq)]
 pub struct MutableState {
     ram: Vec<BaseField>,
@@ -242,6 +252,10 @@ impl Machine {
             };
             self.trace.push(dummy);
         }
+    }
+
+    pub const fn program(&self) -> &ProgramMemory {
+        &self.program
     }
 }
 
