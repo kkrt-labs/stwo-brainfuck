@@ -156,21 +156,16 @@ impl MemoryTable {
     ///
     /// Does nothing if the table is empty.
     fn pad(&mut self) {
-        let (last_clk, last_mem_pointer, last_mem_value) = if let Some(last_row) = self.table.last()
-        {
-            (last_row.clk, last_row.mp, last_row.mv)
-        } else {
-            return;
-        };
-        let trace_len = self.table.len();
-        let padding_offset = (trace_len.next_power_of_two() - trace_len) as u32;
-        for i in 0..padding_offset {
-            let dummy_row = MemoryTableRow::new_dummy(
-                last_clk + BaseField::from(i + 1),
-                last_mem_pointer,
-                last_mem_value,
-            );
-            self.add_row(dummy_row);
+        if let Some(last_row) = self.table.last().cloned() {
+            let trace_len = self.table.len();
+            let padding_offset = (trace_len.next_power_of_two() - trace_len) as u32;
+            for i in 1..=padding_offset {
+                self.add_row(MemoryTableRow::new_dummy(
+                    last_row.clk + BaseField::from(i),
+                    last_row.mp,
+                    last_row.mv,
+                ));
+            }
         }
     }
 }
