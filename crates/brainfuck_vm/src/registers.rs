@@ -49,7 +49,7 @@ impl std::fmt::Debug for Registers {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use num_traits::Zero;
+    use num_traits::{One, Zero};
 
     // Test default and new() implementation
     #[test]
@@ -83,7 +83,7 @@ mod tests {
     #[test]
     fn test_registers_display() {
         let registers = Registers {
-            clk: BaseField::from(1),
+            clk: BaseField::one(),
             ip: BaseField::from(2),
             ci: BaseField::from(3),
             ni: BaseField::from(4),

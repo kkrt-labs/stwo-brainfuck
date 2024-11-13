@@ -315,7 +315,7 @@ mod tests {
         let (mut machine, _) = create_test_machine(&code, &[]);
         machine.execute()?;
 
-        assert_eq!(machine.state.registers.mp, BaseField::from(1));
+        assert_eq!(machine.state.registers.mp, BaseField::one());
         Ok(())
     }
 
@@ -326,8 +326,8 @@ mod tests {
         let (mut machine, _) = create_test_machine(&code, &[]);
         machine.execute()?;
 
-        assert_eq!(machine.state.ram[0], BaseField::from(1));
-        assert_eq!(machine.state.registers.mv, BaseField::from(1));
+        assert_eq!(machine.state.ram[0], BaseField::one());
+        assert_eq!(machine.state.registers.mv, BaseField::one());
         Ok(())
     }
 
@@ -429,8 +429,8 @@ mod tests {
         let final_state = Registers {
             clk: BaseField::from(2),
             ip: BaseField::from(2),
-            ci: BaseField::from(0),
-            ni: BaseField::from(0),
+            ci: BaseField::zero(),
+            ni: BaseField::zero(),
             mp: BaseField::zero(),
             mv: BaseField::from(2),
             mvi: BaseField::from(2).inverse(),
@@ -470,8 +470,8 @@ mod tests {
         let final_state = Registers {
             clk: BaseField::from(2),
             ip: BaseField::from(2),
-            ci: BaseField::from(0),
-            ni: BaseField::from(0),
+            ci: BaseField::zero(),
+            ni: BaseField::zero(),
             mp: BaseField::zero(),
             mv: BaseField::from(2),
             mvi: BaseField::from(2).inverse(),

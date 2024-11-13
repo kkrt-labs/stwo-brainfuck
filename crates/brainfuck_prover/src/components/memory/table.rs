@@ -278,7 +278,7 @@ mod tests {
         let mut memory_table = MemoryTable::new();
         // Create a row to add to the table
         let row = MemoryTableRow {
-            clk: BaseField::from(0),
+            clk: BaseField::zero(),
             mp: BaseField::from(43),
             mv: BaseField::from(91),
             d: BaseField::zero(),
@@ -296,7 +296,7 @@ mod tests {
         let memory_table = MemoryTable::new();
         // Create a row to search for in the table
         let row = MemoryTableRow {
-            clk: BaseField::from(0),
+            clk: BaseField::zero(),
             mp: BaseField::from(43),
             mv: BaseField::from(91),
             d: BaseField::zero(),
@@ -337,7 +337,7 @@ mod tests {
         expected_memory_table.add_rows(vec![
             row1,
             row2,
-            MemoryTableRow::new_dummy(BaseField::from(1), BaseField::one(), BaseField::zero()),
+            MemoryTableRow::new_dummy(BaseField::one(), BaseField::one(), BaseField::zero()),
             MemoryTableRow::new_dummy(BaseField::from(2), BaseField::one(), BaseField::zero()),
             MemoryTableRow::new_dummy(BaseField::from(3), BaseField::one(), BaseField::zero()),
             MemoryTableRow::new_dummy(BaseField::from(4), BaseField::one(), BaseField::zero()),
