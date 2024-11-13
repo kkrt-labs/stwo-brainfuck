@@ -12,11 +12,11 @@ use stwo_prover::core::fields::m31::BaseField;
 #[derive(Debug, Default, PartialEq, Eq, Clone)]
 pub struct MemoryTableRow {
     /// Clock cycle counter: the current step.
-    pub clk: BaseField,
+    clk: BaseField,
     /// Memory pointer: points to a memory cell.
-    pub mp: BaseField,
+    mp: BaseField,
     /// Memory value: value of the cell pointer by `mp` - values in [0..2^31 - 1)
-    pub mv: BaseField,
+    mv: BaseField,
     /// Dummy: Flag whether the row is a dummy one or not
     d: BaseField,
 }
@@ -53,7 +53,7 @@ impl From<(&Registers, bool)> for MemoryTableRow {
 #[derive(Debug, Default, PartialEq, Eq, Clone)]
 pub struct MemoryTable {
     /// A vector of [`MemoryTableRow`] representing the table rows.
-    pub table: Vec<MemoryTableRow>,
+    table: Vec<MemoryTableRow>,
 }
 
 impl MemoryTable {
@@ -71,7 +71,7 @@ impl MemoryTable {
     /// * `row` - The [`MemoryTableRow`] to add to the table.
     ///
     /// This method pushes a new [`MemoryTableRow`] onto the `table` vector.
-    pub fn add_row(&mut self, row: MemoryTableRow) {
+    fn add_row(&mut self, row: MemoryTableRow) {
         self.table.push(row);
     }
 
@@ -81,7 +81,7 @@ impl MemoryTable {
     /// * `rows` - A vector of [`MemoryTableRow`] to add to the table.
     ///
     /// This method extends the `table` vector with the provided rows.
-    pub fn add_rows(&mut self, rows: Vec<MemoryTableRow>) {
+    fn add_rows(&mut self, rows: Vec<MemoryTableRow>) {
         self.table.extend(rows);
     }
 
