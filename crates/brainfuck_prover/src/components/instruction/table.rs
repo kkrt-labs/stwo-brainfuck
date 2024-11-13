@@ -87,15 +87,6 @@ impl InstructionTable {
     pub fn get_row(&self, row: &InstructionTableRow) -> Option<&InstructionTableRow> {
         self.table.iter().find(|r| *r == row)
     }
-
-    /// Retrieves the last row in the Instruction Table.
-    ///
-    /// # Returns
-    /// An `Option` containing a reference to the last [`InstructionTableRow`] in the table,
-    /// or `None` if the table is empty.
-    fn last_row(&self) -> Option<&InstructionTableRow> {
-        self.table.last()
-    }
 }
 
 impl From<(Vec<Registers>, &ProgramMemory)> for InstructionTable {
@@ -150,7 +141,7 @@ impl From<(Vec<Registers>, &ProgramMemory)> for InstructionTable {
         // - `ci` = 0 and `ni` = 0
         // TODO: execution trace may be padded with empty registers, so we need to check this case
         // in the future.
-        if let Some(last_row) = instruction_table.last_row() {
+        if let Some(last_row) = instruction_table.table.last() {
             if last_row.ci == BaseField::zero() && last_row.ni == BaseField::zero() {
                 instruction_table.table.pop();
             }
@@ -272,44 +263,6 @@ mod tests {
         let retrieved = instruction_table.get_row(&row);
         // Check that the retrieved row is None
         assert!(retrieved.is_none(), "Should return None for a non-existing row.");
-    }
-
-    #[test]
-    fn test_instruction_table_last_row() {
-        let mut instruction_table = InstructionTable::new();
-
-        // Initially, the table should be empty, so last_row should return None
-        assert!(instruction_table.last_row().is_none(), "The table should be empty initially.");
-
-        // Add a row to the table
-        let row = InstructionTableRow {
-            ip: BaseField::one(),
-            ci: BaseField::from(2),
-            ni: BaseField::from(3),
-        };
-        instruction_table.add_row(row.clone());
-
-        // Now, last_row should return a reference to the added row
-        assert_eq!(
-            instruction_table.last_row(),
-            Some(&row),
-            "The last row should match the added row."
-        );
-
-        // Add another row
-        let second_row = InstructionTableRow {
-            ip: BaseField::from(4),
-            ci: BaseField::from(5),
-            ni: BaseField::from(6),
-        };
-        instruction_table.add_row(second_row.clone());
-
-        // Now, last_row should return a reference to the second row
-        assert_eq!(
-            instruction_table.last_row(),
-            Some(&second_row),
-            "The last row should match the second added row."
-        );
     }
 
     #[test]
