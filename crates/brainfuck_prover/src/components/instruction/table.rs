@@ -163,12 +163,12 @@ impl From<(Vec<Registers>, &ProgramMemory)> for InstructionTable {
 
 #[cfg(test)]
 mod tests {
+    use super::*;
     use crate::utils::{
         DECREMENT_INSTRUCTION_BF, INCREMENT_INSTRUCTION_BF, INPUT_INSTRUCTION_BF,
         JUMP_IF_NON_ZERO_INSTRUCTION_BF, JUMP_IF_ZERO_INSTRUCTION_BF, OUTPUT_INSTRUCTION_BF,
         SHIFT_LEFT_INSTRUCTION_BF, SHIFT_RIGHT_INSTRUCTION_BF,
     };
-    use super::*;
     use brainfuck_vm::{compiler::Compiler, test_helper::create_test_machine};
     use num_traits::{One, Zero};
 
