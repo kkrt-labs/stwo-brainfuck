@@ -88,28 +88,30 @@ impl InstructionTable {
         self.table.iter().find(|r| *r == row)
     }
 
-    /// Retrieves the last row in the Instruction Table.
+    /// Pads the instruction table with dummy rows up to the next power of two length.
     ///
-    /// # Returns
-    /// An `Option` containing a reference to the last [`InstructionTableRow`] in the table,
-    /// or `None` if the table is empty.
-    fn last_row(&self) -> Option<&InstructionTableRow> {
-        self.table.last()
+    /// Each dummy row preserves the last instruction pointer
+    /// with current and next instructions `ci` and `ni` set to zero.
+    ///
+    /// Does nothing if the table is empty.
+    fn pad(&mut self) {
+        if let Some(last_row) = self.table.last().cloned() {
+            let trace_len = self.table.len();
+            let padding_offset = (trace_len.next_power_of_two() - trace_len) as u32;
+            for _ in 1..=padding_offset {
+                self.add_row(InstructionTableRow { ip: last_row.ip, ..Default::default() });
+            }
+        }
     }
 }
 
 impl From<(Vec<Registers>, &ProgramMemory)> for InstructionTable {
-    #[allow(clippy::cast_lossless)]
     fn from((execution_trace, program_memory): (Vec<Registers>, &ProgramMemory)) -> Self {
-        // Create an empty vector to store the program instructions.
         let mut program = Vec::new();
 
-        // Extract the program's code from the `ProgramMemory`.
         let code = program_memory.code();
 
-        // Iterate over the code and collect valid instructions.
         for (index, ci) in code.iter().enumerate() {
-            // Skip invalid instructions.
             if !VALID_INSTRUCTIONS.contains(ci) {
                 continue;
             }
@@ -127,36 +129,19 @@ impl From<(Vec<Registers>, &ProgramMemory)> for InstructionTable {
             });
         }
 
-        // Concatenate the program's instructions with the provided execution trace.
         let mut sorted_registers = [program, execution_trace].concat();
-        // Sort the registers by:
-        // 1. `ip` (instruction pointer)
-        // 2. `clk` (clock cycle)
         sorted_registers.sort_by_key(|r| (r.ip, r.clk));
 
-        // Initialize a new instruction table to store the sorted and processed rows.
+        let instruction_rows: Vec<InstructionTableRow> = sorted_registers
+            .iter()
+            .map(|reg| InstructionTableRow { ip: reg.ip, ci: reg.ci, ni: reg.ni })
+            .collect();
+
         let mut instruction_table = Self::new();
+        instruction_table.add_rows(instruction_rows);
 
-        for register in &sorted_registers {
-            // Add the current register to the instruction table.
-            instruction_table.add_row(InstructionTableRow {
-                ip: register.ip,
-                ci: register.ci,
-                ni: register.ni,
-            });
-        }
+        instruction_table.pad();
 
-        // If the last row marks the end of the program, remove it:
-        // - `ci` = 0 and `ni` = 0
-        // TODO: execution trace may be padded with empty registers, so we need to check this case
-        // in the future.
-        if let Some(last_row) = instruction_table.last_row() {
-            if last_row.ci == BaseField::zero() && last_row.ni == BaseField::zero() {
-                instruction_table.table.pop();
-            }
-        }
-
-        // Return the fully constructed and populated instruction table.
         instruction_table
     }
 }
@@ -275,44 +260,6 @@ mod tests {
     }
 
     #[test]
-    fn test_instruction_table_last_row() {
-        let mut instruction_table = InstructionTable::new();
-
-        // Initially, the table should be empty, so last_row should return None
-        assert!(instruction_table.last_row().is_none(), "The table should be empty initially.");
-
-        // Add a row to the table
-        let row = InstructionTableRow {
-            ip: BaseField::one(),
-            ci: BaseField::from(2),
-            ni: BaseField::from(3),
-        };
-        instruction_table.add_row(row.clone());
-
-        // Now, last_row should return a reference to the added row
-        assert_eq!(
-            instruction_table.last_row(),
-            Some(&row),
-            "The last row should match the added row."
-        );
-
-        // Add another row
-        let second_row = InstructionTableRow {
-            ip: BaseField::from(4),
-            ci: BaseField::from(5),
-            ni: BaseField::from(6),
-        };
-        instruction_table.add_row(second_row.clone());
-
-        // Now, last_row should return a reference to the second row
-        assert_eq!(
-            instruction_table.last_row(),
-            Some(&second_row),
-            "The last row should match the second added row."
-        );
-    }
-
-    #[test]
     fn test_instruction_table_from_registers_empty() {
         // Create an empty vector of registers
         let registers = vec![];
@@ -325,7 +272,6 @@ mod tests {
     }
 
     #[test]
-    #[allow(clippy::cast_lossless, clippy::too_many_lines)]
     fn test_instruction_table_from_registers_example_program() {
         // Create a small program and compile it
         let code = "+>,<[>+.<-]";
@@ -342,127 +288,108 @@ mod tests {
         let instruction_table: InstructionTable = (trace, machine.program()).into();
 
         // Create the expected `InstructionTable`
-        let expected_instruction_table = InstructionTable {
+        let ins_0 = InstructionTableRow {
+            ip: BaseField::zero(),
+            ci: INCREMENT_INSTRUCTION_BF,
+            ni: SHIFT_RIGHT_INSTRUCTION_BF,
+        };
+
+        let ins_1 = InstructionTableRow {
+            ip: BaseField::one(),
+            ci: SHIFT_RIGHT_INSTRUCTION_BF,
+            ni: INPUT_INSTRUCTION_BF,
+        };
+
+        let ins_2 = InstructionTableRow {
+            ip: BaseField::from(2),
+            ci: INPUT_INSTRUCTION_BF,
+            ni: SHIFT_LEFT_INSTRUCTION_BF,
+        };
+
+        let ins_3 = InstructionTableRow {
+            ip: BaseField::from(3),
+            ci: SHIFT_LEFT_INSTRUCTION_BF,
+            ni: JUMP_IF_ZERO_INSTRUCTION_BF,
+        };
+        let ins_4 = InstructionTableRow {
+            ip: BaseField::from(4),
+            ci: JUMP_IF_ZERO_INSTRUCTION_BF,
+            ni: BaseField::from(12),
+        };
+        let ins_6 = InstructionTableRow {
+            ip: BaseField::from(6),
+            ci: SHIFT_RIGHT_INSTRUCTION_BF,
+            ni: INCREMENT_INSTRUCTION_BF,
+        };
+        let ins_7 = InstructionTableRow {
+            ip: BaseField::from(7),
+            ci: INCREMENT_INSTRUCTION_BF,
+            ni: OUTPUT_INSTRUCTION_BF,
+        };
+        let ins_8 = InstructionTableRow {
+            ip: BaseField::from(8),
+            ci: OUTPUT_INSTRUCTION_BF,
+            ni: SHIFT_LEFT_INSTRUCTION_BF,
+        };
+        let ins_9 = InstructionTableRow {
+            ip: BaseField::from(9),
+            ci: SHIFT_LEFT_INSTRUCTION_BF,
+            ni: DECREMENT_INSTRUCTION_BF,
+        };
+        let inst_10 = InstructionTableRow {
+            ip: BaseField::from(10),
+            ci: DECREMENT_INSTRUCTION_BF,
+            ni: JUMP_IF_NON_ZERO_INSTRUCTION_BF,
+        };
+        let ins_11 = InstructionTableRow {
+            ip: BaseField::from(11),
+            ci: JUMP_IF_NON_ZERO_INSTRUCTION_BF,
+            ni: BaseField::from(6),
+        };
+
+        let padded_rows = vec![
+            InstructionTableRow {
+                ip: BaseField::from(13),
+                ci: BaseField::zero(),
+                ni: BaseField::zero(),
+            };
+            10
+        ];
+
+        let mut expected_instruction_table = InstructionTable {
             table: vec![
-                InstructionTableRow {
-                    ip: BaseField::from(0),
-                    ci: INCREMENT_INSTRUCTION_BF,
-                    ni: SHIFT_RIGHT_INSTRUCTION_BF,
-                },
-                InstructionTableRow {
-                    ip: BaseField::from(0),
-                    ci: INCREMENT_INSTRUCTION_BF,
-                    ni: SHIFT_RIGHT_INSTRUCTION_BF,
-                },
-                InstructionTableRow {
-                    ip: BaseField::from(1),
-                    ci: SHIFT_RIGHT_INSTRUCTION_BF,
-                    ni: INPUT_INSTRUCTION_BF,
-                },
-                InstructionTableRow {
-                    ip: BaseField::from(1),
-                    ci: SHIFT_RIGHT_INSTRUCTION_BF,
-                    ni: INPUT_INSTRUCTION_BF,
-                },
-                InstructionTableRow {
-                    ip: BaseField::from(2),
-                    ci: INPUT_INSTRUCTION_BF,
-                    ni: SHIFT_LEFT_INSTRUCTION_BF,
-                },
-                InstructionTableRow {
-                    ip: BaseField::from(2),
-                    ci: INPUT_INSTRUCTION_BF,
-                    ni: SHIFT_LEFT_INSTRUCTION_BF,
-                },
-                InstructionTableRow {
-                    ip: BaseField::from(3),
-                    ci: SHIFT_LEFT_INSTRUCTION_BF,
-                    ni: JUMP_IF_ZERO_INSTRUCTION_BF,
-                },
-                InstructionTableRow {
-                    ip: BaseField::from(3),
-                    ci: SHIFT_LEFT_INSTRUCTION_BF,
-                    ni: JUMP_IF_ZERO_INSTRUCTION_BF,
-                },
-                InstructionTableRow {
-                    ip: BaseField::from(4),
-                    ci: JUMP_IF_ZERO_INSTRUCTION_BF,
-                    ni: BaseField::from(12),
-                },
-                InstructionTableRow {
-                    ip: BaseField::from(4),
-                    ci: JUMP_IF_ZERO_INSTRUCTION_BF,
-                    ni: BaseField::from(12),
-                },
-                InstructionTableRow {
-                    ip: BaseField::from(6),
-                    ci: SHIFT_RIGHT_INSTRUCTION_BF,
-                    ni: INCREMENT_INSTRUCTION_BF,
-                },
-                InstructionTableRow {
-                    ip: BaseField::from(6),
-                    ci: SHIFT_RIGHT_INSTRUCTION_BF,
-                    ni: INCREMENT_INSTRUCTION_BF,
-                },
-                InstructionTableRow {
-                    ip: BaseField::from(7),
-                    ci: INCREMENT_INSTRUCTION_BF,
-                    ni: OUTPUT_INSTRUCTION_BF,
-                },
-                InstructionTableRow {
-                    ip: BaseField::from(7),
-                    ci: INCREMENT_INSTRUCTION_BF,
-                    ni: OUTPUT_INSTRUCTION_BF,
-                },
-                InstructionTableRow {
-                    ip: BaseField::from(8),
-                    ci: OUTPUT_INSTRUCTION_BF,
-                    ni: SHIFT_LEFT_INSTRUCTION_BF,
-                },
-                InstructionTableRow {
-                    ip: BaseField::from(8),
-                    ci: OUTPUT_INSTRUCTION_BF,
-                    ni: SHIFT_LEFT_INSTRUCTION_BF,
-                },
-                InstructionTableRow {
-                    ip: BaseField::from(9),
-                    ci: SHIFT_LEFT_INSTRUCTION_BF,
-                    ni: DECREMENT_INSTRUCTION_BF,
-                },
-                InstructionTableRow {
-                    ip: BaseField::from(9),
-                    ci: SHIFT_LEFT_INSTRUCTION_BF,
-                    ni: DECREMENT_INSTRUCTION_BF,
-                },
-                InstructionTableRow {
-                    ip: BaseField::from(10),
-                    ci: DECREMENT_INSTRUCTION_BF,
-                    ni: JUMP_IF_NON_ZERO_INSTRUCTION_BF,
-                },
-                InstructionTableRow {
-                    ip: BaseField::from(10),
-                    ci: DECREMENT_INSTRUCTION_BF,
-                    ni: JUMP_IF_NON_ZERO_INSTRUCTION_BF,
-                },
-                InstructionTableRow {
-                    ip: BaseField::from(11),
-                    ci: JUMP_IF_NON_ZERO_INSTRUCTION_BF,
-                    ni: BaseField::from(6),
-                },
-                InstructionTableRow {
-                    ip: BaseField::from(11),
-                    ci: JUMP_IF_NON_ZERO_INSTRUCTION_BF,
-                    ni: BaseField::from(6),
-                },
+                ins_0.clone(),
+                ins_0,
+                ins_1.clone(),
+                ins_1,
+                ins_2.clone(),
+                ins_2,
+                ins_3.clone(),
+                ins_3,
+                ins_4.clone(),
+                ins_4,
+                ins_6.clone(),
+                ins_6,
+                ins_7.clone(),
+                ins_7,
+                ins_8.clone(),
+                ins_8,
+                ins_9.clone(),
+                ins_9,
+                inst_10.clone(),
+                inst_10,
+                ins_11.clone(),
+                ins_11,
             ],
         };
+
+        expected_instruction_table.add_rows(padded_rows);
 
         // Verify that the instruction table is correct
         assert_eq!(instruction_table, expected_instruction_table);
     }
 
     #[test]
-    #[allow(clippy::cast_lossless)]
     fn test_instruction_table_program_unused_instruction() {
         // We chose a simple program that has unused instructions
         // The goal is to verify that the merge between the trace and the program is correct
@@ -479,30 +406,36 @@ mod tests {
         // Convert the trace to an `InstructionTable`
         let instruction_table: InstructionTable = (trace, machine.program()).into();
 
-        let expected_instruction_table = InstructionTable {
-            table: vec![
-                InstructionTableRow {
-                    ip: BaseField::zero(),
-                    ci: JUMP_IF_ZERO_INSTRUCTION_BF,
-                    ni: BaseField::from(4),
-                },
-                InstructionTableRow {
-                    ip: BaseField::zero(),
-                    ci: JUMP_IF_ZERO_INSTRUCTION_BF,
-                    ni: BaseField::from(4),
-                },
-                InstructionTableRow {
-                    ip: BaseField::from(2),
-                    ci: DECREMENT_INSTRUCTION_BF,
-                    ni: JUMP_IF_NON_ZERO_INSTRUCTION_BF,
-                },
-                InstructionTableRow {
-                    ip: BaseField::from(3),
-                    ci: JUMP_IF_NON_ZERO_INSTRUCTION_BF,
-                    ni: BaseField::from(2),
-                },
-            ],
+        let ins_0 = InstructionTableRow {
+            ip: BaseField::zero(),
+            ci: JUMP_IF_ZERO_INSTRUCTION_BF,
+            ni: BaseField::from(4),
         };
+
+        let ins_2 = InstructionTableRow {
+            ip: BaseField::from(2),
+            ci: DECREMENT_INSTRUCTION_BF,
+            ni: JUMP_IF_NON_ZERO_INSTRUCTION_BF,
+        };
+
+        let ins_3 = InstructionTableRow {
+            ip: BaseField::from(3),
+            ci: JUMP_IF_NON_ZERO_INSTRUCTION_BF,
+            ni: BaseField::from(2),
+        };
+
+        let padded_rows = vec![
+            InstructionTableRow {
+                ip: BaseField::from(5),
+                ci: BaseField::zero(),
+                ni: BaseField::zero(),
+            };
+            4
+        ];
+        let mut expected_instruction_table =
+            InstructionTable { table: vec![ins_0.clone(), ins_0, ins_2, ins_3] };
+
+        expected_instruction_table.add_rows(padded_rows);
 
         // Verify that the instruction table is correct
         assert_eq!(instruction_table, expected_instruction_table);
