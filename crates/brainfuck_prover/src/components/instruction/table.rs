@@ -108,15 +108,11 @@ impl InstructionTable {
 impl From<(Vec<Registers>, &ProgramMemory)> for InstructionTable {
     #[allow(clippy::cast_lossless)]
     fn from((execution_trace, program_memory): (Vec<Registers>, &ProgramMemory)) -> Self {
-        // Create an empty vector to store the program instructions.
         let mut program = Vec::new();
 
-        // Extract the program's code from the `ProgramMemory`.
         let code = program_memory.code();
 
-        // Iterate over the code and collect valid instructions.
         for (index, ci) in code.iter().enumerate() {
-            // Skip invalid instructions.
             if !VALID_INSTRUCTIONS.contains(ci) {
                 continue;
             }
@@ -134,18 +130,12 @@ impl From<(Vec<Registers>, &ProgramMemory)> for InstructionTable {
             });
         }
 
-        // Concatenate the program's instructions with the provided execution trace.
         let mut sorted_registers = [program, execution_trace].concat();
-        // Sort the registers by:
-        // 1. `ip` (instruction pointer)
-        // 2. `clk` (clock cycle)
         sorted_registers.sort_by_key(|r| (r.ip, r.clk));
 
-        // Initialize a new instruction table to store the sorted and processed rows.
         let mut instruction_table = Self::new();
 
         for register in &sorted_registers {
-            // Add the current register to the instruction table.
             instruction_table.add_row(InstructionTableRow {
                 ip: register.ip,
                 ci: register.ci,
@@ -155,7 +145,6 @@ impl From<(Vec<Registers>, &ProgramMemory)> for InstructionTable {
 
         instruction_table.pad();
 
-        // Return the fully constructed and populated instruction table.
         instruction_table
     }
 }
