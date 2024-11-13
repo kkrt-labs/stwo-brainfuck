@@ -107,18 +107,6 @@ impl MemoryTable {
         self.table.iter().find(|r| *r == row)
     }
 
-    /// Returns a reference to a row in the Memory Table given its index.
-    ///
-    /// # Arguments
-    /// * `index` - The [`usize`] index to search for in the table.
-    ///
-    /// # Returns
-    /// An `Option` containing a reference to the matching row if found,
-    /// or `None` if the row does not exist in the table.
-    pub fn get_row_from_index(&self, index: usize) -> Option<&MemoryTableRow> {
-        self.table.get(index)
-    }
-
     /// Sorts in-place the existing [`MemoryTableRow`] rows in the Memory Table by `mp`, then `clk`.
     ///
     /// Having the rows sorted is required to ensure a correct proof generation (such that the
@@ -132,22 +120,22 @@ impl MemoryTable {
     /// Required to ensure the correct sorting of the [`MemoryTable`] in the constraints.
     fn complete_with_dummy_rows(&mut self) {
         let mut new_table = Vec::with_capacity(self.table.len());
-        let mut prev_row = self.get_row_from_index(0).unwrap();
-
-        for row in &self.table {
-            let next_clk = prev_row.clk + BaseField::one();
-            if row.mp == prev_row.mp && row.clk > next_clk {
-                let mut clk = next_clk;
-                while clk < row.clk {
-                    new_table.push(MemoryTableRow::new_dummy(clk, prev_row.mp, prev_row.mv));
-                    clk += BaseField::one();
+        if let Some(mut prev_row) = self.table.first() {
+            for row in &self.table {
+                let next_clk = prev_row.clk + BaseField::one();
+                if row.mp == prev_row.mp && row.clk > next_clk {
+                    let mut clk = next_clk;
+                    while clk < row.clk {
+                        new_table.push(MemoryTableRow::new_dummy(clk, prev_row.mp, prev_row.mv));
+                        clk += BaseField::one();
+                    }
                 }
+                new_table.push(row.clone());
+                prev_row = row;
             }
-            new_table.push(row.clone());
-            prev_row = row;
+            new_table.shrink_to_fit();
+            self.table = new_table;
         }
-        new_table.shrink_to_fit();
-        self.table = new_table;
     }
 
     /// Pads the memory table with dummy rows up to the next power of two length.
@@ -341,6 +329,14 @@ mod tests {
         memory_table.sort();
 
         assert_eq!(memory_table, expected_memory_table);
+    }
+
+    #[test]
+    fn test_empty_complete_wih_dummy_rows() {
+        let mut memory_table = MemoryTable::new();
+        memory_table.complete_with_dummy_rows();
+
+        assert_eq!(memory_table, MemoryTable::new());
     }
 
     #[test]
