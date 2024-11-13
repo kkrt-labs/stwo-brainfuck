@@ -114,8 +114,7 @@ impl From<(Vec<Registers>, &ProgramMemory)> for InstructionTable {
         let mut sorted_registers = [program, execution_trace].concat();
         sorted_registers.sort_by_key(|r| (r.ip, r.clk));
 
-        let instruction_rows: Vec<InstructionTableRow> =
-            sorted_registers.iter().map(Into::into).collect();
+        let instruction_rows = sorted_registers.iter().map(Into::into).collect();
 
         let mut instruction_table = Self::new();
         instruction_table.add_rows(instruction_rows);
