@@ -142,8 +142,7 @@ impl From<Vec<Registers>> for MemoryTable {
     fn from(registers: Vec<Registers>) -> Self {
         let mut memory_table = Self::new();
 
-        let memory_rows: Vec<MemoryTableRow> =
-            registers.iter().map(|reg| MemoryTableRow::from((reg, false))).collect();
+        let memory_rows = registers.iter().map(|reg| (reg, false).into()).collect();
         memory_table.add_rows(memory_rows);
 
         memory_table.sort();
