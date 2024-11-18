@@ -81,8 +81,8 @@ impl InstructionType {
     }
 }
 
-// Define all valid instructions as [`BaseField`] values
-pub const VALID_INSTRUCTIONS: [BaseField; 8] = [
+/// Define all valid instructions as [`BaseField`] values
+pub const VALID_INSTRUCTIONS_BF: [BaseField; 8] = [
     InstructionType::Right.to_base_field(),
     InstructionType::Left.to_base_field(),
     InstructionType::Plus.to_base_field(),

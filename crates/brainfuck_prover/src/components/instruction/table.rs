@@ -1,4 +1,6 @@
-use brainfuck_vm::{instruction::VALID_INSTRUCTIONS, machine::ProgramMemory, registers::Registers};
+use brainfuck_vm::{
+    instruction::VALID_INSTRUCTIONS_BF, machine::ProgramMemory, registers::Registers,
+};
 use num_traits::Zero;
 use stwo_prover::core::fields::m31::BaseField;
 
@@ -92,7 +94,7 @@ impl From<(Vec<Registers>, &ProgramMemory)> for InstructionTable {
         let code = program_memory.code();
 
         for (index, ci) in code.iter().enumerate() {
-            if !VALID_INSTRUCTIONS.contains(ci) {
+            if !VALID_INSTRUCTIONS_BF.contains(ci) {
                 continue;
             }
 
