@@ -64,14 +64,14 @@ impl InstructionType {
     /// Convert an [`InstructionType`] to its corresponding u32 representation
     pub const fn to_u32(&self) -> u32 {
         match self {
-            InstructionType::Right => b'>' as u32,
-            InstructionType::Left => b'<' as u32,
-            InstructionType::Plus => b'+' as u32,
-            InstructionType::Minus => b'-' as u32,
-            InstructionType::PutChar => b'.' as u32,
-            InstructionType::ReadChar => b',' as u32,
-            InstructionType::JumpIfZero => b'[' as u32,
-            InstructionType::JumpIfNotZero => b']' as u32,
+            Self::Right => b'>' as u32,
+            Self::Left => b'<' as u32,
+            Self::Plus => b'+' as u32,
+            Self::Minus => b'-' as u32,
+            Self::PutChar => b'.' as u32,
+            Self::ReadChar => b',' as u32,
+            Self::JumpIfZero => b'[' as u32,
+            Self::JumpIfNotZero => b']' as u32,
         }
     }
 
@@ -179,49 +179,49 @@ mod tests {
 
     #[test]
     fn test_instruction_type_to_u32() {
-        assert_eq!(InstructionType::Right.to_u32(), b'>' as u32);
-        assert_eq!(InstructionType::Left.to_u32(), b'<' as u32);
-        assert_eq!(InstructionType::Plus.to_u32(), b'+' as u32);
-        assert_eq!(InstructionType::Minus.to_u32(), b'-' as u32);
-        assert_eq!(InstructionType::PutChar.to_u32(), b'.' as u32);
-        assert_eq!(InstructionType::ReadChar.to_u32(), b',' as u32);
-        assert_eq!(InstructionType::JumpIfZero.to_u32(), b'[' as u32);
-        assert_eq!(InstructionType::JumpIfNotZero.to_u32(), b']' as u32);
+        assert_eq!(InstructionType::Right.to_u32(), b'>'.into());
+        assert_eq!(InstructionType::Left.to_u32(), b'<'.into());
+        assert_eq!(InstructionType::Plus.to_u32(), b'+'.into());
+        assert_eq!(InstructionType::Minus.to_u32(), b'-'.into());
+        assert_eq!(InstructionType::PutChar.to_u32(), b'.'.into());
+        assert_eq!(InstructionType::ReadChar.to_u32(), b','.into());
+        assert_eq!(InstructionType::JumpIfZero.to_u32(), b'['.into());
+        assert_eq!(InstructionType::JumpIfNotZero.to_u32(), b']'.into());
     }
 
     #[test]
     fn test_instruction_type_to_base_field() {
         assert_eq!(
             InstructionType::Right.to_base_field(),
-            BaseField::from_u32_unchecked(b'>' as u32)
+            BaseField::from_u32_unchecked(b'>'.into())
         );
         assert_eq!(
             InstructionType::Left.to_base_field(),
-            BaseField::from_u32_unchecked(b'<' as u32)
+            BaseField::from_u32_unchecked(b'<'.into())
         );
         assert_eq!(
             InstructionType::Plus.to_base_field(),
-            BaseField::from_u32_unchecked(b'+' as u32)
+            BaseField::from_u32_unchecked(b'+'.into())
         );
         assert_eq!(
             InstructionType::Minus.to_base_field(),
-            BaseField::from_u32_unchecked(b'-' as u32)
+            BaseField::from_u32_unchecked(b'-'.into())
         );
         assert_eq!(
             InstructionType::PutChar.to_base_field(),
-            BaseField::from_u32_unchecked(b'.' as u32)
+            BaseField::from_u32_unchecked(b'.'.into())
         );
         assert_eq!(
             InstructionType::ReadChar.to_base_field(),
-            BaseField::from_u32_unchecked(b',' as u32)
+            BaseField::from_u32_unchecked(b','.into())
         );
         assert_eq!(
             InstructionType::JumpIfZero.to_base_field(),
-            BaseField::from_u32_unchecked(b'[' as u32)
+            BaseField::from_u32_unchecked(b'['.into())
         );
         assert_eq!(
             InstructionType::JumpIfNotZero.to_base_field(),
-            BaseField::from_u32_unchecked(b']' as u32)
+            BaseField::from_u32_unchecked(b']'.into())
         );
     }
 
