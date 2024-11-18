@@ -1,8 +1,6 @@
-use brainfuck_vm::{machine::ProgramMemory, registers::Registers};
+use brainfuck_vm::{instruction::VALID_INSTRUCTIONS, machine::ProgramMemory, registers::Registers};
 use num_traits::Zero;
 use stwo_prover::core::fields::m31::BaseField;
-
-use crate::utils::VALID_INSTRUCTIONS;
 
 /// Represents a single row in the Instruction Table.
 ///
@@ -128,12 +126,9 @@ impl From<(Vec<Registers>, &ProgramMemory)> for InstructionTable {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::utils::{
-        DECREMENT_INSTRUCTION_BF, INCREMENT_INSTRUCTION_BF, INPUT_INSTRUCTION_BF,
-        JUMP_IF_NON_ZERO_INSTRUCTION_BF, JUMP_IF_ZERO_INSTRUCTION_BF, OUTPUT_INSTRUCTION_BF,
-        SHIFT_LEFT_INSTRUCTION_BF, SHIFT_RIGHT_INSTRUCTION_BF,
+    use brainfuck_vm::{
+        compiler::Compiler, instruction::InstructionType, test_helper::create_test_machine,
     };
-    use brainfuck_vm::{compiler::Compiler, test_helper::create_test_machine};
     use num_traits::{One, Zero};
 
     #[test]
@@ -218,60 +213,60 @@ mod tests {
         // Create the expected `InstructionTable`
         let ins_0 = InstructionTableRow {
             ip: BaseField::zero(),
-            ci: INCREMENT_INSTRUCTION_BF,
-            ni: SHIFT_RIGHT_INSTRUCTION_BF,
+            ci: InstructionType::Plus.to_base_field(),
+            ni: InstructionType::Right.to_base_field(),
         };
 
         let ins_1 = InstructionTableRow {
             ip: BaseField::one(),
-            ci: SHIFT_RIGHT_INSTRUCTION_BF,
-            ni: INPUT_INSTRUCTION_BF,
+            ci: InstructionType::Right.to_base_field(),
+            ni: InstructionType::ReadChar.to_base_field(),
         };
 
         let ins_2 = InstructionTableRow {
             ip: BaseField::from(2),
-            ci: INPUT_INSTRUCTION_BF,
-            ni: SHIFT_LEFT_INSTRUCTION_BF,
+            ci: InstructionType::ReadChar.to_base_field(),
+            ni: InstructionType::Left.to_base_field(),
         };
 
         let ins_3 = InstructionTableRow {
             ip: BaseField::from(3),
-            ci: SHIFT_LEFT_INSTRUCTION_BF,
-            ni: JUMP_IF_ZERO_INSTRUCTION_BF,
+            ci: InstructionType::Left.to_base_field(),
+            ni: InstructionType::JumpIfZero.to_base_field(),
         };
         let ins_4 = InstructionTableRow {
             ip: BaseField::from(4),
-            ci: JUMP_IF_ZERO_INSTRUCTION_BF,
+            ci: InstructionType::JumpIfZero.to_base_field(),
             ni: BaseField::from(12),
         };
         let ins_6 = InstructionTableRow {
             ip: BaseField::from(6),
-            ci: SHIFT_RIGHT_INSTRUCTION_BF,
-            ni: INCREMENT_INSTRUCTION_BF,
+            ci: InstructionType::Right.to_base_field(),
+            ni: InstructionType::Plus.to_base_field(),
         };
         let ins_7 = InstructionTableRow {
             ip: BaseField::from(7),
-            ci: INCREMENT_INSTRUCTION_BF,
-            ni: OUTPUT_INSTRUCTION_BF,
+            ci: InstructionType::Plus.to_base_field(),
+            ni: InstructionType::PutChar.to_base_field(),
         };
         let ins_8 = InstructionTableRow {
             ip: BaseField::from(8),
-            ci: OUTPUT_INSTRUCTION_BF,
-            ni: SHIFT_LEFT_INSTRUCTION_BF,
+            ci: InstructionType::PutChar.to_base_field(),
+            ni: InstructionType::Left.to_base_field(),
         };
         let ins_9 = InstructionTableRow {
             ip: BaseField::from(9),
-            ci: SHIFT_LEFT_INSTRUCTION_BF,
-            ni: DECREMENT_INSTRUCTION_BF,
+            ci: InstructionType::Left.to_base_field(),
+            ni: InstructionType::Minus.to_base_field(),
         };
         let inst_10 = InstructionTableRow {
             ip: BaseField::from(10),
-            ci: DECREMENT_INSTRUCTION_BF,
-            ni: JUMP_IF_NON_ZERO_INSTRUCTION_BF,
+            ci: InstructionType::Minus.to_base_field(),
+            ni: InstructionType::JumpIfNotZero.to_base_field(),
         };
         let ins_11 = InstructionTableRow {
             ip: BaseField::from(11),
-            ci: JUMP_IF_NON_ZERO_INSTRUCTION_BF,
+            ci: InstructionType::JumpIfNotZero.to_base_field(),
             ni: BaseField::from(6),
         };
 
@@ -336,19 +331,19 @@ mod tests {
 
         let ins_0 = InstructionTableRow {
             ip: BaseField::zero(),
-            ci: JUMP_IF_ZERO_INSTRUCTION_BF,
+            ci: InstructionType::JumpIfZero.to_base_field(),
             ni: BaseField::from(4),
         };
 
         let ins_2 = InstructionTableRow {
             ip: BaseField::from(2),
-            ci: DECREMENT_INSTRUCTION_BF,
-            ni: JUMP_IF_NON_ZERO_INSTRUCTION_BF,
+            ci: InstructionType::Minus.to_base_field(),
+            ni: InstructionType::JumpIfNotZero.to_base_field(),
         };
 
         let ins_3 = InstructionTableRow {
             ip: BaseField::from(3),
-            ci: JUMP_IF_NON_ZERO_INSTRUCTION_BF,
+            ci: InstructionType::JumpIfNotZero.to_base_field(),
             ni: BaseField::from(2),
         };
 

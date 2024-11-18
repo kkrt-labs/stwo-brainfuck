@@ -1,5 +1,4 @@
-use crate::utils::{INPUT_INSTRUCTION, OUTPUT_INSTRUCTION};
-use brainfuck_vm::registers::Registers;
+use brainfuck_vm::{instruction::InstructionType, registers::Registers};
 use stwo_prover::core::fields::m31::BaseField;
 
 /// Represents a single row in the I/O Table.
@@ -112,13 +111,13 @@ impl<const N: u32> From<Vec<Registers>> for IOTable<N> {
 ///
 /// This table is made of the memory values (`mv` register) corresponding to
 /// inputs (when the current instruction `ci` equals ',').
-pub type InputTable = IOTable<INPUT_INSTRUCTION>;
+pub type InputTable = IOTable<{ InstructionType::ReadChar.to_u32() }>;
 
 /// Output table (trace) for the Output component.
 ///
 /// This table is made of the memory values (`mv` register) corresponding to
 /// outputs (when the current instruction `ci` equals '.').
-pub type OutputTable = IOTable<OUTPUT_INSTRUCTION>;
+pub type OutputTable = IOTable<{ InstructionType::PutChar.to_u32() }>;
 
 #[cfg(test)]
 mod tests {
@@ -206,12 +205,12 @@ mod tests {
         let reg1 = Registers::default();
         let reg2 = Registers {
             mv: BaseField::one(),
-            ci: BaseField::from(INPUT_INSTRUCTION),
+            ci: BaseField::from(InstructionType::ReadChar.to_base_field()),
             ..Default::default()
         };
         let reg3 = Registers {
             mv: BaseField::from(5),
-            ci: BaseField::from(OUTPUT_INSTRUCTION),
+            ci: BaseField::from(InstructionType::PutChar.to_base_field()),
             ..Default::default()
         };
         let registers: Vec<Registers> = vec![reg3, reg1, reg2];
@@ -230,12 +229,12 @@ mod tests {
         let reg1 = Registers::default();
         let reg2 = Registers {
             mv: BaseField::one(),
-            ci: BaseField::from(INPUT_INSTRUCTION),
+            ci: BaseField::from(InstructionType::ReadChar.to_base_field()),
             ..Default::default()
         };
         let reg3 = Registers {
             mv: BaseField::from(5),
-            ci: BaseField::from(OUTPUT_INSTRUCTION),
+            ci: BaseField::from(InstructionType::PutChar.to_base_field()),
             ..Default::default()
         };
         let registers: Vec<Registers> = vec![reg3, reg1, reg2];

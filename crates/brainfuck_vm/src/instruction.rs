@@ -1,6 +1,7 @@
 // Taken from rkdud007 brainfuck-zkvm https://github.com/rkdud007/brainfuck-zkvm/blob/main/src/instruction.rs
 
 use std::{fmt::Display, str::FromStr};
+use stwo_prover::core::fields::m31::BaseField;
 use thiserror::Error;
 
 /// Custom error type for instructions
@@ -58,6 +59,39 @@ impl FromStr for InstructionType {
         }
     }
 }
+
+impl InstructionType {
+    /// Convert an [`InstructionType`] to its corresponding u32 representation
+    pub const fn to_u32(&self) -> u32 {
+        match self {
+            InstructionType::Right => b'>' as u32,
+            InstructionType::Left => b'<' as u32,
+            InstructionType::Plus => b'+' as u32,
+            InstructionType::Minus => b'-' as u32,
+            InstructionType::PutChar => b'.' as u32,
+            InstructionType::ReadChar => b',' as u32,
+            InstructionType::JumpIfZero => b'[' as u32,
+            InstructionType::JumpIfNotZero => b']' as u32,
+        }
+    }
+
+    /// Convert an [`InstructionType`] to a [`BaseField`]
+    pub const fn to_base_field(&self) -> BaseField {
+        BaseField::from_u32_unchecked(self.to_u32())
+    }
+}
+
+// Define all valid instructions as [`BaseField`] values
+pub const VALID_INSTRUCTIONS: [BaseField; 8] = [
+    InstructionType::Right.to_base_field(),
+    InstructionType::Left.to_base_field(),
+    InstructionType::Plus.to_base_field(),
+    InstructionType::Minus.to_base_field(),
+    InstructionType::PutChar.to_base_field(),
+    InstructionType::ReadChar.to_base_field(),
+    InstructionType::JumpIfZero.to_base_field(),
+    InstructionType::JumpIfNotZero.to_base_field(),
+];
 
 impl Display for InstructionType {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -141,6 +175,54 @@ mod tests {
     fn test_instruction_type_from_u8_invalid() {
         let result = InstructionType::try_from(b'x');
         assert_eq!(result, Err(InstructionError::Conversion('x')));
+    }
+
+    #[test]
+    fn test_instruction_type_to_u32() {
+        assert_eq!(InstructionType::Right.to_u32(), b'>' as u32);
+        assert_eq!(InstructionType::Left.to_u32(), b'<' as u32);
+        assert_eq!(InstructionType::Plus.to_u32(), b'+' as u32);
+        assert_eq!(InstructionType::Minus.to_u32(), b'-' as u32);
+        assert_eq!(InstructionType::PutChar.to_u32(), b'.' as u32);
+        assert_eq!(InstructionType::ReadChar.to_u32(), b',' as u32);
+        assert_eq!(InstructionType::JumpIfZero.to_u32(), b'[' as u32);
+        assert_eq!(InstructionType::JumpIfNotZero.to_u32(), b']' as u32);
+    }
+
+    #[test]
+    fn test_instruction_type_to_base_field() {
+        assert_eq!(
+            InstructionType::Right.to_base_field(),
+            BaseField::from_u32_unchecked(b'>' as u32)
+        );
+        assert_eq!(
+            InstructionType::Left.to_base_field(),
+            BaseField::from_u32_unchecked(b'<' as u32)
+        );
+        assert_eq!(
+            InstructionType::Plus.to_base_field(),
+            BaseField::from_u32_unchecked(b'+' as u32)
+        );
+        assert_eq!(
+            InstructionType::Minus.to_base_field(),
+            BaseField::from_u32_unchecked(b'-' as u32)
+        );
+        assert_eq!(
+            InstructionType::PutChar.to_base_field(),
+            BaseField::from_u32_unchecked(b'.' as u32)
+        );
+        assert_eq!(
+            InstructionType::ReadChar.to_base_field(),
+            BaseField::from_u32_unchecked(b',' as u32)
+        );
+        assert_eq!(
+            InstructionType::JumpIfZero.to_base_field(),
+            BaseField::from_u32_unchecked(b'[' as u32)
+        );
+        assert_eq!(
+            InstructionType::JumpIfNotZero.to_base_field(),
+            BaseField::from_u32_unchecked(b']' as u32)
+        );
     }
 
     // Test Instruction struct creation
