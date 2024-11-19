@@ -192,6 +192,7 @@ dependencies = [
  "brainfuck_vm",
  "num-traits",
  "stwo-prover",
+ "thiserror 2.0.0",
 ]
 
 [[package]]

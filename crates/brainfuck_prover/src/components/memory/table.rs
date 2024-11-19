@@ -1,6 +1,20 @@
 use brainfuck_vm::registers::Registers;
 use num_traits::One;
-use stwo_prover::core::fields::m31::BaseField;
+use stwo_prover::core::{
+    backend::{
+        simd::{column::BaseColumn, m31::LOG_N_LANES, SimdBackend},
+        Column,
+    },
+    fields::m31::BaseField,
+    poly::{
+        circle::{CanonicCoset, CircleEvaluation},
+        BitReversedOrder,
+    },
+    ColumnVec,
+};
+use thiserror::Error;
+
+use super::component::Claim;
 
 /// Represents a single row in the Memory Table.
 ///
@@ -151,6 +165,51 @@ impl From<Vec<Registers>> for MemoryTable {
 
         memory_table
     }
+}
+
+/// Number of columns in the memory table
+pub const N_COLS_MEMORY_TABLE: usize = 4;
+/// Index of the `clk` register column in the Memory trace.
+const CLK_COL_INDEX: usize = 0;
+/// Index of the `mp` register column in the Memory trace.
+const MP_COL_INDEX: usize = 1;
+/// Index of the `mv` register column in the Memory trace.
+const MV_COL_INDEX: usize = 2;
+/// Index of the `d` register column in the Memory trace.
+const D_COL_INDEX: usize = 3;
+
+/// Type for trace to be used in Stwo.
+pub type Trace = ColumnVec<CircleEvaluation<SimdBackend, BaseField, BitReversedOrder>>;
+
+/// Custom error type for the Trace.
+#[derive(Debug, Error, PartialEq)]
+pub enum TraceError {
+    /// The component trace is empty.
+    #[error("The trace is empty.")]
+    EmptyTraceError,
+}
+
+pub fn write_trace(memory: &MemoryTable) -> Result<(Trace, Claim), TraceError> {
+    let n_rows = memory.table.len() as u32;
+    if n_rows == 0 {
+        return Err(TraceError::EmptyTraceError);
+    }
+    let log_size = n_rows.ilog2() + LOG_N_LANES;
+    let mut trace: Vec<BaseColumn> =
+        (0..N_COLS_MEMORY_TABLE).map(|_| BaseColumn::zeros(1 << log_size)).collect();
+
+    for vec_row in 0..1 << (log_size - LOG_N_LANES) {
+        let MemoryTableRow { clk, mp, mv, d } = memory.table[vec_row];
+        trace[CLK_COL_INDEX].data[vec_row] = clk.into();
+        trace[MP_COL_INDEX].data[vec_row] = mp.into();
+        trace[MV_COL_INDEX].data[vec_row] = mv.into();
+        trace[D_COL_INDEX].data[vec_row] = d.into();
+    }
+
+    let domain = CanonicCoset::new(log_size).circle_domain();
+    let trace = trace.into_iter().map(|col| CircleEvaluation::new(domain, col)).collect();
+
+    Ok((trace, Claim { log_size: n_rows }))
 }
 
 #[cfg(test)]
@@ -333,5 +392,57 @@ mod tests {
         ]);
 
         assert_eq!(MemoryTable::from(registers), expected_memory_table);
+    }
+
+    #[test]
+    fn test_write_trace() {
+        let mut memory_table = MemoryTable::new();
+        let rows = vec![
+            MemoryTableRow::new(BaseField::zero(), BaseField::from(43), BaseField::from(91)),
+            MemoryTableRow::new(BaseField::one(), BaseField::from(91), BaseField::from(9)),
+        ];
+        memory_table.add_rows(rows);
+
+        let (trace, claim) = write_trace(&memory_table).unwrap();
+
+        let expected_n_rows: u32 = 2;
+        let expected_log_size = expected_n_rows.ilog2() + LOG_N_LANES;
+        let expected_size = 1 << expected_log_size;
+        let mut clk_column: BaseColumn = BaseColumn::zeros(expected_size);
+        let mut mp_column: BaseColumn = BaseColumn::zeros(expected_size);
+        let mut mv_col: BaseColumn = BaseColumn::zeros(expected_size);
+        let mut d_column: BaseColumn = BaseColumn::zeros(expected_size);
+
+        clk_column.data[0] = BaseField::zero().into();
+        clk_column.data[1] = BaseField::one().into();
+
+        mp_column.data[0] = BaseField::from(43).into();
+        mp_column.data[1] = BaseField::from(91).into();
+
+        mv_col.data[0] = BaseField::from(91).into();
+        mv_col.data[1] = BaseField::from(9).into();
+
+        d_column.data[0] = BaseField::zero().into();
+        d_column.data[1] = BaseField::zero().into();
+
+        let domain = CanonicCoset::new(expected_log_size).circle_domain();
+        let expected_trace: Trace = vec![clk_column, mp_column, mv_col, d_column]
+            .into_iter()
+            .map(|col| CircleEvaluation::new(domain, col))
+            .collect();
+        let expected_claim = Claim { log_size: expected_n_rows };
+
+        assert_eq!(claim, expected_claim);
+        for col_index in 0..expected_trace.len() {
+            assert_eq!(trace[col_index].domain, expected_trace[col_index].domain);
+            assert_eq!(trace[col_index].to_cpu().values, expected_trace[col_index].to_cpu().values);
+        }
+    }
+    #[test]
+    fn test_write_empty_trace() {
+        let memory_table = MemoryTable::new();
+        let run = write_trace(&memory_table);
+
+        assert!(matches!(run, Err(TraceError::EmptyTraceError)));
     }
 }
