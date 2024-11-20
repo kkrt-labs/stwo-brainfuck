@@ -206,8 +206,8 @@ pub fn write_trace(memory: &MemoryTable) -> Result<(TraceEval, Claim), TraceErro
     let domain = CanonicCoset::new(log_size).circle_domain();
     let trace = trace.into_iter().map(|col| CircleEvaluation::new(domain, col)).collect();
 
-    // TODO: Confirm that the log_size in `Claim` is `log_n_rows`
-    Ok((trace, Claim { log_size: log_n_rows }))
+    // TODO: Confirm that the log_size in `Claim` is `log_size`, including the SIMD lanes
+    Ok((trace, Claim { log_size }))
 }
 
 #[cfg(test)]
@@ -428,7 +428,7 @@ mod tests {
             .into_iter()
             .map(|col| CircleEvaluation::new(domain, col))
             .collect();
-        let expected_claim = Claim { log_size: expected_log_n_rows };
+        let expected_claim = Claim { log_size: expected_log_size };
 
         assert_eq!(claim, expected_claim);
         for col_index in 0..expected_trace.len() {
