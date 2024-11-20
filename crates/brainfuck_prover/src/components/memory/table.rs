@@ -249,10 +249,10 @@ impl MemoryColumn {
     /// Returns the index of the column in the Memory table
     pub const fn index(self) -> usize {
         match self {
-            MemoryColumn::Clk => 0,
-            MemoryColumn::Mp => 1,
-            MemoryColumn::Mv => 2,
-            MemoryColumn::D => 3,
+            Self::Clk => 0,
+            Self::Mp => 1,
+            Self::Mv => 2,
+            Self::D => 3,
         }
     }
 
