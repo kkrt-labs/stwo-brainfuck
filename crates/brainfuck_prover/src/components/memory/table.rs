@@ -52,22 +52,22 @@ impl MemoryTableRow {
     }
 
     /// Getter for the `clk` field.
-    pub fn clk(&self) -> BaseField {
+    pub const fn clk(&self) -> BaseField {
         self.clk
     }
 
     /// Getter for the `mp` field.
-    pub fn mp(&self) -> BaseField {
+    pub const fn mp(&self) -> BaseField {
         self.mp
     }
 
     /// Getter for the `mv` field.
-    pub fn mv(&self) -> BaseField {
+    pub const fn mv(&self) -> BaseField {
         self.mv
     }
 
     /// Getter for the `d` field.
-    pub fn d(&self) -> BaseField {
+    pub const fn d(&self) -> BaseField {
         self.d
     }
 }
@@ -106,8 +106,8 @@ impl MemoryTable {
         Self::default()
     }
 
-    /// Getter for the `table`field.`
-    pub fn table(&self) -> &Vec<MemoryTableRow> {
+    /// Getter for the `table` field.
+    pub const fn table(&self) -> &Vec<MemoryTableRow> {
         &self.table
     }
 
@@ -232,8 +232,7 @@ pub fn get_trace_evaluation(memory: &MemoryTable) -> Result<(TraceEval, Claim), 
     let mut trace: Vec<BaseColumn> =
         (0..N_COLS_MEMORY_TABLE).map(|_| BaseColumn::zeros(1 << log_size)).collect();
 
-    for vec_row in 0..1 << (log_n_rows) {
-        let row = &table[vec_row];
+    for (vec_row, row) in table.iter().enumerate().take(1 << log_n_rows) {
         trace[CLK_COL_INDEX].data[vec_row] = row.clk().into();
         trace[MP_COL_INDEX].data[vec_row] = row.mp().into();
         trace[MV_COL_INDEX].data[vec_row] = row.mv().into();
