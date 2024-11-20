@@ -18,7 +18,7 @@ fn test_a_bc() {
     let (mut machine, output) = create_test_machine(&code, input);
     machine.execute().unwrap();
     let expected_output = b"bc".to_vec();
-    assert_eq!(output.get_output(), expected_output);
+    assert_eq!(output.output(), expected_output);
 }
 
 #[test]
@@ -30,7 +30,7 @@ fn test_collatz() {
     let (mut machine, output) = create_test_machine(&code, input);
     machine.execute().unwrap();
     let expected_output = [0x31, 0x36, 10].to_vec(); // 16 EOF
-    assert_eq!(output.get_output(), expected_output);
+    assert_eq!(output.output(), expected_output);
 }
 
 #[test]
@@ -41,7 +41,7 @@ fn test_hello_world_1() {
     let (mut machine, output) = create_test_machine(&code, &[]);
     machine.execute().unwrap();
     let expected_output = b"Hello World!\n".to_vec();
-    assert_eq!(output.get_output(), expected_output);
+    assert_eq!(output.output(), expected_output);
 }
 
 #[test]
@@ -52,7 +52,7 @@ fn test_hello_world_2() {
     let (mut machine, output) = create_test_machine(&code, &[]);
     machine.execute().unwrap();
     let expected_output = b"Hello World!\n".to_vec();
-    assert_eq!(output.get_output(), expected_output);
+    assert_eq!(output.output(), expected_output);
 }
 
 #[test]
@@ -63,7 +63,7 @@ fn test_hello_world_3() {
     let (mut machine, output) = create_test_machine(&code, &[]);
     machine.execute().unwrap();
     let expected_output = b"Hello, World!\n".to_vec();
-    assert_eq!(output.get_output(), expected_output);
+    assert_eq!(output.output(), expected_output);
 }
 
 #[test]
@@ -74,5 +74,5 @@ fn test_hello_world_4() {
     let (mut machine, output) = create_test_machine(&code, &[]);
     machine.execute().unwrap();
     let expected_output = b"Hello World!\n".to_vec();
-    assert_eq!(output.get_output(), expected_output);
+    assert_eq!(output.output(), expected_output);
 }

@@ -352,7 +352,7 @@ mod tests {
 
         machine.execute()?;
 
-        let output_data = output.get_output();
+        let output_data = output.output();
         assert_eq!(output_data, input);
         Ok(())
     }

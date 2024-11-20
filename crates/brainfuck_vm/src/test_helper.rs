@@ -16,7 +16,7 @@ impl TestWriter {
         Self { buffer: Rc::new(RefCell::new(Vec::new())) }
     }
 
-    pub fn get_output(&self) -> Vec<u8> {
+    pub fn output(&self) -> Vec<u8> {
         self.buffer.borrow().clone()
     }
 }
