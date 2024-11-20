@@ -207,7 +207,7 @@ mod tests {
         let () = machine.execute().expect("Failed to execute machine");
 
         // Get the trace of the executed program
-        let trace = machine.get_trace();
+        let trace = machine.trace();
 
         // Convert the trace to an `InstructionTable`
         let instruction_table: InstructionTable = (trace, machine.program()).into();
@@ -326,7 +326,7 @@ mod tests {
         let () = machine.execute().expect("Failed to execute machine");
 
         // Get the trace of the executed program
-        let trace = machine.get_trace();
+        let trace = machine.trace();
 
         // Convert the trace to an `InstructionTable`
         let instruction_table: InstructionTable = (trace, machine.program()).into();

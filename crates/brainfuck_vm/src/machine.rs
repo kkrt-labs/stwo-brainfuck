@@ -237,7 +237,7 @@ impl Machine {
         self.trace.push(self.state.registers.clone());
     }
 
-    pub fn get_trace(&self) -> Vec<Registers> {
+    pub fn trace(&self) -> Vec<Registers> {
         self.trace.clone()
     }
 
@@ -400,14 +400,14 @@ mod tests {
     }
 
     #[test]
-    fn test_get_trace() -> Result<(), MachineError> {
+    fn test_trace() -> Result<(), MachineError> {
         // '++'
         let code = vec![BaseField::from(43), BaseField::from(43)];
         let (mut machine, _) = create_test_machine(&code, &[]);
         machine.execute()?;
 
         // Initial state + executed instructions
-        let trace = machine.get_trace();
+        let trace = machine.trace();
         let initial_state = Registers {
             clk: BaseField::zero(),
             ip: BaseField::zero(),
@@ -448,7 +448,7 @@ mod tests {
         machine.execute()?;
 
         // Initial state + executed instructions
-        let trace = machine.get_trace();
+        let trace = machine.trace();
         let initial_state = Registers {
             clk: BaseField::zero(),
             ip: BaseField::zero(),
@@ -483,7 +483,7 @@ mod tests {
         assert_eq!(trace[2], final_state);
 
         machine.pad_trace();
-        let trace = machine.get_trace();
+        let trace = machine.trace();
         let dummy = Registers { clk: final_state.clk + BaseField::one(), ..final_state };
 
         assert_eq!(trace.len(), 4);
