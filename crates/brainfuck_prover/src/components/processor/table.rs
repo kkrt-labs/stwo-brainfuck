@@ -29,7 +29,7 @@ pub struct ProcessorTableRow {
     mp: BaseField,
     /// Memory value: the value at the current memory cell.
     mv: BaseField,
-    /// Memory value increment flag: indicates if the memory value should be incremented.
+    /// Memory value inverse: the modular inverse of `mv` on the cell values' range (over [`BaseField`])
     mvi: BaseField,
 }
 
