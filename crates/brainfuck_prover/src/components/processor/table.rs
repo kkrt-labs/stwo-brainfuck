@@ -14,7 +14,7 @@ use stwo_prover::core::fields::m31::BaseField;
 /// - `ni`: The next instruction.
 /// - `mp`: The memory pointer.
 /// - `mv`: The memory value.
-/// - `mvi`: The memory value increment flag.
+/// - `mvi`: The memory value inverse.
 #[derive(Debug, Default, PartialEq, Eq, Clone)]
 pub struct ProcessorTableRow {
     /// Cycle count: increases by one per step.
