@@ -8,7 +8,7 @@ use stwo_prover::core::fields::m31::BaseField;
 /// register values for each cycle that the program ran.
 ///
 /// Each row contains the values for the following registers:
-/// - `clk`: The cycle count, which increases by one per step.
+/// - `clk`: The clock cycle counter, represents the current step.
 /// - `ip`: The instruction pointer.
 /// - `ci`: The current instruction.
 /// - `ni`: The next instruction.
