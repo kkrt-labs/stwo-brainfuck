@@ -175,7 +175,8 @@ const MV_COL_INDEX: usize = 2;
 /// Index of the `d` register column in the Memory trace.
 const D_COL_INDEX: usize = 3;
 
-/// Transforms the [`MemoryTable`] into [`Trace`], to be commited when generating a STARK proof.
+/// Transforms the [`MemoryTable`] into [`super::super::TraceEval`], to be commited when generating
+/// a STARK proof.
 ///
 /// The [`MemoryTable`] is transformed from an array of rows (one element = one step of all
 /// registers) to an array of columns (one element = all steps of one register).
