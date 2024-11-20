@@ -1,3 +1,5 @@
+use super::component::Claim;
+use crate::components::{TraceError, TraceEval};
 use brainfuck_vm::registers::Registers;
 use num_traits::One;
 use stwo_prover::core::{
@@ -8,10 +10,6 @@ use stwo_prover::core::{
     fields::m31::BaseField,
     poly::circle::{CanonicCoset, CircleEvaluation},
 };
-
-use crate::components::{TraceError, TraceEval};
-
-use super::component::Claim;
 
 /// Represents a single row in the Memory Table.
 ///
@@ -223,7 +221,7 @@ pub fn get_trace_evaluation(memory: &MemoryTable) -> Result<(TraceEval, Claim), 
     let table = memory.table();
     let n_rows = table.len() as u32;
     if n_rows == 0 {
-        return Err(TraceError::EmptyTraceError);
+        return Err(TraceError::EmptyTrace);
     }
     let log_n_rows = n_rows.ilog2();
     // TODO: Confirm that the log_size used for evaluation on Circle domain is the log_size of the
@@ -477,6 +475,6 @@ mod tests {
         let memory_table = MemoryTable::new();
         let run = get_trace_evaluation(&memory_table);
 
-        assert!(matches!(run, Err(TraceError::EmptyTraceError)));
+        assert!(matches!(run, Err(TraceError::EmptyTrace)));
     }
 }

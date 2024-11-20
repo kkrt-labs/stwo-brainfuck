@@ -18,5 +18,5 @@ pub type TraceEval = ColumnVec<CircleEvaluation<SimdBackend, BaseField, BitRever
 pub enum TraceError {
     /// The component trace is empty.
     #[error("The trace is empty.")]
-    EmptyTraceError,
+    EmptyTrace,
 }

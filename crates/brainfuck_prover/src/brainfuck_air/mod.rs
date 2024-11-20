@@ -1,3 +1,4 @@
+use crate::components::memory;
 use brainfuck_vm::machine::Machine;
 use stwo_prover::core::{
     air::{Component, ComponentProver},
@@ -11,8 +12,6 @@ use stwo_prover::core::{
         ops::MerkleHasher,
     },
 };
-
-use crate::components::memory;
 
 /// The STARK proof of the execution of a given Brainfuck program.
 ///
