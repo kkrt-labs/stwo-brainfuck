@@ -64,18 +64,6 @@ impl<const N: u32> IOTable<N> {
         self.table.extend(rows);
     }
 
-    /// Retrieves a reference to a specific row in the I/O Table.
-    ///
-    /// # Arguments
-    /// * `row` - The [`IOTableRow`] to search for in the table.
-    ///
-    /// # Returns
-    /// An `Option` containing a reference to the matching row if found,
-    /// or `None` if the row does not exist in the table.
-    pub fn get_row(&self, row: &IOTableRow) -> Option<&IOTableRow> {
-        self.table.iter().find(|r| *r == row)
-    }
-
     /// Pads the I/O table with dummy rows up to the next power of two length.
     ///
     /// Each dummy row sets the memory value register `mv` to zero.
@@ -174,30 +162,6 @@ mod tests {
         io_table.add_rows(rows.clone());
         // Check that the table contains the added rows
         assert_eq!(io_table, IOTable { table: rows });
-    }
-
-    #[test]
-    fn test_table_get_existing_row() {
-        let mut io_table = TestIOTable::new();
-        // Create a row to add to the table
-        let row = IOTableRow { mv: BaseField::from(91) };
-        // Add the row to the table
-        io_table.add_row(row.clone());
-        // Retrieve the row from the table
-        let retrieved = io_table.get_row(&row);
-        // Check that the retrieved row matches the added row
-        assert_eq!(retrieved.unwrap(), &row, "Retrieved row should match the added row.");
-    }
-
-    #[test]
-    fn test_table_get_non_existing_row() {
-        let io_table = TestIOTable::new();
-        // Create a row to search for in the table
-        let row = IOTableRow { mv: BaseField::from(91) };
-        // Try to retrieve the non-existing row from the table
-        let retrieved = io_table.get_row(&row);
-        // Check that the retrieved row is None
-        assert!(retrieved.is_none(), "Should return None for a non-existing row.");
     }
 
     #[test]
