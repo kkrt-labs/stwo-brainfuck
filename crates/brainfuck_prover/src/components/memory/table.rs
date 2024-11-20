@@ -189,6 +189,14 @@ pub enum TraceError {
     EmptyTraceError,
 }
 
+/// Transforms the [`MemoryTable`] into [`Trace`], to be commited when generating a STARK proof.
+///
+/// The [`MemoryTable`] is transformed from an array of rows (one element = one step of all
+/// registers) to an array of columns (one element = all steps of one register).
+/// It is then evaluated on the circle domain.
+///
+/// # Arguments
+/// * memory - The [`MemoryTable`] containing the sorted and padded trace as an array of rows.
 pub fn write_trace(memory: &MemoryTable) -> Result<(Trace, Claim), TraceError> {
     let n_rows = memory.table.len() as u32;
     if n_rows == 0 {
