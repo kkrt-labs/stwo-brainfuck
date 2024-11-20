@@ -131,7 +131,8 @@ pub fn prove_brainfuck(
     // └───────────────────────────────────────┘
     let vm_trace = inputs.get_trace();
 
-    let (memory_trace, memory_claim) = memory::table::write_trace(&vm_trace.into()).unwrap();
+    let (memory_trace, memory_claim) =
+        memory::table::get_trace_evaluation(&vm_trace.into()).unwrap();
 
     tree_builder.extend_evals(memory_trace);
 

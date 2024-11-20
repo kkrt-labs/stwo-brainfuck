@@ -50,6 +50,26 @@ impl MemoryTableRow {
     pub fn new_dummy(clk: BaseField, mp: BaseField, mv: BaseField) -> Self {
         Self { clk, mp, mv, d: BaseField::one() }
     }
+
+    /// Getter for the `clk` field.
+    pub fn clk(&self) -> BaseField {
+        self.clk
+    }
+
+    /// Getter for the `mp` field.
+    pub fn mp(&self) -> BaseField {
+        self.mp
+    }
+
+    /// Getter for the `mv` field.
+    pub fn mv(&self) -> BaseField {
+        self.mv
+    }
+
+    /// Getter for the `d` field.
+    pub fn d(&self) -> BaseField {
+        self.d
+    }
 }
 
 impl From<(&Registers, bool)> for MemoryTableRow {
@@ -84,6 +104,11 @@ impl MemoryTable {
     /// A new instance of [`MemoryTable`] with an empty table.
     pub fn new() -> Self {
         Self::default()
+    }
+
+    /// Getter for the `table`field.`
+    pub fn table(&self) -> &Vec<MemoryTableRow> {
+        &self.table
     }
 
     /// Adds a new row to the Memory Table.
@@ -194,8 +219,9 @@ const D_COL_INDEX: usize = 3;
 ///
 /// # Arguments
 /// * memory - The [`MemoryTable`] containing the sorted and padded trace as an array of rows.
-pub fn write_trace(memory: &MemoryTable) -> Result<(TraceEval, Claim), TraceError> {
-    let n_rows = memory.table.len() as u32;
+pub fn get_trace_evaluation(memory: &MemoryTable) -> Result<(TraceEval, Claim), TraceError> {
+    let table = memory.table();
+    let n_rows = table.len() as u32;
     if n_rows == 0 {
         return Err(TraceError::EmptyTraceError);
     }
@@ -207,11 +233,11 @@ pub fn write_trace(memory: &MemoryTable) -> Result<(TraceEval, Claim), TraceErro
         (0..N_COLS_MEMORY_TABLE).map(|_| BaseColumn::zeros(1 << log_size)).collect();
 
     for vec_row in 0..1 << (log_n_rows) {
-        let MemoryTableRow { clk, mp, mv, d } = memory.table[vec_row];
-        trace[CLK_COL_INDEX].data[vec_row] = clk.into();
-        trace[MP_COL_INDEX].data[vec_row] = mp.into();
-        trace[MV_COL_INDEX].data[vec_row] = mv.into();
-        trace[D_COL_INDEX].data[vec_row] = d.into();
+        let row = &table[vec_row];
+        trace[CLK_COL_INDEX].data[vec_row] = row.clk().into();
+        trace[MP_COL_INDEX].data[vec_row] = row.mp().into();
+        trace[MV_COL_INDEX].data[vec_row] = row.mv().into();
+        trace[D_COL_INDEX].data[vec_row] = row.d().into();
     }
 
     let domain = CanonicCoset::new(log_size).circle_domain();
@@ -412,7 +438,7 @@ mod tests {
         ];
         memory_table.add_rows(rows);
 
-        let (trace, claim) = write_trace(&memory_table).unwrap();
+        let (trace, claim) = get_trace_evaluation(&memory_table).unwrap();
 
         let expected_log_n_rows: u32 = 1;
         let expected_log_size = expected_log_n_rows + LOG_N_LANES;
@@ -450,7 +476,7 @@ mod tests {
     #[test]
     fn test_write_empty_trace() {
         let memory_table = MemoryTable::new();
-        let run = write_trace(&memory_table);
+        let run = get_trace_evaluation(&memory_table);
 
         assert!(matches!(run, Err(TraceError::EmptyTraceError)));
     }
