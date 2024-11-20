@@ -1,6 +1,15 @@
+use super::component::Claim;
+use crate::components::{TraceError, TraceEval};
 use brainfuck_vm::registers::Registers;
 use num_traits::One;
-use stwo_prover::core::fields::m31::BaseField;
+use stwo_prover::core::{
+    backend::{
+        simd::{column::BaseColumn, m31::LOG_N_LANES},
+        Column,
+    },
+    fields::m31::BaseField,
+    poly::circle::{CanonicCoset, CircleEvaluation},
+};
 
 /// Represents a single row in the Memory Table.
 ///
@@ -22,12 +31,42 @@ pub struct MemoryTableRow {
 }
 
 impl MemoryTableRow {
+    /// Creates a row for the [`MemoryTable`] which is considered 'real'.
+    ///
+    /// A 'real' row, is a row that is part of the execution trace from the Brainfuck program
+    /// execution.
     pub fn new(clk: BaseField, mp: BaseField, mv: BaseField) -> Self {
         Self { clk, mp, mv, ..Default::default() }
     }
 
+    /// Creates a row for the [`MemoryTable`] which is considered 'dummy'.
+    ///
+    /// A 'dummy' row, is a row that is not part of the execution trace from the Brainfuck program
+    /// execution.
+    /// They are used for padding and filling the `clk` gaps after sorting by `mp`, to enforce the
+    /// correct sorting.
     pub fn new_dummy(clk: BaseField, mp: BaseField, mv: BaseField) -> Self {
         Self { clk, mp, mv, d: BaseField::one() }
+    }
+
+    /// Getter for the `clk` field.
+    pub const fn clk(&self) -> BaseField {
+        self.clk
+    }
+
+    /// Getter for the `mp` field.
+    pub const fn mp(&self) -> BaseField {
+        self.mp
+    }
+
+    /// Getter for the `mv` field.
+    pub const fn mv(&self) -> BaseField {
+        self.mv
+    }
+
+    /// Getter for the `d` field.
+    pub const fn d(&self) -> BaseField {
+        self.d
     }
 }
 
@@ -63,6 +102,11 @@ impl MemoryTable {
     /// A new instance of [`MemoryTable`] with an empty table.
     pub fn new() -> Self {
         Self::default()
+    }
+
+    /// Getter for the `table` field.
+    pub const fn table(&self) -> &Vec<MemoryTableRow> {
+        &self.table
     }
 
     /// Adds a new row to the Memory Table.
@@ -136,6 +180,41 @@ impl MemoryTable {
             }
         }
     }
+
+    /// Transforms the [`MemoryTable`] into [`super::super::TraceEval`], to be commited when
+    /// generating a STARK proof.
+    ///
+    /// The [`MemoryTable`] is transformed from an array of rows (one element = one step of all
+    /// registers) to an array of columns (one element = all steps of one register).
+    /// It is then evaluated on the circle domain.
+    ///
+    /// # Arguments
+    /// * memory - The [`MemoryTable`] containing the sorted and padded trace as an array of rows.
+    pub fn trace_evaluation(&self) -> Result<(TraceEval, Claim), TraceError> {
+        let n_rows = self.table.len() as u32;
+        if n_rows == 0 {
+            return Err(TraceError::EmptyTrace);
+        }
+        let log_n_rows = n_rows.ilog2();
+        // TODO: Confirm that the log_size used for evaluation on Circle domain is the log_size of
+        // the table plus the SIMD lanes
+        let log_size = log_n_rows + LOG_N_LANES;
+        let mut trace: Vec<BaseColumn> =
+            (0..N_COLS_MEMORY_TABLE).map(|_| BaseColumn::zeros(1 << log_size)).collect();
+
+        for (vec_row, row) in self.table.iter().enumerate().take(1 << log_n_rows) {
+            trace[CLK_COL_INDEX].data[vec_row] = row.clk().into();
+            trace[MP_COL_INDEX].data[vec_row] = row.mp().into();
+            trace[MV_COL_INDEX].data[vec_row] = row.mv().into();
+            trace[D_COL_INDEX].data[vec_row] = row.d().into();
+        }
+
+        let domain = CanonicCoset::new(log_size).circle_domain();
+        let trace = trace.into_iter().map(|col| CircleEvaluation::new(domain, col)).collect();
+
+        // TODO: Confirm that the log_size in `Claim` is `log_size`, including the SIMD lanes
+        Ok((trace, Claim { log_size }))
+    }
 }
 
 impl From<Vec<Registers>> for MemoryTable {
@@ -152,6 +231,17 @@ impl From<Vec<Registers>> for MemoryTable {
         memory_table
     }
 }
+
+/// Number of columns in the memory table
+pub const N_COLS_MEMORY_TABLE: usize = 4;
+/// Index of the `clk` register column in the Memory trace.
+const CLK_COL_INDEX: usize = 0;
+/// Index of the `mp` register column in the Memory trace.
+const MP_COL_INDEX: usize = 1;
+/// Index of the `mv` register column in the Memory trace.
+const MV_COL_INDEX: usize = 2;
+/// Index of the `d` register column in the Memory trace.
+const D_COL_INDEX: usize = 3;
 
 #[cfg(test)]
 mod tests {
@@ -333,5 +423,57 @@ mod tests {
         ]);
 
         assert_eq!(MemoryTable::from(registers), expected_memory_table);
+    }
+
+    #[test]
+    fn test_write_trace() {
+        let mut memory_table = MemoryTable::new();
+        let rows = vec![
+            MemoryTableRow::new(BaseField::zero(), BaseField::from(43), BaseField::from(91)),
+            MemoryTableRow::new(BaseField::one(), BaseField::from(91), BaseField::from(9)),
+        ];
+        memory_table.add_rows(rows);
+
+        let (trace, claim) = memory_table.trace_evaluation().unwrap();
+
+        let expected_log_n_rows: u32 = 1;
+        let expected_log_size = expected_log_n_rows + LOG_N_LANES;
+        let expected_size = 1 << expected_log_size;
+        let mut clk_column = BaseColumn::zeros(expected_size);
+        let mut mp_column = BaseColumn::zeros(expected_size);
+        let mut mv_col = BaseColumn::zeros(expected_size);
+        let mut d_column = BaseColumn::zeros(expected_size);
+
+        clk_column.data[0] = BaseField::zero().into();
+        clk_column.data[1] = BaseField::one().into();
+
+        mp_column.data[0] = BaseField::from(43).into();
+        mp_column.data[1] = BaseField::from(91).into();
+
+        mv_col.data[0] = BaseField::from(91).into();
+        mv_col.data[1] = BaseField::from(9).into();
+
+        d_column.data[0] = BaseField::zero().into();
+        d_column.data[1] = BaseField::zero().into();
+
+        let domain = CanonicCoset::new(expected_log_size).circle_domain();
+        let expected_trace: TraceEval = vec![clk_column, mp_column, mv_col, d_column]
+            .into_iter()
+            .map(|col| CircleEvaluation::new(domain, col))
+            .collect();
+        let expected_claim = Claim { log_size: expected_log_size };
+
+        assert_eq!(claim, expected_claim);
+        for col_index in 0..expected_trace.len() {
+            assert_eq!(trace[col_index].domain, expected_trace[col_index].domain);
+            assert_eq!(trace[col_index].to_cpu().values, expected_trace[col_index].to_cpu().values);
+        }
+    }
+    #[test]
+    fn test_write_empty_trace() {
+        let memory_table = MemoryTable::new();
+        let run = memory_table.trace_evaluation();
+
+        assert!(matches!(run, Err(TraceError::EmptyTrace)));
     }
 }

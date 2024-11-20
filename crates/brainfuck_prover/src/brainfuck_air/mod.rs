@@ -1,3 +1,5 @@
+use crate::components::memory::{self, table::MemoryTable};
+use brainfuck_vm::machine::Machine;
 use stwo_prover::core::{
     air::{Component, ComponentProver},
     backend::simd::SimdBackend,
@@ -24,15 +26,17 @@ pub struct BrainfuckProof<H: MerkleHasher> {
 ///
 /// It includes the common claim values such as the initial and final states
 /// and the claim of each component.
-pub struct BrainfuckClaim;
+pub struct BrainfuckClaim {
+    pub memory: memory::component::Claim,
+}
 
 impl BrainfuckClaim {
-    pub fn mix_into(&self, _channel: &mut impl Channel) {
-        todo!();
+    pub fn mix_into(&self, channel: &mut impl Channel) {
+        self.memory.mix_into(channel);
     }
 
     pub fn log_sizes(&self) -> TreeVec<Vec<u32>> {
-        todo!();
+        self.memory.log_sizes()
     }
 }
 
@@ -93,12 +97,19 @@ impl BrainfuckComponents {
     }
 }
 
-/// `LOG_MAX_ROWS = log2(MAX_ROWS)` ?
+/// `LOG_MAX_ROWS = ilog2(MAX_ROWS)`
 ///
 /// Means that the ZK-VM does not accept programs with more than 2^20 steps (1M steps).
 const LOG_MAX_ROWS: u32 = 20;
 
-pub fn prove_brainfuck() -> Result<BrainfuckProof<Blake2sMerkleHasher>, ProvingError> {
+/// Generate a STARK proof of the given Brainfuck program execution.
+///
+/// # Arguments
+/// * `inputs` - The [`Machine`] struct after the program execution
+/// The inputs contains the program, the memory, the I/O and the trace.
+pub fn prove_brainfuck(
+    inputs: &Machine,
+) -> Result<BrainfuckProof<Blake2sMerkleHasher>, ProvingError> {
     // ┌──────────────────────────┐
     // │     Protocol Setup       │
     // └──────────────────────────┘
@@ -112,22 +123,26 @@ pub fn prove_brainfuck() -> Result<BrainfuckProof<Blake2sMerkleHasher>, ProvingE
     let channel = &mut Blake2sChannel::default();
     let commitment_scheme =
         &mut CommitmentSchemeProver::<_, Blake2sMerkleChannel>::new(config, &twiddles);
-    let tree_builder = commitment_scheme.tree_builder();
+    let mut tree_builder = commitment_scheme.tree_builder();
 
-    // ┌──────────────────────────┐
-    // │   Interaction Phase 0    │
-    // └──────────────────────────┘
+    // ┌───────────────────────────────────────┐
+    // │    Interaction Phase 0 - Main Trace   │
+    // └───────────────────────────────────────┘
+    let vm_trace = inputs.get_trace();
 
-    // Generate BrainfuckClaim (from the execution trace provided by brainfuck_vm)
+    let (memory_trace, memory_claim) = MemoryTable::from(vm_trace).trace_evaluation().unwrap();
+
+    tree_builder.extend_evals(memory_trace);
+
+    let claim = BrainfuckClaim { memory: memory_claim };
 
     // Commit to the claim and the trace.
-    let claim = BrainfuckClaim {};
     claim.mix_into(channel);
     tree_builder.commit(channel);
 
-    // ┌──────────────────────────┐
-    // │   Interaction Phase 1    │
-    // └──────────────────────────┘
+    // ┌───────────────────────────────────────────────┐
+    // │    Interaction Phase 1 - Interaction Trace    │
+    // └───────────────────────────────────────────────┘
 
     // Draw interaction elements
     let interaction_elements = BrainfuckInteractionElements::draw(channel);
@@ -139,9 +154,10 @@ pub fn prove_brainfuck() -> Result<BrainfuckProof<Blake2sMerkleHasher>, ProvingE
     interaction_claim.mix_into(channel);
     tree_builder.commit(channel);
 
-    // ┌──────────────────────────┐
-    // │   Interaction Phase 2    │
-    // └──────────────────────────┘
+    // TODO: move the preprocessed trace to Phase 0
+    // ┌───────────────────────────────────────────────┐
+    // │   Interaction Phase 2 - Preprocessed Trace    │
+    // └───────────────────────────────────────────────┘
 
     // Generate constant columns (e.g. is_first)
     let tree_builder = commitment_scheme.tree_builder();
