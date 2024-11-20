@@ -29,7 +29,8 @@ pub struct ProcessorTableRow {
     mp: BaseField,
     /// Memory value: the value at the current memory cell.
     mv: BaseField,
-    /// Memory value inverse: the modular inverse of `mv` on the cell values' range (over [`BaseField`])
+    /// Memory value inverse: the modular inverse of `mv` on the cell values' range (over
+    /// [`BaseField`])
     mvi: BaseField,
 }
 
@@ -87,7 +88,6 @@ mod tests {
 
     #[test]
     fn test_processor_table_row_from_registers() {
-        // Create a Registers instance with test values
         let registers = Registers {
             clk: BaseField::one(),
             ip: BaseField::from(5),
@@ -98,10 +98,8 @@ mod tests {
             mvi: BaseField::zero(),
         };
 
-        // Convert Registers to ProcessorTableRow
         let row = ProcessorTableRow::from(&registers);
 
-        // Check that the row matches the expected values
         let expected_row = ProcessorTableRow {
             clk: BaseField::one(),
             ip: BaseField::from(5),
@@ -112,26 +110,20 @@ mod tests {
             mvi: BaseField::zero(),
         };
 
-        assert_eq!(row, expected_row, "Row should match the expected values");
+        assert_eq!(row, expected_row);
     }
 
     #[test]
     fn test_processor_table_new() {
-        // Create a new ProcessorTable
         let processor_table = ProcessorTable::new();
 
-        // Check that the table is empty
-        assert!(
-            processor_table.table.is_empty(),
-            "Processor table should be empty upon initialization."
-        );
+        assert!(processor_table.table.is_empty());
     }
 
     #[test]
     fn test_add_row() {
         let mut processor_table = ProcessorTable::new();
 
-        // Create a ProcessorTableRow with test values
         let row = ProcessorTableRow {
             clk: BaseField::from(10),
             ip: BaseField::from(15),
@@ -142,18 +134,15 @@ mod tests {
             mvi: BaseField::one(),
         };
 
-        // Add the row to the Processor Table
         processor_table.add_row(row.clone());
 
-        // Check that the table contains the added row
-        assert_eq!(processor_table.table, vec![row], "Added row should match the expected row.");
+        assert_eq!(processor_table.table, vec![row]);
     }
 
     #[test]
     fn test_add_multiple_rows() {
         let mut processor_table = ProcessorTable::new();
 
-        // Create multiple ProcessorTableRows with test values
         let rows = vec![
             ProcessorTableRow {
                 clk: BaseField::from(1),
@@ -184,15 +173,10 @@ mod tests {
             },
         ];
 
-        // Add the rows to the Processor Table
         for row in &rows {
             processor_table.add_row(row.clone());
         }
 
-        // Check that the table contains all the added rows
-        assert_eq!(
-            processor_table.table, rows,
-            "Processor table should contain all the added rows in order."
-        );
+        assert_eq!(processor_table.table, rows,);
     }
 }
