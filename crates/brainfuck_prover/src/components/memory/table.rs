@@ -180,6 +180,41 @@ impl MemoryTable {
             }
         }
     }
+
+    /// Transforms the [`MemoryTable`] into [`super::super::TraceEval`], to be commited when
+    /// generating a STARK proof.
+    ///
+    /// The [`MemoryTable`] is transformed from an array of rows (one element = one step of all
+    /// registers) to an array of columns (one element = all steps of one register).
+    /// It is then evaluated on the circle domain.
+    ///
+    /// # Arguments
+    /// * memory - The [`MemoryTable`] containing the sorted and padded trace as an array of rows.
+    pub fn trace_evaluation(&self) -> Result<(TraceEval, Claim), TraceError> {
+        let n_rows = self.table.len() as u32;
+        if n_rows == 0 {
+            return Err(TraceError::EmptyTrace);
+        }
+        let log_n_rows = n_rows.ilog2();
+        // TODO: Confirm that the log_size used for evaluation on Circle domain is the log_size of
+        // the table plus the SIMD lanes
+        let log_size = log_n_rows + LOG_N_LANES;
+        let mut trace: Vec<BaseColumn> =
+            (0..N_COLS_MEMORY_TABLE).map(|_| BaseColumn::zeros(1 << log_size)).collect();
+
+        for (vec_row, row) in self.table.iter().enumerate().take(1 << log_n_rows) {
+            trace[CLK_COL_INDEX].data[vec_row] = row.clk().into();
+            trace[MP_COL_INDEX].data[vec_row] = row.mp().into();
+            trace[MV_COL_INDEX].data[vec_row] = row.mv().into();
+            trace[D_COL_INDEX].data[vec_row] = row.d().into();
+        }
+
+        let domain = CanonicCoset::new(log_size).circle_domain();
+        let trace = trace.into_iter().map(|col| CircleEvaluation::new(domain, col)).collect();
+
+        // TODO: Confirm that the log_size in `Claim` is `log_size`, including the SIMD lanes
+        Ok((trace, Claim { log_size }))
+    }
 }
 
 impl From<Vec<Registers>> for MemoryTable {
@@ -207,42 +242,6 @@ const MP_COL_INDEX: usize = 1;
 const MV_COL_INDEX: usize = 2;
 /// Index of the `d` register column in the Memory trace.
 const D_COL_INDEX: usize = 3;
-
-/// Transforms the [`MemoryTable`] into [`super::super::TraceEval`], to be commited when generating
-/// a STARK proof.
-///
-/// The [`MemoryTable`] is transformed from an array of rows (one element = one step of all
-/// registers) to an array of columns (one element = all steps of one register).
-/// It is then evaluated on the circle domain.
-///
-/// # Arguments
-/// * memory - The [`MemoryTable`] containing the sorted and padded trace as an array of rows.
-pub fn get_trace_evaluation(memory: &MemoryTable) -> Result<(TraceEval, Claim), TraceError> {
-    let table = memory.table();
-    let n_rows = table.len() as u32;
-    if n_rows == 0 {
-        return Err(TraceError::EmptyTrace);
-    }
-    let log_n_rows = n_rows.ilog2();
-    // TODO: Confirm that the log_size used for evaluation on Circle domain is the log_size of the
-    // table plus the SIMD lanes
-    let log_size = log_n_rows + LOG_N_LANES;
-    let mut trace: Vec<BaseColumn> =
-        (0..N_COLS_MEMORY_TABLE).map(|_| BaseColumn::zeros(1 << log_size)).collect();
-
-    for (vec_row, row) in table.iter().enumerate().take(1 << log_n_rows) {
-        trace[CLK_COL_INDEX].data[vec_row] = row.clk().into();
-        trace[MP_COL_INDEX].data[vec_row] = row.mp().into();
-        trace[MV_COL_INDEX].data[vec_row] = row.mv().into();
-        trace[D_COL_INDEX].data[vec_row] = row.d().into();
-    }
-
-    let domain = CanonicCoset::new(log_size).circle_domain();
-    let trace = trace.into_iter().map(|col| CircleEvaluation::new(domain, col)).collect();
-
-    // TODO: Confirm that the log_size in `Claim` is `log_size`, including the SIMD lanes
-    Ok((trace, Claim { log_size }))
-}
 
 #[cfg(test)]
 mod tests {
@@ -435,7 +434,7 @@ mod tests {
         ];
         memory_table.add_rows(rows);
 
-        let (trace, claim) = get_trace_evaluation(&memory_table).unwrap();
+        let (trace, claim) = memory_table.trace_evaluation().unwrap();
 
         let expected_log_n_rows: u32 = 1;
         let expected_log_size = expected_log_n_rows + LOG_N_LANES;
@@ -473,7 +472,7 @@ mod tests {
     #[test]
     fn test_write_empty_trace() {
         let memory_table = MemoryTable::new();
-        let run = get_trace_evaluation(&memory_table);
+        let run = memory_table.trace_evaluation();
 
         assert!(matches!(run, Err(TraceError::EmptyTrace)));
     }

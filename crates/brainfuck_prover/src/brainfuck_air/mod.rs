@@ -1,4 +1,4 @@
-use crate::components::memory;
+use crate::components::memory::{self, table::MemoryTable};
 use brainfuck_vm::machine::Machine;
 use stwo_prover::core::{
     air::{Component, ComponentProver},
@@ -130,8 +130,7 @@ pub fn prove_brainfuck(
     // └───────────────────────────────────────┘
     let vm_trace = inputs.get_trace();
 
-    let (memory_trace, memory_claim) =
-        memory::table::get_trace_evaluation(&vm_trace.into()).unwrap();
+    let (memory_trace, memory_claim) = MemoryTable::from(vm_trace).trace_evaluation().unwrap();
 
     tree_builder.extend_evals(memory_trace);
 
