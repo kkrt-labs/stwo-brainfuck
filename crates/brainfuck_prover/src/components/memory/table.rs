@@ -33,10 +33,20 @@ pub struct MemoryTableRow {
 }
 
 impl MemoryTableRow {
+    /// Creates a row for the [`MemoryTable`] which is considered 'real'.
+    ///
+    /// A 'real' row, is a row that is part of the execution trace from the Brainfuck program
+    /// execution.
     pub fn new(clk: BaseField, mp: BaseField, mv: BaseField) -> Self {
         Self { clk, mp, mv, ..Default::default() }
     }
 
+    /// Creates a row for the [`MemoryTable`] which is considered 'dummy'.
+    ///
+    /// A 'dummy' row, is a row that is not part of the execution trace from the Brainfuck program
+    /// execution.
+    /// They are used for padding and filling the `clk` gaps after sorting by `mp`, to enforce the
+    /// correct sorting.
     pub fn new_dummy(clk: BaseField, mp: BaseField, mv: BaseField) -> Self {
         Self { clk, mp, mv, d: BaseField::one() }
     }
