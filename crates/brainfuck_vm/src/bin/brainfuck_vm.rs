@@ -48,7 +48,7 @@ fn main() -> Result<(), MachineError> {
         if args.pad_trace {
             bf_vm.pad_trace();
         };
-        let trace = bf_vm.get_trace();
+        let trace = bf_vm.trace();
         tracing::info!("Execution trace: {:#?}", trace);
     }
     Ok(())

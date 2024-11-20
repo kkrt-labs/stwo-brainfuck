@@ -128,7 +128,7 @@ pub fn prove_brainfuck(
     // ┌───────────────────────────────────────┐
     // │    Interaction Phase 0 - Main Trace   │
     // └───────────────────────────────────────┘
-    let vm_trace = inputs.get_trace();
+    let vm_trace = inputs.trace();
 
     let (memory_trace, memory_claim) = MemoryTable::from(vm_trace).trace_evaluation().unwrap();
 
