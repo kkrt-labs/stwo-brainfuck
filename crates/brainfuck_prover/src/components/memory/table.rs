@@ -182,7 +182,7 @@ const D_COL_INDEX: usize = 3;
 pub type Trace = ColumnVec<CircleEvaluation<SimdBackend, BaseField, BitReversedOrder>>;
 
 /// Custom error type for the Trace.
-#[derive(Debug, Error, PartialEq)]
+#[derive(Debug, Error, Eq, PartialEq)]
 pub enum TraceError {
     /// The component trace is empty.
     #[error("The trace is empty.")]
@@ -420,10 +420,10 @@ mod tests {
         let expected_log_n_rows: u32 = 1;
         let expected_log_size = expected_log_n_rows + LOG_N_LANES;
         let expected_size = 1 << expected_log_size;
-        let mut clk_column: BaseColumn = BaseColumn::zeros(expected_size);
-        let mut mp_column: BaseColumn = BaseColumn::zeros(expected_size);
-        let mut mv_col: BaseColumn = BaseColumn::zeros(expected_size);
-        let mut d_column: BaseColumn = BaseColumn::zeros(expected_size);
+        let mut clk_column = BaseColumn::zeros(expected_size);
+        let mut mp_column = BaseColumn::zeros(expected_size);
+        let mut mv_col = BaseColumn::zeros(expected_size);
+        let mut d_column = BaseColumn::zeros(expected_size);
 
         clk_column.data[0] = BaseField::zero().into();
         clk_column.data[1] = BaseField::one().into();

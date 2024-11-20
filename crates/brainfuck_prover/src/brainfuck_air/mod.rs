@@ -109,7 +109,7 @@ const LOG_MAX_ROWS: u32 = 20;
 /// * `inputs` - The [`Machine`] struct after the program execution
 /// The inputs contains the program, the memory, the I/O and the trace.
 pub fn prove_brainfuck(
-    inputs: Machine,
+    inputs: &Machine,
 ) -> Result<BrainfuckProof<Blake2sMerkleHasher>, ProvingError> {
     // ┌──────────────────────────┐
     // │     Protocol Setup       │

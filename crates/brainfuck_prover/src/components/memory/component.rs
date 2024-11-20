@@ -3,7 +3,7 @@ use stwo_prover::core::{channel::Channel, pcs::TreeVec};
 use super::table::N_COLS_MEMORY_TABLE;
 
 /// The claim for the Memory component
-#[derive(Debug, PartialEq)]
+#[derive(Debug, Eq, PartialEq)]
 pub struct Claim {
     pub log_size: u32,
 }
@@ -14,6 +14,6 @@ impl Claim {
     }
 
     pub fn mix_into(&self, channel: &mut impl Channel) {
-        channel.mix_u64(self.log_size as u64);
+        channel.mix_u64(u64::from(self.log_size));
     }
 }
