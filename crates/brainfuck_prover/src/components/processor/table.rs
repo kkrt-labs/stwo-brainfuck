@@ -17,7 +17,7 @@ use stwo_prover::core::fields::m31::BaseField;
 /// - `mvi`: The memory value inverse.
 #[derive(Debug, Default, PartialEq, Eq, Clone)]
 pub struct ProcessorTableRow {
-    /// Cycle count: increases by one per step.
+    /// Clock cycle counter: the current step.
     clk: BaseField,
     /// Instruction pointer: the pointer to the current instruction.
     ip: BaseField,
