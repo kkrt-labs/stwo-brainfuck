@@ -2,17 +2,14 @@ use brainfuck_vm::registers::Registers;
 use num_traits::One;
 use stwo_prover::core::{
     backend::{
-        simd::{column::BaseColumn, m31::LOG_N_LANES, SimdBackend},
+        simd::{column::BaseColumn, m31::LOG_N_LANES},
         Column,
     },
     fields::m31::BaseField,
-    poly::{
-        circle::{CanonicCoset, CircleEvaluation},
-        BitReversedOrder,
-    },
-    ColumnVec,
+    poly::circle::{CanonicCoset, CircleEvaluation},
 };
-use thiserror::Error;
+
+use crate::components::{TraceError, TraceEval};
 
 use super::component::Claim;
 
@@ -178,17 +175,6 @@ const MV_COL_INDEX: usize = 2;
 /// Index of the `d` register column in the Memory trace.
 const D_COL_INDEX: usize = 3;
 
-/// Type for trace to be used in Stwo.
-pub type Trace = ColumnVec<CircleEvaluation<SimdBackend, BaseField, BitReversedOrder>>;
-
-/// Custom error type for the Trace.
-#[derive(Debug, Error, Eq, PartialEq)]
-pub enum TraceError {
-    /// The component trace is empty.
-    #[error("The trace is empty.")]
-    EmptyTraceError,
-}
-
 /// Transforms the [`MemoryTable`] into [`Trace`], to be commited when generating a STARK proof.
 ///
 /// The [`MemoryTable`] is transformed from an array of rows (one element = one step of all
@@ -197,7 +183,7 @@ pub enum TraceError {
 ///
 /// # Arguments
 /// * memory - The [`MemoryTable`] containing the sorted and padded trace as an array of rows.
-pub fn write_trace(memory: &MemoryTable) -> Result<(Trace, Claim), TraceError> {
+pub fn write_trace(memory: &MemoryTable) -> Result<(TraceEval, Claim), TraceError> {
     let n_rows = memory.table.len() as u32;
     if n_rows == 0 {
         return Err(TraceError::EmptyTraceError);
@@ -438,7 +424,7 @@ mod tests {
         d_column.data[1] = BaseField::zero().into();
 
         let domain = CanonicCoset::new(expected_log_size).circle_domain();
-        let expected_trace: Trace = vec![clk_column, mp_column, mv_col, d_column]
+        let expected_trace: TraceEval = vec![clk_column, mp_column, mv_col, d_column]
             .into_iter()
             .map(|col| CircleEvaluation::new(domain, col))
             .collect();
