@@ -202,11 +202,14 @@ pub fn write_trace(memory: &MemoryTable) -> Result<(Trace, Claim), TraceError> {
     if n_rows == 0 {
         return Err(TraceError::EmptyTraceError);
     }
-    let log_size = n_rows.ilog2() + LOG_N_LANES;
+    let log_n_rows = n_rows.ilog2();
+    // TODO: Confirm that the log_size used for evaluation on Circle domain is the log_size of the
+    // table plus the SIMD lanes
+    let log_size = log_n_rows + LOG_N_LANES;
     let mut trace: Vec<BaseColumn> =
         (0..N_COLS_MEMORY_TABLE).map(|_| BaseColumn::zeros(1 << log_size)).collect();
 
-    for vec_row in 0..1 << (log_size - LOG_N_LANES) {
+    for vec_row in 0..1 << (log_n_rows) {
         let MemoryTableRow { clk, mp, mv, d } = memory.table[vec_row];
         trace[CLK_COL_INDEX].data[vec_row] = clk.into();
         trace[MP_COL_INDEX].data[vec_row] = mp.into();
@@ -217,7 +220,8 @@ pub fn write_trace(memory: &MemoryTable) -> Result<(Trace, Claim), TraceError> {
     let domain = CanonicCoset::new(log_size).circle_domain();
     let trace = trace.into_iter().map(|col| CircleEvaluation::new(domain, col)).collect();
 
-    Ok((trace, Claim { log_size: n_rows }))
+    // TODO: Confirm that the log_size in `Claim` is `log_n_rows`
+    Ok((trace, Claim { log_size: log_n_rows }))
 }
 
 #[cfg(test)]
