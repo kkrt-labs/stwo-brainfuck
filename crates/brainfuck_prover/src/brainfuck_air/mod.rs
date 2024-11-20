@@ -103,6 +103,11 @@ impl BrainfuckComponents {
 /// Means that the ZK-VM does not accept programs with more than 2^20 steps (1M steps).
 const LOG_MAX_ROWS: u32 = 20;
 
+/// Generate a STARK proof of the given Brainfuck program execution.
+///
+/// # Arguments
+/// * `inputs` - The [`Machine`] struct after the program execution
+/// The inputs contains the program, the memory, the I/O and the trace.
 pub fn prove_brainfuck(
     inputs: Machine,
 ) -> Result<BrainfuckProof<Blake2sMerkleHasher>, ProvingError> {
