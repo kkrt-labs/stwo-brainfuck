@@ -417,8 +417,8 @@ mod tests {
 
         let (trace, claim) = write_trace(&memory_table).unwrap();
 
-        let expected_n_rows: u32 = 2;
-        let expected_log_size = expected_n_rows.ilog2() + LOG_N_LANES;
+        let expected_log_n_rows: u32 = 1;
+        let expected_log_size = expected_log_n_rows + LOG_N_LANES;
         let expected_size = 1 << expected_log_size;
         let mut clk_column: BaseColumn = BaseColumn::zeros(expected_size);
         let mut mp_column: BaseColumn = BaseColumn::zeros(expected_size);
@@ -442,7 +442,7 @@ mod tests {
             .into_iter()
             .map(|col| CircleEvaluation::new(domain, col))
             .collect();
-        let expected_claim = Claim { log_size: expected_n_rows };
+        let expected_claim = Claim { log_size: expected_log_n_rows };
 
         assert_eq!(claim, expected_claim);
         for col_index in 0..expected_trace.len() {
