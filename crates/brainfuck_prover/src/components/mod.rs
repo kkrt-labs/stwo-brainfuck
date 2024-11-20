@@ -9,6 +9,7 @@ use thiserror::Error;
 pub mod instruction;
 pub mod io;
 pub mod memory;
+pub mod processor;
 
 /// Type for trace evaluation to be used in Stwo.
 pub type TraceEval = ColumnVec<CircleEvaluation<SimdBackend, BaseField, BitReversedOrder>>;
