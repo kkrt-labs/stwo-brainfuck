@@ -123,13 +123,22 @@ pub fn prove_brainfuck(
     let channel = &mut Blake2sChannel::default();
     let commitment_scheme =
         &mut CommitmentSchemeProver::<_, Blake2sMerkleChannel>::new(config, &twiddles);
-    let mut tree_builder = commitment_scheme.tree_builder();
+
+    // ┌───────────────────────────────────────────────┐
+    // │   Interaction Phase 0 - Preprocessed Trace    │
+    // └───────────────────────────────────────────────┘
+
+    // Generate constant columns (e.g. is_first)
+    let tree_builder = commitment_scheme.tree_builder();
+    tree_builder.commit(channel);
 
     // ┌───────────────────────────────────────┐
-    // │    Interaction Phase 0 - Main Trace   │
+    // │    Interaction Phase 1 - Main Trace   │
     // └───────────────────────────────────────┘
-    let vm_trace = inputs.trace();
 
+    let mut tree_builder = commitment_scheme.tree_builder();
+
+    let vm_trace = inputs.trace();
     let (memory_trace, memory_claim) = MemoryTable::from(vm_trace).trace_evaluation().unwrap();
 
     tree_builder.extend_evals(memory_trace);
@@ -141,7 +150,7 @@ pub fn prove_brainfuck(
     tree_builder.commit(channel);
 
     // ┌───────────────────────────────────────────────┐
-    // │    Interaction Phase 1 - Interaction Trace    │
+    // │    Interaction Phase 2 - Interaction Trace    │
     // └───────────────────────────────────────────────┘
 
     // Draw interaction elements
@@ -152,15 +161,6 @@ pub fn prove_brainfuck(
 
     let interaction_claim = BrainfuckInteractionClaim {};
     interaction_claim.mix_into(channel);
-    tree_builder.commit(channel);
-
-    // TODO: move the preprocessed trace to Phase 0
-    // ┌───────────────────────────────────────────────┐
-    // │   Interaction Phase 2 - Preprocessed Trace    │
-    // └───────────────────────────────────────────────┘
-
-    // Generate constant columns (e.g. is_first)
-    let tree_builder = commitment_scheme.tree_builder();
     tree_builder.commit(channel);
 
     // ┌──────────────────────────┐
