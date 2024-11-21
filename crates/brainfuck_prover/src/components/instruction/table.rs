@@ -146,7 +146,7 @@ impl InstructionTable {
 
         // Initialize a trace with 3 columns (for `ip`, `ci`, and `ni` registers),
         // each column containing `2^log_size` entries initialized to zero.
-        let mut trace = vec![BaseColumn::zeros(1 << log_size); 3];
+        let mut trace = vec![BaseColumn::zeros(1 << log_size); InstructionColumn::count()];
 
         // Populate the columns with data from the table rows.
         // We iterate over the table rows and, for each row:
