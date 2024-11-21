@@ -1,5 +1,8 @@
 use super::table::MemoryColumn;
-use stwo_prover::core::{channel::Channel, pcs::TreeVec};
+use stwo_prover::{
+    constraint_framework::logup::ClaimedPrefixSum,
+    core::{channel::Channel, fields::qm31::SecureField, pcs::TreeVec},
+};
 
 /// The claim for the Memory component
 #[derive(Debug, Eq, PartialEq)]
@@ -40,5 +43,32 @@ impl Claim {
     /// to bound the channel randomness and the trace.
     pub fn mix_into(&self, channel: &mut impl Channel) {
         channel.mix_u64(self.log_size.into());
+    }
+}
+
+#[derive(Debug, Eq, PartialEq)]
+/// The claim of the interaction phase 2 (with the LogUp protocol).
+///
+/// The total sum is the computed sum of the LogUp extension column,
+/// including the padded rows.
+/// It allows proving that the Memory main trace is a permutation
+/// of the Processor trace (which is the execution trace provided by the brainfuck_vm).
+///
+/// The [`ClaimedPrefixSum`] is the sum of the 'real' rows (i.e. without the padding rows).
+/// The total sum and the claimed sum should be equal.
+pub struct InteractionClaim {
+    pub total_sum: SecureField,
+    pub claimed_sum: Option<ClaimedPrefixSum>,
+}
+impl InteractionClaim {
+    /// Mix the sums from the LogUp protocol into the Fiat-Shamir [`Channel`],
+    /// to bound the proof to the trace.
+    pub fn mix_into(&self, channel: &mut impl Channel) {
+        if let Some((claimed_sum, idx)) = self.claimed_sum {
+            channel.mix_felts(&[self.total_sum, claimed_sum]);
+            channel.mix_u64(idx as u64);
+        } else {
+            channel.mix_felts(&[self.total_sum]);
+        }
     }
 }
