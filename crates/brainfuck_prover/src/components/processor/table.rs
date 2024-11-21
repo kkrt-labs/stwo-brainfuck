@@ -35,11 +35,11 @@ pub struct ProcessorTableRow {
 }
 
 impl ProcessorTableRow {
-    /// Creates a row for the [`MemoryTable`] which is considered 'dummy'.
+    /// Creates a row for the [`ProcessorTable`] which is considered 'dummy'.
     ///
     /// A 'dummy' row, is a row that is not part of the execution trace from the Brainfuck program
     /// execution.
-    /// They are used for padding and filling the `clk` gaps after sorting by `mp`, to enforce the
+    /// They are used for padding and filling the  gaps after sorting by `clk`, to enforce the
     /// correct sorting.
     pub fn new_dummy(clk: BaseField, ip: BaseField) -> Self {
         Self { clk, ip, ..Default::default() }
@@ -103,7 +103,7 @@ impl ProcessorTable {
 
     /// Pads the Processor table with dummy rows up to the next power of two length.
     ///
-    /// Each dummy row increase clk, preserve ip, set others to zero.
+    /// Each dummy row increase clk, copy the others from the last step
     ///
     /// Does nothing if the table is empty.
     fn pad(&mut self) {
@@ -111,7 +111,6 @@ impl ProcessorTable {
             let trace_len = self.table.len();
             let padding_offset = (trace_len.next_power_of_two() - trace_len) as u32;
             for i in 1..=padding_offset {
-                // TODO: i think ip should change in padding but trace returning like this
                 self.add_row(ProcessorTableRow::new_dummy(
                     last_row.clk + BaseField::from(i),
                     last_row.ip,
