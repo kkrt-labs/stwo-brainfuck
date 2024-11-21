@@ -136,7 +136,9 @@ impl InstructionTable {
         }
 
         // Compute `log_n_rows`, the base-2 logarithm of the number of rows.
-        // This determines the smallest power of two greater than or equal to `n_rows`.
+        // This determines the smallest power of two greater than or equal to `n_rows`
+        //
+        // The result is rounded down (i.e. (17 as u32).ilog2() = 4).
         let log_n_rows = n_rows.ilog2();
 
         // Add `LOG_N_LANES` to account for SIMD optimization. This ensures that
