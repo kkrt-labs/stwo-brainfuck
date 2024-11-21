@@ -1,5 +1,4 @@
 use brainfuck_vm::registers::Registers;
-use num_traits::Zero;
 use stwo_prover::core::fields::m31::BaseField;
 
 /// Represents a single row in the Processor Table.
@@ -43,15 +42,7 @@ impl ProcessorTableRow {
     /// They are used for padding and filling the `clk` gaps after sorting by `mp`, to enforce the
     /// correct sorting.
     pub fn new_dummy(clk: BaseField, ip: BaseField) -> Self {
-        Self {
-            clk,
-            ip,
-            ci: BaseField::zero(),
-            ni: BaseField::zero(),
-            mp: BaseField::zero(),
-            mv: BaseField::zero(),
-            mvi: BaseField::zero(),
-        }
+        Self { clk, ip, ..Default::default() }
     }
 }
 
