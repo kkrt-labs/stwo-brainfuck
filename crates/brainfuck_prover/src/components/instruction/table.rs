@@ -507,10 +507,27 @@ mod tests {
             "Trace should contain one column per register."
         );
 
-        // Check that each column contains the correct values
-        assert_eq!(trace[InstructionColumn::Ip.index()].to_cpu().values[0], BaseField::from(1));
-        assert_eq!(trace[InstructionColumn::Ci.index()].to_cpu().values[0], BaseField::from(43));
-        assert_eq!(trace[InstructionColumn::Ni.index()].to_cpu().values[0], BaseField::from(91));
+        // Expected values for the single row
+        let expected_ip_column = vec![BaseField::from(1); 16];
+        let expected_ci_column = vec![BaseField::from(43); 16];
+        let expected_ni_column = vec![BaseField::from(91); 16];
+
+        // Check that the entire column matches expected values
+        assert_eq!(
+            trace[InstructionColumn::Ip.index()].to_cpu().values,
+            expected_ip_column,
+            "IP column should match expected values."
+        );
+        assert_eq!(
+            trace[InstructionColumn::Ci.index()].to_cpu().values,
+            expected_ci_column,
+            "CI column should match expected values."
+        );
+        assert_eq!(
+            trace[InstructionColumn::Ni.index()].to_cpu().values,
+            expected_ni_column,
+            "NI column should match expected values."
+        );
     }
 
     #[test]
