@@ -129,7 +129,6 @@ impl InstructionTable {
     /// # Errors
     /// Returns [`TraceError::EmptyTrace`] if the table is empty.
     pub fn trace_evaluation(&self) -> Result<(TraceEval, Claim), TraceError> {
-        // Determine the number of rows in the table.
         let n_rows = self.table.len() as u32;
         // If the table is empty, there is no data to evaluate, so return an error.
         if n_rows == 0 {
