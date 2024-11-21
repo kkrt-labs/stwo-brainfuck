@@ -25,9 +25,15 @@ impl Claim {
     ///
     /// NOTE: Currently only the main trace is provided.
     pub fn log_sizes(&self) -> TreeVec<Vec<u32>> {
-        // TODO: Add the preprocessed and interaction trace sizes
+        // TODO: Add the preprocessed and interaction trace correct sizes
+        let preprocessed_trace_log_sizes: Vec<u32> = vec![];
         let trace_log_sizes = vec![self.log_size; MemoryColumn::count()];
-        TreeVec::new(vec![trace_log_sizes])
+        let interaction_trace_log_sizes: Vec<u32> = vec![];
+        TreeVec::new(vec![
+            preprocessed_trace_log_sizes,
+            trace_log_sizes,
+            interaction_trace_log_sizes,
+        ])
     }
 
     /// Mix the log size of the Memory table to the Fiat-Shamir [`Channel`],
