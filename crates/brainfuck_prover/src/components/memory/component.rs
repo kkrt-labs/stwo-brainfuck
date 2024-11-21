@@ -1,4 +1,4 @@
-use super::table::N_COLS_MEMORY_TABLE;
+use super::table::MemoryColumn;
 use stwo_prover::core::{channel::Channel, pcs::TreeVec};
 
 /// The claim for the Memory component
@@ -26,7 +26,7 @@ impl Claim {
     /// NOTE: Currently only the main trace is provided.
     pub fn log_sizes(&self) -> TreeVec<Vec<u32>> {
         // TODO: Add the preprocessed and interaction trace sizes
-        let trace_log_sizes = vec![self.log_size; N_COLS_MEMORY_TABLE];
+        let trace_log_sizes = vec![self.log_size; MemoryColumn::count()];
         TreeVec::new(vec![trace_log_sizes])
     }
 
