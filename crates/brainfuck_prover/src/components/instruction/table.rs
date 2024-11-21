@@ -513,7 +513,7 @@ mod tests {
 
     #[test]
     #[allow(clippy::similar_names)]
-    fn test_write_instruction_trace() {
+    fn test_instruction_trace_evaluation() {
         let mut instruction_table = InstructionTable::new();
 
         // Add rows to the instruction table.
