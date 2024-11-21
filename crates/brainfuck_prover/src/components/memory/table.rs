@@ -199,7 +199,7 @@ impl MemoryTable {
         // TODO: Confirm that the log_size used for evaluation on Circle domain is the log_size of
         // the table plus the SIMD lanes
         let log_size = log_n_rows + LOG_N_LANES;
-        let mut trace = vec![BaseColumn::zeros(1 << log_size); N_COLS_MEMORY_TABLE];
+        let mut trace = vec![BaseColumn::zeros(1 << log_size); MemoryColumn::count()];
 
         for (vec_row, row) in self.table.iter().enumerate().take(1 << log_n_rows) {
             trace[CLK_COL_INDEX].data[vec_row] = row.clk().into();
