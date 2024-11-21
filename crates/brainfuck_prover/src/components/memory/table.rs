@@ -200,13 +200,13 @@ impl MemoryTable {
         // the table plus the SIMD lanes
         let log_size = log_n_rows + LOG_N_LANES;
         let mut trace: Vec<BaseColumn> =
-            (0..N_COLS_MEMORY_TABLE).map(|_| BaseColumn::zeros(1 << log_size)).collect();
+            (0..MemoryColumn::count()).map(|_| BaseColumn::zeros(1 << log_size)).collect();
 
         for (vec_row, row) in self.table.iter().enumerate().take(1 << log_n_rows) {
-            trace[CLK_COL_INDEX].data[vec_row] = row.clk().into();
-            trace[MP_COL_INDEX].data[vec_row] = row.mp().into();
-            trace[MV_COL_INDEX].data[vec_row] = row.mv().into();
-            trace[D_COL_INDEX].data[vec_row] = row.d().into();
+            trace[MemoryColumn::Clk.index()].data[vec_row] = row.clk().into();
+            trace[MemoryColumn::Mp.index()].data[vec_row] = row.mp().into();
+            trace[MemoryColumn::Mv.index()].data[vec_row] = row.mv().into();
+            trace[MemoryColumn::D.index()].data[vec_row] = row.d().into();
         }
 
         let domain = CanonicCoset::new(log_size).circle_domain();
@@ -232,16 +232,35 @@ impl From<Vec<Registers>> for MemoryTable {
     }
 }
 
-/// Number of columns in the memory table
-pub const N_COLS_MEMORY_TABLE: usize = 4;
-/// Index of the `clk` register column in the Memory trace.
-const CLK_COL_INDEX: usize = 0;
-/// Index of the `mp` register column in the Memory trace.
-const MP_COL_INDEX: usize = 1;
-/// Index of the `mv` register column in the Memory trace.
-const MV_COL_INDEX: usize = 2;
-/// Index of the `d` register column in the Memory trace.
-const D_COL_INDEX: usize = 3;
+/// Enum representing the column indices in the Memory trace
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum MemoryColumn {
+    /// Index of the `clk` register column in the Memory trace.
+    Clk,
+    /// Index of the `mp` register column in the Memory trace.
+    Mp,
+    /// Index of the `mv` register column in the Memory trace.
+    Mv,
+    /// Index of the `d` register column in the Memory trace.
+    D,
+}
+
+impl MemoryColumn {
+    /// Returns the index of the column in the Memory table
+    pub const fn index(self) -> usize {
+        match self {
+            Self::Clk => 0,
+            Self::Mp => 1,
+            Self::Mv => 2,
+            Self::D => 3,
+        }
+    }
+
+    /// Returns the total number of columns in the Memory table
+    pub const fn count() -> usize {
+        4
+    }
+}
 
 #[cfg(test)]
 mod tests {
