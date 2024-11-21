@@ -223,7 +223,7 @@ pub enum InstructionColumn {
 }
 
 impl InstructionColumn {
-    /// Returns the index of the column in the Instruction table
+    /// Returns the index of the column in the Instruction trace
     pub const fn index(self) -> usize {
         match self {
             Self::Ip => 0,
