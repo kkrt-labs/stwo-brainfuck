@@ -1,3 +1,4 @@
+use crate::components::{memory::component::Claim, TraceError, TraceEval};
 use brainfuck_vm::{
     instruction::VALID_INSTRUCTIONS_BF, machine::ProgramMemory, registers::Registers,
 };
@@ -10,8 +11,6 @@ use stwo_prover::core::{
     fields::m31::BaseField,
     poly::circle::{CanonicCoset, CircleEvaluation},
 };
-
-use crate::components::{memory::component::Claim, TraceError, TraceEval};
 
 /// Represents a single row in the Instruction Table.
 ///
