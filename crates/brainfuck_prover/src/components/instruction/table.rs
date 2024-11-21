@@ -232,7 +232,7 @@ impl InstructionColumn {
         }
     }
 
-    /// Returns the total number of columns in the Instruction table
+    /// Returns the total number of columns in the Instruction trace
     pub const fn count() -> usize {
         3
     }
