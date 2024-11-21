@@ -490,6 +490,7 @@ mod tests {
     }
 
     #[test]
+    #[allow(clippy::similar_names)]
     fn test_trace_evaluation_single_row() {
         let mut instruction_table = InstructionTable::new();
         instruction_table.add_row(InstructionTableRow {
