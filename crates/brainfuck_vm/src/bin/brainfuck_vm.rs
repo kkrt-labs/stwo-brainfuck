@@ -21,8 +21,6 @@ struct Args {
     #[clap(long)]
     trace: bool,
     #[clap(long)]
-    pad_trace: bool,
-    #[clap(long)]
     ram_size: Option<usize>,
 }
 

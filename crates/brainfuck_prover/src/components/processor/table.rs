@@ -34,18 +34,6 @@ pub struct ProcessorTableRow {
     mvi: BaseField,
 }
 
-impl ProcessorTableRow {
-    /// Creates a row for the [`ProcessorTable`] which is considered 'dummy'.
-    ///
-    /// A 'dummy' row, is a row that is not part of the execution trace from the Brainfuck program
-    /// execution.
-    /// They are used for padding and filling the  gaps after sorting by `clk`, to enforce the
-    /// correct sorting.
-    pub fn new_dummy(clk: BaseField, ip: BaseField) -> Self {
-        Self { clk, ip, ..Default::default() }
-    }
-}
-
 impl From<&Registers> for ProcessorTableRow {
     fn from(registers: &Registers) -> Self {
         Self {
@@ -111,10 +99,11 @@ impl ProcessorTable {
             let trace_len = self.table.len();
             let padding_offset = (trace_len.next_power_of_two() - trace_len) as u32;
             for i in 1..=padding_offset {
-                self.add_row(ProcessorTableRow::new_dummy(
-                    last_row.clk + BaseField::from(i),
-                    last_row.ip,
-                ));
+                self.add_row(ProcessorTableRow {
+                    clk: last_row.clk + BaseField::from(i),
+                    ip: last_row.ip,
+                    ..Default::default()
+                });
             }
         }
     }
@@ -124,7 +113,7 @@ impl From<Vec<Registers>> for ProcessorTable {
     fn from(registers: Vec<Registers>) -> Self {
         let mut processor_table = Self::new();
 
-        let rows = registers.iter().map(|x| x.into()).collect();
+        let rows = registers.iter().map(Into::into).collect();
         processor_table.add_rows(rows);
         processor_table.pad();
 
