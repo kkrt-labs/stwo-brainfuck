@@ -101,9 +101,13 @@ impl<const N: u32> IOTable<N> {
     pub fn trace_evaluation(&self) -> Result<(TraceEval, Claim), TraceError> {
         let n_rows = self.table.len() as u32;
 
-        // If the table is empty, return an error.
+        // It is possible that the table is empty because the program has no input or output.
+        //
+        // In this case, we return:
+        // - An empty trace.
+        // - A claim with a log size of 0.
         if n_rows == 0 {
-            return Err(TraceError::EmptyTrace);
+            return Ok((TraceEval::new(), Claim { log_size: 0 }));
         }
 
         // Compute `log_n_rows`, the base-2 logarithm of the number of rows.
@@ -267,9 +271,15 @@ mod tests {
     #[test]
     fn test_trace_evaluation_empty_table() {
         let io_table = TestIOTable::new();
-        let result = io_table.trace_evaluation();
 
-        assert!(matches!(result, Err(TraceError::EmptyTrace)));
+        // Perform the trace evaluation.
+        let (trace, claim) = io_table.trace_evaluation().unwrap();
+
+        // Verify the claim log size is 0.
+        assert_eq!(claim.log_size, 0, "The log size should be 0 for an empty table.");
+
+        // Verify the trace is empty.
+        assert!(trace.is_empty(), "The trace should be empty when the table has no rows.");
     }
 
     #[test]
