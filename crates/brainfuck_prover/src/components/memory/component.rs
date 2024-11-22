@@ -46,7 +46,6 @@ impl Claim {
     }
 }
 
-#[derive(Debug, Eq, PartialEq)]
 /// The claim of the interaction phase 2 (with the LogUp protocol).
 ///
 /// The total sum is the computed sum of the LogUp extension column,
@@ -56,6 +55,7 @@ impl Claim {
 ///
 /// The [`ClaimedPrefixSum`] is the sum of the 'real' rows (i.e. without the padding rows).
 /// The total sum and the claimed sum should be equal.
+#[derive(Debug, Eq, PartialEq)]
 pub struct InteractionClaim {
     pub total_sum: SecureField,
     pub claimed_sum: Option<ClaimedPrefixSum>,
@@ -63,10 +63,14 @@ pub struct InteractionClaim {
 impl InteractionClaim {
     /// Mix the sums from the LogUp protocol into the Fiat-Shamir [`Channel`],
     /// to bound the proof to the trace.
+    ///
+    /// If the trace has been padded, both the total sum and the claimed
+    /// sum are mixed, as well as the index in the extension column
+    /// where the claimed_sum is.
     pub fn mix_into(&self, channel: &mut impl Channel) {
-        if let Some((claimed_sum, idx)) = self.claimed_sum {
+        if let Some((claimed_sum, claimed_index)) = self.claimed_sum {
             channel.mix_felts(&[self.total_sum, claimed_sum]);
-            channel.mix_u64(idx as u64);
+            channel.mix_u64(claimed_index as u64);
         } else {
             channel.mix_felts(&[self.total_sum]);
         }
