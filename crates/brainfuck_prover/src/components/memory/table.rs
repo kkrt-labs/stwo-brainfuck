@@ -327,6 +327,16 @@ impl<F: Clone, EF: RelationEFTraitBound<F>> Relation<F, EF> for MemoryElements {
 /// Creates the interaction trace from the main trace evaluation
 /// and the interaction elements for the Memory component.
 ///
+/// The Processor component uses the other components:
+/// The Processor component multiplicities are then positive,
+/// and the Memory component multiplicities are negative
+/// in the logup protocol.
+///
+/// Only the 'real' rows are impacting the logup sum.
+/// Dummy rows are padded rows and rows filling the `clk` gaps
+/// which does not appear in the Processor main trace.
+///
+///
 /// # Returns
 /// - Interaction trace evaluation, to be commited.
 /// - Interaction claim: the total sum from the logup protocol,
@@ -349,9 +359,6 @@ pub fn interaction_trace_evaluation(
         let mp = mp_col[vec_row];
         let mv = mv_column[vec_row];
         // Set the fraction numerator to 0 if it is a dummy row (d = 1), otherwise set it to -1.
-        // The numerator multiplicity is negative as the Memory component is yielding
-        // while the Processor component is using the Memory component:
-        // the related column in the Processor component has a numerator of positive multiplicity.
         let is_dummy_num = PackedSecureField::from(d_col[vec_row]) - PackedSecureField::one();
         // Only the common registers with the processor table are part of the extension column.
         let denom: PackedSecureField = lookup_elements.combine(&[clk, mp, mv]);
