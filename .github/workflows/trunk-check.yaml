@@ -18,5 +18,11 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      - run: rustup update
+      - name: Rust cache
+        uses: Swatinem/rust-cache@v2
+        with:
+          cache-on-failure: "true"
+
       - name: Trunk Code Quality
         uses: trunk-io/trunk-action@v1

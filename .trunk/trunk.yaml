@@ -23,12 +23,6 @@ runtimes:
   definitions:
     - type: rust
       system_version: allowed
-downloads:
-  - name: rust
-    downloads:
-      - os: linux
-        url: https://static.rust-lang.org/dist/2024-01-04/rust-nightly-x86_64-unknown-linux-gnu.tar.gz
-        strip_components: 2
 lint:
   definitions:
     - name: clippy
