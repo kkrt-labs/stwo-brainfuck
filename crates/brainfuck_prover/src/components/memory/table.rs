@@ -274,20 +274,37 @@ impl MemoryColumn {
     }
 }
 
+/// The interaction elements drawn for the extension column of the Memory component.
+///
+/// The logup protocol uses these elements to combine the values of the different
+/// registers of the main trace to create a random linear combination
+/// of them, and use it in the denominator of the fractions in the logup protocol.
+///
+/// There are 3 lookup elements in the Memory component, as only the 'real' registers
+/// are used: `clk`, `mp` and `mv`. `d` is used to eventually nullify the numerator.
 #[derive(Clone, Debug, Eq, PartialEq)]
-pub struct MemoryElements(LookupElements<{ MemoryColumn::count() }>);
+pub struct MemoryElements(LookupElements<{ MemoryColumn::count() - 1 }>);
 
 impl MemoryElements {
+    /// Provides dummy lookup elements.
     pub fn dummy() -> Self {
         Self(LookupElements::dummy())
     }
 
+    /// Draw random elements from the Fiat-Shamir [`Channel`].
+    ///
+    /// These elements are randomly secured, and will be use
+    /// to generate the interaction trace with the logup protocol.
     pub fn draw(channel: &mut impl Channel) -> Self {
         Self(LookupElements::draw(channel))
     }
 }
 
 impl<F: Clone, EF: RelationEFTraitBound<F>> Relation<F, EF> for MemoryElements {
+    /// Combine multiple values from a basefield (e.g. [`BaseField`])
+    /// and combine them to a value from an extension field (e.g. [`PackedSecureField`])
+    ///
+    /// This is used when computing the interaction values from the main trace values.
     fn combine(&self, values: &[F]) -> EF {
         values
             .iter()
@@ -296,19 +313,28 @@ impl<F: Clone, EF: RelationEFTraitBound<F>> Relation<F, EF> for MemoryElements {
             self.0.z.into()
     }
 
+    /// Returns the name of the struct.
     fn get_name(&self) -> &str {
         stringify!(MemoryElements)
     }
 
+    /// Returns the number interaction elements.
     fn get_size(&self) -> usize {
-        MemoryColumn::count()
+        MemoryColumn::count() - 1
     }
 }
 
+/// Creates the interaction trace from the main trace evaluation
+/// and the interaction elements for the Memory component.
+///
+/// # Returns
+/// - Interaction trace evaluation, to be commited.
+/// - Interaction claim: the total sum from the logup protocol,
+/// to be mixed into the Fiat-Shamir [`Channel`].
 pub fn interaction_trace_evaluation(
     main_trace_eval: &TraceEval,
     lookup_elements: &MemoryElements,
-) -> Result<(TraceEval, InteractionClaim), TraceError> {
+) -> (TraceEval, InteractionClaim) {
     let log_size = main_trace_eval[0].domain.log_size();
 
     let mut logup_gen = LogupTraceGenerator::new(log_size);
@@ -337,14 +363,13 @@ pub fn interaction_trace_evaluation(
     let (trace, claimed_sum) = logup_gen.finalize_last();
     let interaction_claim = InteractionClaim { claimed_sum };
 
-    Ok((trace, interaction_claim))
+    (trace, interaction_claim)
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
     use num_traits::Zero;
-    use stwo_prover::core::channel::Blake2sChannel;
 
     #[test]
     fn test_memory_row_new() {
@@ -594,12 +619,10 @@ mod tests {
 
         let (trace_eval, claim) = memory_table.trace_evaluation().unwrap();
 
-        // Setup the channel to draw the interaction elements for the logup protocol.
-        let channel = &mut Blake2sChannel::default();
-        let lookup_elements = MemoryElements::draw(channel);
+        let lookup_elements = MemoryElements::dummy();
 
         let (interaction_trace_eval, interaction_claim) =
-            interaction_trace_evaluation(&trace_eval, &lookup_elements).unwrap();
+            interaction_trace_evaluation(&trace_eval, &lookup_elements);
 
         let log_size = trace_eval[0].domain.log_size();
         let mut logup_gen = LogupTraceGenerator::new(log_size);
@@ -681,15 +704,12 @@ mod tests {
         let (trace_eval, _) = memory_table.trace_evaluation().unwrap();
         let (new_trace_eval, _) = real_memory_table.trace_evaluation().unwrap();
 
-        // Setup the channel to draw the interaction elements for the logup protocol.
-        let channel = &mut Blake2sChannel::default();
-        let lookup_elements = MemoryElements::draw(channel);
+        let lookup_elements = MemoryElements::dummy();
 
-        let (_, interaction_claim) =
-            interaction_trace_evaluation(&trace_eval, &lookup_elements).unwrap();
+        let (_, interaction_claim) = interaction_trace_evaluation(&trace_eval, &lookup_elements);
 
         let (_, new_interaction_claim) =
-            interaction_trace_evaluation(&new_trace_eval, &lookup_elements).unwrap();
+            interaction_trace_evaluation(&new_trace_eval, &lookup_elements);
 
         assert_eq!(interaction_claim, new_interaction_claim,);
     }
