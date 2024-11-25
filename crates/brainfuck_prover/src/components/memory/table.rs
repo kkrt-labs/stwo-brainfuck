@@ -344,6 +344,7 @@ pub fn interaction_trace_evaluation(
 mod tests {
     use super::*;
     use num_traits::Zero;
+    use stwo_prover::core::channel::Blake2sChannel;
 
     #[test]
     fn test_memory_row_new() {
@@ -573,5 +574,123 @@ mod tests {
         let run = memory_table.trace_evaluation();
 
         assert!(matches!(run, Err(TraceError::EmptyTrace)));
+    }
+
+    #[test]
+    fn test_interaction_trace_evaluation() {
+        let mut memory_table = MemoryTable::new();
+        // Trace rows are:
+        // - Real row
+        // - Dummy row (filling the `clk` value)
+        // - Real row
+        // - Dummy row (padding to power of 2)
+        let rows = vec![
+            MemoryTableRow::new(BaseField::zero(), BaseField::from(43), BaseField::from(91)),
+            MemoryTableRow::new_dummy(BaseField::one(), BaseField::from(43), BaseField::from(91)),
+            MemoryTableRow::new(BaseField::from(2), BaseField::from(91), BaseField::from(9)),
+            MemoryTableRow::new_dummy(BaseField::from(2), BaseField::from(91), BaseField::from(9)),
+        ];
+        memory_table.add_rows(rows);
+
+        let (trace_eval, claim) = memory_table.trace_evaluation().unwrap();
+
+        // Setup the channel to draw the interaction elements for the logup protocol.
+        let channel = &mut Blake2sChannel::default();
+        let lookup_elements = MemoryElements::draw(channel);
+
+        let (interaction_trace_eval, interaction_claim) =
+            interaction_trace_evaluation(&trace_eval, &lookup_elements).unwrap();
+
+        let log_size = trace_eval[0].domain.log_size();
+        let mut logup_gen = LogupTraceGenerator::new(log_size);
+        let mut col_gen = logup_gen.new_col();
+
+        let mut denoms = [PackedSecureField::zero(); 4];
+        let clk_col = &trace_eval[MemoryColumn::Clk.index()].data;
+        let mp_col = &trace_eval[MemoryColumn::Mp.index()].data;
+        let mv_column = &trace_eval[MemoryColumn::Mv.index()].data;
+        // Construct the denominator for each row of the logup column, from the main trace
+        // evaluation.
+        for vec_row in 0..1 << (log_size - LOG_N_LANES) {
+            let clk = clk_col[vec_row];
+            let mp = mp_col[vec_row];
+            let mv = mv_column[vec_row];
+            let denom: PackedSecureField = lookup_elements.combine(&[clk, mp, mv]);
+            denoms[vec_row] = denom;
+        }
+
+        let num_1 = -PackedSecureField::one();
+        let num_2 = PackedSecureField::zero();
+        let num_3 = num_1;
+        let num_4 = num_2;
+
+        col_gen.write_frac(0, num_1, denoms[0]);
+        col_gen.write_frac(1, num_2, denoms[1]);
+        col_gen.write_frac(2, num_3, denoms[2]);
+        col_gen.write_frac(3, num_4, denoms[3]);
+
+        col_gen.finalize_col();
+        let (expected_interaction_trace_eval, expected_claimed_sum) = logup_gen.finalize_last();
+
+        assert_eq!(claim.log_size, log_size,);
+        for col_index in 0..expected_interaction_trace_eval.len() {
+            assert_eq!(
+                interaction_trace_eval[col_index].domain,
+                expected_interaction_trace_eval[col_index].domain
+            );
+            assert_eq!(
+                interaction_trace_eval[col_index].to_cpu().values,
+                expected_interaction_trace_eval[col_index].to_cpu().values
+            );
+        }
+        assert_eq!(interaction_claim.claimed_sum, expected_claimed_sum);
+    }
+
+    // This test verifies that the dummy rows have no impact
+    // on the total sum of the logup protocol in the Memory component.
+    // Indeed, the total sum computed by the Processor component won't
+    // have the exact same dummy rows (the Memory component) adds extra
+    // dummy rows to fill the `clk` jumps and enforce the sorting.
+    #[test]
+    fn test_dummy_rows_impact_on_interaction_trace_evaluation() {
+        let mut memory_table = MemoryTable::new();
+        let mut real_memory_table = MemoryTable::new();
+
+        // Trace rows are:
+        // - Real row
+        // - Dummy row (filling the `clk` value)
+        // - Real row
+        // - Dummy row (padding to power of 2)
+        let rows = vec![
+            MemoryTableRow::new(BaseField::zero(), BaseField::from(43), BaseField::from(91)),
+            MemoryTableRow::new_dummy(BaseField::one(), BaseField::from(43), BaseField::from(91)),
+            MemoryTableRow::new(BaseField::from(2), BaseField::from(91), BaseField::from(9)),
+            MemoryTableRow::new_dummy(BaseField::from(2), BaseField::from(91), BaseField::from(9)),
+        ];
+        memory_table.add_rows(rows);
+
+        // Trace rows are:
+        // - Real row
+        // - Real row
+        let real_rows = vec![
+            MemoryTableRow::new(BaseField::zero(), BaseField::from(43), BaseField::from(91)),
+            MemoryTableRow::new(BaseField::from(2), BaseField::from(91), BaseField::from(9)),
+        ];
+        real_memory_table.add_rows(real_rows);
+
+        let (trace_eval, _) = memory_table.trace_evaluation().unwrap();
+        let (new_trace_eval, _) = real_memory_table.trace_evaluation().unwrap();
+
+        // Setup the channel to draw the interaction elements for the logup protocol.
+        let channel = &mut Blake2sChannel::default();
+        let lookup_elements = MemoryElements::draw(channel);
+
+        let (_, interaction_claim) =
+            interaction_trace_evaluation(&trace_eval, &lookup_elements).unwrap();
+
+        let (_, new_interaction_claim) =
+            interaction_trace_evaluation(&new_trace_eval, &lookup_elements).unwrap();
+
+        assert_eq!(interaction_claim, new_interaction_claim,);
     }
 }
