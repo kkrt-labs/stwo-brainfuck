@@ -1,8 +1,5 @@
 use super::table::MemoryColumn;
-use stwo_prover::{
-    constraint_framework::logup::ClaimedPrefixSum,
-    core::{channel::Channel, fields::qm31::SecureField, pcs::TreeVec},
-};
+use stwo_prover::core::{channel::Channel, fields::qm31::SecureField, pcs::TreeVec};
 
 /// The claim for the Memory component
 #[derive(Debug, Eq, PartialEq)]
@@ -46,33 +43,20 @@ impl Claim {
     }
 }
 
-/// The claim of the interaction phase 2 (with the LogUp protocol).
+/// The claim of the interaction phase 2 (with the logUp protocol).
 ///
-/// The total sum is the computed sum of the LogUp extension column,
+/// The total sum is the computed sum of the logUp extension column,
 /// including the padded rows.
 /// It allows proving that the Memory main trace is a permutation
-/// of the Processor trace (which is the execution trace provided by the brainfuck_vm).
-///
-/// The [`ClaimedPrefixSum`] is the sum of the 'real' rows (i.e. without the padding rows).
-/// The total sum and the claimed sum should be equal.
+/// of the Processor trace (which is the execution trace provided by the `brainfuck_vm`).
 #[derive(Debug, Eq, PartialEq)]
 pub struct InteractionClaim {
-    pub total_sum: SecureField,
-    pub claimed_sum: Option<ClaimedPrefixSum>,
+    pub claimed_sum: SecureField,
 }
 impl InteractionClaim {
-    /// Mix the sums from the LogUp protocol into the Fiat-Shamir [`Channel`],
+    /// Mix the sums from the logUp protocol into the Fiat-Shamir [`Channel`],
     /// to bound the proof to the trace.
-    ///
-    /// If the trace has been padded, both the total sum and the claimed
-    /// sum are mixed, as well as the index in the extension column
-    /// where the claimed_sum is.
     pub fn mix_into(&self, channel: &mut impl Channel) {
-        if let Some((claimed_sum, claimed_index)) = self.claimed_sum {
-            channel.mix_felts(&[self.total_sum, claimed_sum]);
-            channel.mix_u64(claimed_index as u64);
-        } else {
-            channel.mix_felts(&[self.total_sum]);
-        }
+        channel.mix_felts(&[self.claimed_sum]);
     }
 }

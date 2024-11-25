@@ -1,12 +1,15 @@
-use super::component::Claim;
+use super::component::{Claim, InteractionClaim};
 use crate::components::{TraceError, TraceEval};
 use brainfuck_vm::registers::Registers;
 use num_traits::One;
 use stwo_prover::{
-    constraint_framework::{logup::LookupElements, Relation, RelationEFTraitBound},
+    constraint_framework::{
+        logup::{LogupTraceGenerator, LookupElements},
+        Relation, RelationEFTraitBound,
+    },
     core::{
         backend::{
-            simd::{column::BaseColumn, m31::LOG_N_LANES},
+            simd::{column::BaseColumn, m31::LOG_N_LANES, qm31::PackedSecureField},
             Column,
         },
         channel::Channel,
@@ -271,7 +274,7 @@ impl MemoryColumn {
     }
 }
 
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, Eq, PartialEq)]
 pub struct MemoryElements(LookupElements<{ MemoryColumn::count() }>);
 
 impl MemoryElements {
@@ -300,6 +303,41 @@ impl<F: Clone, EF: RelationEFTraitBound<F>> Relation<F, EF> for MemoryElements {
     fn get_size(&self) -> usize {
         MemoryColumn::count()
     }
+}
+
+pub fn interaction_trace_evaluation(
+    main_trace_eval: &TraceEval,
+    lookup_elements: &MemoryElements,
+) -> Result<(TraceEval, InteractionClaim), TraceError> {
+    let log_size = main_trace_eval[0].domain.log_size();
+
+    let mut logup_gen = LogupTraceGenerator::new(log_size);
+    let mut col_gen = logup_gen.new_col();
+
+    let clk_col = &main_trace_eval[MemoryColumn::Clk.index()].data;
+    let mp_col = &main_trace_eval[MemoryColumn::Mp.index()].data;
+    let mv_column = &main_trace_eval[MemoryColumn::Mv.index()].data;
+    let d_col = &main_trace_eval[MemoryColumn::D.index()].data;
+    for vec_row in 0..1 << (log_size - LOG_N_LANES) {
+        let clk = clk_col[vec_row];
+        let mp = mp_col[vec_row];
+        let mv = mv_column[vec_row];
+        // Set the fraction numerator to 0 if it is a dummy row (d = 1), otherwise set it to -1.
+        // The numerator multiplicity is negative as the Memory component is yielding
+        // while the Processor component is using the Memory component:
+        // the related column in the Processor component has a numerator of positive multiplicity.
+        let is_dummy_num = PackedSecureField::from(d_col[vec_row]) - PackedSecureField::one();
+        // Only the common registers with the processor table are part of the extension column.
+        let denom: PackedSecureField = lookup_elements.combine(&[clk, mp, mv]);
+        col_gen.write_frac(vec_row, is_dummy_num, denom);
+    }
+
+    col_gen.finalize_col();
+
+    let (trace, claimed_sum) = logup_gen.finalize_last();
+    let interaction_claim = InteractionClaim { claimed_sum };
+
+    Ok((trace, interaction_claim))
 }
 
 #[cfg(test)]
@@ -485,7 +523,7 @@ mod tests {
     }
 
     #[test]
-    fn test_write_trace() {
+    fn test_trace_evaluation() {
         let mut memory_table = MemoryTable::new();
         let rows = vec![
             MemoryTableRow::new(BaseField::zero(), BaseField::from(43), BaseField::from(91)),
@@ -530,7 +568,7 @@ mod tests {
     }
 
     #[test]
-    fn test_write_empty_trace() {
+    fn test_evaluate_empty_trace() {
         let memory_table = MemoryTable::new();
         let run = memory_table.trace_evaluation();
 
