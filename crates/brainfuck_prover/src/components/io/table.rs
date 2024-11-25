@@ -1,4 +1,4 @@
-use crate::components::{memory::component::Claim, TraceError, TraceEval};
+use crate::components::{memory::component::Claim, TraceEval};
 use brainfuck_vm::{instruction::InstructionType, registers::Registers};
 use stwo_prover::core::{
     backend::{
@@ -95,19 +95,13 @@ impl<const N: u32> IOTable<N> {
     ///
     /// # Returns
     /// A tuple containing the evaluated trace and claim for STARK proof.
-    ///
-    /// # Errors
-    /// Returns [`TraceError::EmptyTrace`] if the table is empty.
-    pub fn trace_evaluation(&self) -> Result<(TraceEval, Claim), TraceError> {
+    /// If the table is empty, returns an empty trace and a claim with a log size of 0.
+    pub fn trace_evaluation(&self) -> (TraceEval, Claim) {
         let n_rows = self.table.len() as u32;
 
         // It is possible that the table is empty because the program has no input or output.
-        //
-        // In this case, we return:
-        // - An empty trace.
-        // - A claim with a log size of 0.
         if n_rows == 0 {
-            return Ok((TraceEval::new(), Claim { log_size: 0 }));
+            return (TraceEval::new(), Claim { log_size: 0 });
         }
 
         // Compute `log_n_rows`, the base-2 logarithm of the number of rows.
@@ -132,7 +126,7 @@ impl<const N: u32> IOTable<N> {
         let trace = trace.into_iter().map(|col| CircleEvaluation::new(domain, col)).collect();
 
         // Return the evaluated trace and a claim containing the log size of the domain.
-        Ok((trace, Claim { log_size }))
+        (trace, Claim { log_size })
     }
 }
 
@@ -273,7 +267,7 @@ mod tests {
         let io_table = TestIOTable::new();
 
         // Perform the trace evaluation.
-        let (trace, claim) = io_table.trace_evaluation().unwrap();
+        let (trace, claim) = io_table.trace_evaluation();
 
         // Verify the claim log size is 0.
         assert_eq!(claim.log_size, 0, "The log size should be 0 for an empty table.");
@@ -287,7 +281,7 @@ mod tests {
         let mut io_table = TestIOTable::new();
         io_table.add_row(IOTableRow::new(BaseField::from(42)));
 
-        let (trace, claim) = io_table.trace_evaluation().unwrap();
+        let (trace, claim) = io_table.trace_evaluation();
 
         // Verify the log size includes SIMD lanes.
         assert!(claim.log_size >= LOG_N_LANES, "Claim log size should include SIMD lanes.");
@@ -313,7 +307,7 @@ mod tests {
         io_table.add_rows(rows);
 
         // Perform the trace evaluation.
-        let (trace, claim) = io_table.trace_evaluation().unwrap();
+        let (trace, claim) = io_table.trace_evaluation();
 
         // Calculate the expected parameters.
         let expected_log_n_rows: u32 = 1; // log2(2 rows)
@@ -362,7 +356,7 @@ mod tests {
             IOTableRow::new(BaseField::from(2)),
         ]);
 
-        let (trace, claim) = io_table.trace_evaluation().unwrap();
+        let (trace, claim) = io_table.trace_evaluation();
 
         // Verify the domain of the trace matches the expected circle domain.
         let domain = CanonicCoset::new(claim.log_size).circle_domain();
