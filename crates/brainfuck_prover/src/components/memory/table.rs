@@ -2,13 +2,17 @@ use super::component::Claim;
 use crate::components::{TraceError, TraceEval};
 use brainfuck_vm::registers::Registers;
 use num_traits::One;
-use stwo_prover::core::{
-    backend::{
-        simd::{column::BaseColumn, m31::LOG_N_LANES},
-        Column,
+use stwo_prover::{
+    constraint_framework::{logup::LookupElements, Relation, RelationEFTraitBound},
+    core::{
+        backend::{
+            simd::{column::BaseColumn, m31::LOG_N_LANES},
+            Column,
+        },
+        channel::Channel,
+        fields::m31::BaseField,
+        poly::circle::{CanonicCoset, CircleEvaluation},
     },
-    fields::m31::BaseField,
-    poly::circle::{CanonicCoset, CircleEvaluation},
 };
 
 /// Represents a single row in the Memory Table.
@@ -264,6 +268,37 @@ impl MemoryColumn {
     /// Returns the total number of columns in the Memory table
     pub const fn count() -> usize {
         4
+    }
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub struct MemoryElements(LookupElements<{ MemoryColumn::count() }>);
+
+impl MemoryElements {
+    pub fn dummy() -> Self {
+        Self(LookupElements::dummy())
+    }
+
+    pub fn draw(channel: &mut impl Channel) -> Self {
+        Self(LookupElements::draw(channel))
+    }
+}
+
+impl<F: Clone, EF: RelationEFTraitBound<F>> Relation<F, EF> for MemoryElements {
+    fn combine(&self, values: &[F]) -> EF {
+        values
+            .iter()
+            .zip(self.0.alpha_powers)
+            .fold(EF::zero(), |acc, (value, power)| acc + EF::from(power) * value.clone()) -
+            self.0.z.into()
+    }
+
+    fn get_name(&self) -> &str {
+        stringify!(MemoryElements)
+    }
+
+    fn get_size(&self) -> usize {
+        MemoryColumn::count()
     }
 }
 
