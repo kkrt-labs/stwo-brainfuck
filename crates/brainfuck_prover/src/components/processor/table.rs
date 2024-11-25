@@ -224,6 +224,7 @@ mod tests {
         assert_eq!(processor_table.table, rows,);
     }
 
+    #[allow(clippy::too_many_lines)]
     #[test]
     fn test_processor_table_from_registers_example_program() {
         // Create a small program and compile it
@@ -341,7 +342,7 @@ mod tests {
             mvi: BaseField::one(),
         };
 
-        let process_10 = ProcessorTableRow {
+        let process_no_10 = ProcessorTableRow {
             clk: BaseField::from(10),
             ip: BaseField::from(11),
             ci: BaseField::from(93),
@@ -351,7 +352,7 @@ mod tests {
             mvi: BaseField::zero(),
         };
 
-        let process_11 = ProcessorTableRow {
+        let process_no_11 = ProcessorTableRow {
             clk: BaseField::from(11),
             ip: BaseField::from(13),
             ci: BaseField::zero(),
@@ -363,8 +364,18 @@ mod tests {
 
         let mut expected_processor_table = ProcessorTable {
             table: vec![
-                process_0, process_1, process_2, process_3, process_4, process_5, process_6,
-                process_7, process_8, process_9, process_10, process_11,
+                process_0,
+                process_1,
+                process_2,
+                process_3,
+                process_4,
+                process_5,
+                process_6,
+                process_7,
+                process_8,
+                process_9,
+                process_no_10,
+                process_no_11,
             ],
         };
 
