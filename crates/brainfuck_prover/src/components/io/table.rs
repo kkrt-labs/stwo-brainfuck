@@ -1,5 +1,13 @@
+use crate::components::{memory::component::Claim, TraceEval};
 use brainfuck_vm::{instruction::InstructionType, registers::Registers};
-use stwo_prover::core::fields::m31::BaseField;
+use stwo_prover::core::{
+    backend::{
+        simd::{column::BaseColumn, m31::LOG_N_LANES},
+        Column,
+    },
+    fields::m31::BaseField,
+    poly::circle::{CanonicCoset, CircleEvaluation},
+};
 
 /// Represents a single row in the I/O Table.
 ///
@@ -76,6 +84,49 @@ impl<const N: u32> IOTable<N> {
             let dummy_row = IOTableRow::default();
             self.add_row(dummy_row);
         }
+    }
+
+    /// Transforms the [`IOTable`] into a [`TraceEval`], to be committed when
+    /// generating a STARK proof.
+    ///
+    /// The [`IOTable`] is transformed from an array of rows (one element = one step
+    /// of all registers) to an array of columns (one element = all steps of one register).
+    /// It is then evaluated on the circle domain.
+    ///
+    /// # Returns
+    /// A tuple containing the evaluated trace and claim for STARK proof.
+    /// If the table is empty, returns an empty trace and a claim with a log size of 0.
+    pub fn trace_evaluation(&self) -> (TraceEval, Claim) {
+        let n_rows = self.table.len() as u32;
+
+        // It is possible that the table is empty because the program has no input or output.
+        if n_rows == 0 {
+            return (TraceEval::new(), Claim { log_size: 0 });
+        }
+
+        // Compute `log_n_rows`, the base-2 logarithm of the number of rows.
+        let log_n_rows = n_rows.ilog2();
+
+        // Add `LOG_N_LANES` to account for SIMD optimization.
+        let log_size = log_n_rows + LOG_N_LANES;
+
+        // Initialize a trace with 1 column (`mv`), each column containing `2^log_size` entries
+        // initialized to zero.
+        let mut trace = vec![BaseColumn::zeros(1 << log_size)];
+
+        // Populate the column with data from the table rows.
+        for (index, row) in self.table.iter().enumerate().take(1 << log_n_rows) {
+            trace[0].data[index] = row.mv.into();
+        }
+
+        // Create a circle domain using a canonical coset.
+        let domain = CanonicCoset::new(log_size).circle_domain();
+
+        // Map the column into the circle domain.
+        let trace = trace.into_iter().map(|col| CircleEvaluation::new(domain, col)).collect();
+
+        // Return the evaluated trace and a claim containing the log size of the domain.
+        (trace, Claim { log_size })
     }
 }
 
@@ -209,5 +260,111 @@ mod tests {
         expected_io_table.add_row(row);
 
         assert_eq!(IOTable::from(registers), expected_io_table);
+    }
+
+    #[test]
+    fn test_trace_evaluation_empty_table() {
+        let io_table = TestIOTable::new();
+
+        // Perform the trace evaluation.
+        let (trace, claim) = io_table.trace_evaluation();
+
+        // Verify the claim log size is 0.
+        assert_eq!(claim.log_size, 0, "The log size should be 0 for an empty table.");
+
+        // Verify the trace is empty.
+        assert!(trace.is_empty(), "The trace should be empty when the table has no rows.");
+    }
+
+    #[test]
+    fn test_trace_evaluation_single_row() {
+        let mut io_table = TestIOTable::new();
+        io_table.add_row(IOTableRow::new(BaseField::from(42)));
+
+        let (trace, claim) = io_table.trace_evaluation();
+
+        // Verify the log size includes SIMD lanes.
+        assert!(claim.log_size >= LOG_N_LANES, "Claim log size should include SIMD lanes.");
+
+        // Verify the trace has one column (`mv`).
+        assert_eq!(trace.len(), 1, "Trace should contain one column for 'mv'.");
+
+        // Verify the content of the column.
+        let expected_mv_column = vec![BaseField::from(42); 16];
+        assert_eq!(
+            trace[0].to_cpu().values,
+            expected_mv_column,
+            "'mv' column should match expected values."
+        );
+    }
+
+    #[test]
+    fn test_io_table_trace_evaluation() {
+        let mut io_table = TestIOTable::new();
+
+        // Add rows to the I/O table.
+        let rows = vec![IOTableRow::new(BaseField::from(1)), IOTableRow::new(BaseField::from(2))];
+        io_table.add_rows(rows);
+
+        // Perform the trace evaluation.
+        let (trace, claim) = io_table.trace_evaluation();
+
+        // Calculate the expected parameters.
+        let expected_log_n_rows: u32 = 1; // log2(2 rows)
+        let expected_log_size = expected_log_n_rows + LOG_N_LANES;
+        let expected_size = 1 << expected_log_size;
+
+        // Construct the expected trace column for `mv`.
+        let mut expected_columns = vec![BaseColumn::zeros(expected_size)];
+
+        // Populate the `mv` column with row data and padding.
+        expected_columns[0].data[0] = BaseField::from(1).into();
+        expected_columns[0].data[1] = BaseField::from(2).into();
+
+        // Create the expected domain for evaluation.
+        let domain = CanonicCoset::new(expected_log_size).circle_domain();
+
+        // Transform expected columns into CircleEvaluation.
+        let expected_trace: TraceEval =
+            expected_columns.into_iter().map(|col| CircleEvaluation::new(domain, col)).collect();
+
+        // Create the expected claim.
+        let expected_claim = Claim { log_size: expected_log_size };
+
+        // Assert equality of the claim.
+        assert_eq!(claim, expected_claim, "The claim should match the expected claim.");
+
+        // Assert equality of the trace for all columns.
+        for (actual, expected) in trace.iter().zip(expected_trace.iter()) {
+            assert_eq!(
+                actual.domain, expected.domain,
+                "The domain of the trace column should match the expected domain."
+            );
+            assert_eq!(
+                actual.to_cpu().values,
+                expected.to_cpu().values,
+                "The values of the trace column should match the expected values."
+            );
+        }
+    }
+
+    #[test]
+    fn test_trace_evaluation_circle_domain() {
+        let mut io_table = TestIOTable::new();
+        io_table.add_rows(vec![
+            IOTableRow::new(BaseField::from(1)),
+            IOTableRow::new(BaseField::from(2)),
+        ]);
+
+        let (trace, claim) = io_table.trace_evaluation();
+
+        // Verify the domain of the trace matches the expected circle domain.
+        let domain = CanonicCoset::new(claim.log_size).circle_domain();
+        for column in trace {
+            assert_eq!(
+                column.domain, domain,
+                "Trace column domain should match the expected circle domain."
+            );
+        }
     }
 }
