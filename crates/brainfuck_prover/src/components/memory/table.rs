@@ -190,6 +190,12 @@ impl MemoryTable {
     ///
     /// # Arguments
     /// * memory - The [`MemoryTable`] containing the sorted and padded trace as an array of rows.
+    ///
+    /// # Returns
+    /// A tuple containing the evaluated trace and claim for STARK proof.
+    ///
+    /// # Errors
+    /// Returns [`TraceError::EmptyTrace`] if the table is empty.
     pub fn trace_evaluation(&self) -> Result<(TraceEval, Claim), TraceError> {
         let n_rows = self.table.len() as u32;
         if n_rows == 0 {
