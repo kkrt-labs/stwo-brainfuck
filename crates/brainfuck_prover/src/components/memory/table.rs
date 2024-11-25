@@ -361,9 +361,8 @@ pub fn interaction_trace_evaluation(
     col_gen.finalize_col();
 
     let (trace, claimed_sum) = logup_gen.finalize_last();
-    let interaction_claim = InteractionClaim { claimed_sum };
 
-    (trace, interaction_claim)
+    (trace, InteractionClaim { claimed_sum })
 }
 
 #[cfg(test)]
