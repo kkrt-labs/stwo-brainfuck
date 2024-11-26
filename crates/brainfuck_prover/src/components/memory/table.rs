@@ -1,13 +1,21 @@
+use super::component::InteractionClaim;
 use crate::components::{Claim, TraceColumn, TraceError, TraceEval};
 use brainfuck_vm::registers::Registers;
 use num_traits::One;
-use stwo_prover::core::{
-    backend::{
-        simd::{column::BaseColumn, m31::LOG_N_LANES},
-        Column,
+use stwo_prover::{
+    constraint_framework::{
+        logup::{LogupTraceGenerator, LookupElements},
+        Relation, RelationEFTraitBound,
     },
-    fields::m31::BaseField,
-    poly::circle::{CanonicCoset, CircleEvaluation},
+    core::{
+        backend::{
+            simd::{column::BaseColumn, m31::LOG_N_LANES, qm31::PackedSecureField},
+            Column,
+        },
+        channel::Channel,
+        fields::m31::BaseField,
+        poly::circle::{CanonicCoset, CircleEvaluation},
+    },
 };
 
 /// Represents a single row in the Memory Table.
@@ -267,6 +275,104 @@ impl TraceColumn for MemoryColumn {
     }
 }
 
+/// The interaction elements drawn for the extension column of the Memory component.
+///
+/// The logUp protocol uses these elements to combine the values of the different
+/// registers of the main trace to create a random linear combination
+/// of them, and use it in the denominator of the fractions in the logUp protocol.
+///
+/// There are 3 lookup elements in the Memory component, as only the 'real' registers
+/// are used: `clk`, `mp` and `mv`. `d` is used to eventually nullify the numerator.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct MemoryElements(LookupElements<{ MemoryColumn::count() - 1 }>);
+
+impl MemoryElements {
+    /// Provides dummy lookup elements.
+    pub fn dummy() -> Self {
+        Self(LookupElements::dummy())
+    }
+
+    /// Draw random elements from the Fiat-Shamir [`Channel`].
+    ///
+    /// These elements are randomly secured, and will be use
+    /// to generate the interaction trace with the logUp protocol.
+    pub fn draw(channel: &mut impl Channel) -> Self {
+        Self(LookupElements::draw(channel))
+    }
+}
+
+impl<F: Clone, EF: RelationEFTraitBound<F>> Relation<F, EF> for MemoryElements {
+    /// Combine multiple values from a basefield (e.g. [`BaseField`])
+    /// and combine them to a value from an extension field (e.g. [`PackedSecureField`])
+    ///
+    /// This is used when computing the interaction values from the main trace values.
+    fn combine(&self, values: &[F]) -> EF {
+        values
+            .iter()
+            .zip(self.0.alpha_powers)
+            .fold(EF::zero(), |acc, (value, power)| acc + EF::from(power) * value.clone()) -
+            self.0.z.into()
+    }
+
+    /// Returns the name of the struct.
+    fn get_name(&self) -> &str {
+        stringify!(MemoryElements)
+    }
+
+    /// Returns the number interaction elements.
+    fn get_size(&self) -> usize {
+        MemoryColumn::count() - 1
+    }
+}
+
+/// Creates the interaction trace from the main trace evaluation
+/// and the interaction elements for the Memory component.
+///
+/// The Processor component uses the other components:
+/// The Processor component multiplicities are then positive,
+/// and the Memory component multiplicities are negative
+/// in the logUp protocol.
+///
+/// Only the 'real' rows are impacting the logUp sum.
+/// Dummy rows are padded rows and rows filling the `clk` gaps
+/// which does not appear in the Processor main trace.
+///
+///
+/// # Returns
+/// - Interaction trace evaluation, to be commited.
+/// - Interaction claim: the total sum from the logUp protocol,
+/// to be mixed into the Fiat-Shamir [`Channel`].
+pub fn interaction_trace_evaluation(
+    main_trace_eval: &TraceEval,
+    lookup_elements: &MemoryElements,
+) -> (TraceEval, InteractionClaim) {
+    let log_size = main_trace_eval[0].domain.log_size();
+
+    let mut logup_gen = LogupTraceGenerator::new(log_size);
+    let mut col_gen = logup_gen.new_col();
+
+    let clk_col = &main_trace_eval[MemoryColumn::Clk.index()].data;
+    let mp_col = &main_trace_eval[MemoryColumn::Mp.index()].data;
+    let mv_column = &main_trace_eval[MemoryColumn::Mv.index()].data;
+    let d_col = &main_trace_eval[MemoryColumn::D.index()].data;
+    for vec_row in 0..1 << (log_size - LOG_N_LANES) {
+        let clk = clk_col[vec_row];
+        let mp = mp_col[vec_row];
+        let mv = mv_column[vec_row];
+        // Set the fraction numerator to 0 if it is a dummy row (d = 1), otherwise set it to -1.
+        let is_dummy_num = PackedSecureField::from(d_col[vec_row]) - PackedSecureField::one();
+        // Only the common registers with the processor table are part of the extension column.
+        let denom: PackedSecureField = lookup_elements.combine(&[clk, mp, mv]);
+        col_gen.write_frac(vec_row, is_dummy_num, denom);
+    }
+
+    col_gen.finalize_col();
+
+    let (trace, claimed_sum) = logup_gen.finalize_last();
+
+    (trace, InteractionClaim { claimed_sum })
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -450,7 +556,7 @@ mod tests {
     }
 
     #[test]
-    fn test_write_trace() {
+    fn test_trace_evaluation() {
         let mut memory_table = MemoryTable::new();
         let rows = vec![
             MemoryTableRow::new(BaseField::zero(), BaseField::from(43), BaseField::from(91)),
@@ -495,10 +601,123 @@ mod tests {
     }
 
     #[test]
-    fn test_write_empty_trace() {
+    fn test_evaluate_empty_trace() {
         let memory_table = MemoryTable::new();
         let run = memory_table.trace_evaluation();
 
         assert!(matches!(run, Err(TraceError::EmptyTrace)));
+    }
+
+    #[test]
+    fn test_interaction_trace_evaluation() {
+        let mut memory_table = MemoryTable::new();
+        // Trace rows are:
+        // - Real row
+        // - Dummy row (filling the `clk` value)
+        // - Real row
+        // - Dummy row (padding to power of 2)
+        let rows = vec![
+            MemoryTableRow::new(BaseField::zero(), BaseField::from(43), BaseField::from(91)),
+            MemoryTableRow::new_dummy(BaseField::one(), BaseField::from(43), BaseField::from(91)),
+            MemoryTableRow::new(BaseField::from(2), BaseField::from(91), BaseField::from(9)),
+            MemoryTableRow::new_dummy(BaseField::from(2), BaseField::from(91), BaseField::from(9)),
+        ];
+        memory_table.add_rows(rows);
+
+        let (trace_eval, claim) = memory_table.trace_evaluation().unwrap();
+
+        let lookup_elements = MemoryElements::dummy();
+
+        let (interaction_trace_eval, interaction_claim) =
+            interaction_trace_evaluation(&trace_eval, &lookup_elements);
+
+        let log_size = trace_eval[0].domain.log_size();
+        let mut logup_gen = LogupTraceGenerator::new(log_size);
+        let mut col_gen = logup_gen.new_col();
+
+        let mut denoms = [PackedSecureField::zero(); 4];
+        let clk_col = &trace_eval[MemoryColumn::Clk.index()].data;
+        let mp_col = &trace_eval[MemoryColumn::Mp.index()].data;
+        let mv_column = &trace_eval[MemoryColumn::Mv.index()].data;
+        // Construct the denominator for each row of the logUp column, from the main trace
+        // evaluation.
+        for vec_row in 0..1 << (log_size - LOG_N_LANES) {
+            let clk = clk_col[vec_row];
+            let mp = mp_col[vec_row];
+            let mv = mv_column[vec_row];
+            let denom: PackedSecureField = lookup_elements.combine(&[clk, mp, mv]);
+            denoms[vec_row] = denom;
+        }
+
+        let num_1 = -PackedSecureField::one();
+        let num_2 = PackedSecureField::zero();
+        let num_3 = -PackedSecureField::one();
+        let num_4 = PackedSecureField::zero();
+
+        col_gen.write_frac(0, num_1, denoms[0]);
+        col_gen.write_frac(1, num_2, denoms[1]);
+        col_gen.write_frac(2, num_3, denoms[2]);
+        col_gen.write_frac(3, num_4, denoms[3]);
+
+        col_gen.finalize_col();
+        let (expected_interaction_trace_eval, expected_claimed_sum) = logup_gen.finalize_last();
+
+        assert_eq!(claim.log_size, log_size,);
+        for col_index in 0..expected_interaction_trace_eval.len() {
+            assert_eq!(
+                interaction_trace_eval[col_index].domain,
+                expected_interaction_trace_eval[col_index].domain
+            );
+            assert_eq!(
+                interaction_trace_eval[col_index].to_cpu().values,
+                expected_interaction_trace_eval[col_index].to_cpu().values
+            );
+        }
+        assert_eq!(interaction_claim.claimed_sum, expected_claimed_sum);
+    }
+
+    // This test verifies that the dummy rows have no impact
+    // on the total sum of the logUp protocol in the Memory component.
+    // Indeed, the total sum computed by the Processor component won't
+    // have the exact same dummy rows (the Memory component) adds extra
+    // dummy rows to fill the `clk` jumps and enforce the sorting.
+    #[test]
+    fn test_dummy_rows_impact_on_interaction_trace_evaluation() {
+        let mut memory_table = MemoryTable::new();
+        let mut real_memory_table = MemoryTable::new();
+
+        // Trace rows are:
+        // - Real row
+        // - Dummy row (filling the `clk` value)
+        // - Real row
+        // - Dummy row (padding to power of 2)
+        let rows = vec![
+            MemoryTableRow::new(BaseField::zero(), BaseField::from(43), BaseField::from(91)),
+            MemoryTableRow::new_dummy(BaseField::one(), BaseField::from(43), BaseField::from(91)),
+            MemoryTableRow::new(BaseField::from(2), BaseField::from(91), BaseField::from(9)),
+            MemoryTableRow::new_dummy(BaseField::from(2), BaseField::from(91), BaseField::from(9)),
+        ];
+        memory_table.add_rows(rows);
+
+        // Trace rows are:
+        // - Real row
+        // - Real row
+        let real_rows = vec![
+            MemoryTableRow::new(BaseField::zero(), BaseField::from(43), BaseField::from(91)),
+            MemoryTableRow::new(BaseField::from(2), BaseField::from(91), BaseField::from(9)),
+        ];
+        real_memory_table.add_rows(real_rows);
+
+        let (trace_eval, _) = memory_table.trace_evaluation().unwrap();
+        let (new_trace_eval, _) = real_memory_table.trace_evaluation().unwrap();
+
+        let lookup_elements = MemoryElements::dummy();
+
+        let (_, interaction_claim) = interaction_trace_evaluation(&trace_eval, &lookup_elements);
+
+        let (_, new_interaction_claim) =
+            interaction_trace_evaluation(&new_trace_eval, &lookup_elements);
+
+        assert_eq!(interaction_claim, new_interaction_claim,);
     }
 }
