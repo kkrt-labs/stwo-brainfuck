@@ -21,8 +21,6 @@ struct Args {
     #[clap(long)]
     trace: bool,
     #[clap(long)]
-    pad_trace: bool,
-    #[clap(long)]
     ram_size: Option<usize>,
 }
 
@@ -45,9 +43,6 @@ fn main() -> Result<(), MachineError> {
     tracing::info!("Provide inputs separated by linefeeds: ");
     bf_vm.execute().unwrap();
     if args.trace {
-        if args.pad_trace {
-            bf_vm.pad_trace();
-        };
         let trace = bf_vm.trace();
         tracing::info!("Execution trace: {:#?}", trace);
     }
