@@ -1,4 +1,4 @@
-use crate::components::{Claim, TraceEval, TraceType};
+use crate::components::{Claim, TraceColumn, TraceEval};
 use brainfuck_vm::{instruction::InstructionType, registers::Registers};
 use stwo_prover::core::{
     backend::{
@@ -96,12 +96,12 @@ impl<const N: u32> IOTable<N> {
     /// # Returns
     /// A tuple containing the evaluated trace and claim for STARK proof.
     /// If the table is empty, returns an empty trace and a claim with a log size of 0.
-    pub fn trace_evaluation(&self) -> (TraceEval, Claim) {
+    pub fn trace_evaluation(&self) -> (TraceEval, Claim<IoColumn>) {
         let n_rows = self.table.len() as u32;
 
         // It is possible that the table is empty because the program has no input or output.
         if n_rows == 0 {
-            return (TraceEval::new(), Claim { log_size: 0, trace: TraceType::Io });
+            return (TraceEval::new(), Claim::<IoColumn>::new(0));
         }
 
         // Compute `log_n_rows`, the base-2 logarithm of the number of rows.
@@ -126,7 +126,7 @@ impl<const N: u32> IOTable<N> {
         let trace = trace.into_iter().map(|col| CircleEvaluation::new(domain, col)).collect();
 
         // Return the evaluated trace and a claim containing the log size of the domain.
-        (trace, Claim { log_size, trace: TraceType::Io })
+        (trace, Claim::<IoColumn>::new(log_size))
     }
 }
 
@@ -172,9 +172,10 @@ impl IoColumn {
             Self::Io => 0,
         }
     }
+}
 
-    /// Returns the total number of columns in the IO table.
-    pub const fn count() -> usize {
+impl TraceColumn for IoColumn {
+    fn count() -> usize {
         1
     }
 }
@@ -182,7 +183,6 @@ impl IoColumn {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::components::TraceType;
     use num_traits::One;
 
     type TestIOTable = IOTable<10>;
@@ -351,7 +351,7 @@ mod tests {
             expected_columns.into_iter().map(|col| CircleEvaluation::new(domain, col)).collect();
 
         // Create the expected claim.
-        let expected_claim = Claim { log_size: expected_log_size, trace: TraceType::Io };
+        let expected_claim = Claim::<IoColumn>::new(expected_log_size);
 
         // Assert equality of the claim.
         assert_eq!(claim, expected_claim, "The claim should match the expected claim.");

@@ -1,6 +1,3 @@
-use instruction::table::InstructionColumn;
-use io::table::IoColumn;
-use memory::table::MemoryColumn;
 use stwo_prover::core::{
     backend::simd::SimdBackend,
     channel::Channel,
@@ -27,41 +24,21 @@ pub enum TraceError {
     EmptyTrace,
 }
 
-/// Represents the different trace types used in the Brainfuck STARK proving system.
-#[derive(Debug, Eq, PartialEq)]
-pub enum TraceType {
-    /// Memory access trace.
-    Memory,
-    /// Instruction execution trace.
-    Instruction,
-    /// Input/output trace.
-    Io,
-    /// Processor trace (register).
-    Processor,
-}
-
-impl TraceType {
-    /// Returns the number of columns associated with the specific trace type.
-    pub fn column_count(&self) -> usize {
-        match self {
-            Self::Memory => MemoryColumn::count(),
-            Self::Instruction => InstructionColumn::count(),
-            Self::Io => IoColumn::count(),
-            Self::Processor => unimplemented!(),
-        }
-    }
-}
-
 /// Represents a claim associated with a specific trace in the Brainfuck STARK proving system.
 #[derive(Debug, Eq, PartialEq)]
-pub struct Claim {
+pub struct Claim<T: TraceColumn> {
     /// Logarithmic size (`log2`) of the evaluated trace.
     pub log_size: u32,
-    /// Type of the associated trace.
-    pub trace: TraceType,
+    /// Marker for the trace type.
+    pub _marker: std::marker::PhantomData<T>,
 }
 
-impl Claim {
+impl<T: TraceColumn> Claim<T> {
+    /// Creates a new claim for the given trace type.
+    pub const fn new(log_size: u32) -> Self {
+        Self { log_size, _marker: std::marker::PhantomData }
+    }
+
     /// Returns the `log_size` for each type of trace committed for the given trace type:
     /// - Preprocessed trace,
     /// - Main trace,
@@ -81,7 +58,7 @@ impl Claim {
     pub fn log_sizes(&self) -> TreeVec<Vec<u32>> {
         // TODO: Add the preprocessed and interaction trace correct sizes
         let preprocessed_trace_log_sizes: Vec<u32> = vec![];
-        let trace_log_sizes = vec![self.log_size; self.trace.column_count()];
+        let trace_log_sizes = vec![self.log_size; T::count()];
         let interaction_trace_log_sizes: Vec<u32> = vec![];
         TreeVec::new(vec![
             preprocessed_trace_log_sizes,
@@ -95,4 +72,10 @@ impl Claim {
     pub fn mix_into(&self, channel: &mut impl Channel) {
         channel.mix_u64(self.log_size.into());
     }
+}
+
+/// Represents columns of a trace.
+pub trait TraceColumn {
+    /// Returns the number of columns associated with the specific trace type.
+    fn count() -> usize;
 }

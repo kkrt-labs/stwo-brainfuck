@@ -1,4 +1,4 @@
-use crate::components::{Claim, TraceError, TraceEval, TraceType};
+use crate::components::{Claim, TraceColumn, TraceError, TraceEval};
 use brainfuck_vm::registers::Registers;
 use num_traits::One;
 use stwo_prover::core::{
@@ -195,7 +195,7 @@ impl MemoryTable {
     ///
     /// # Errors
     /// Returns [`TraceError::EmptyTrace`] if the table is empty.
-    pub fn trace_evaluation(&self) -> Result<(TraceEval, Claim), TraceError> {
+    pub fn trace_evaluation(&self) -> Result<(TraceEval, Claim<MemoryColumn>), TraceError> {
         let n_rows = self.table.len() as u32;
         if n_rows == 0 {
             return Err(TraceError::EmptyTrace);
@@ -217,7 +217,7 @@ impl MemoryTable {
         let trace = trace.into_iter().map(|col| CircleEvaluation::new(domain, col)).collect();
 
         // TODO: Confirm that the log_size in `Claim` is `log_size`, including the SIMD lanes
-        Ok((trace, Claim { log_size, trace: TraceType::Memory }))
+        Ok((trace, Claim::<MemoryColumn>::new(log_size)))
     }
 }
 
@@ -259,9 +259,10 @@ impl MemoryColumn {
             Self::D => 3,
         }
     }
+}
 
-    /// Returns the total number of columns in the Memory table
-    pub const fn count() -> usize {
+impl TraceColumn for MemoryColumn {
+    fn count() -> usize {
         4
     }
 }
@@ -269,7 +270,6 @@ impl MemoryColumn {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::components::TraceType;
     use num_traits::Zero;
 
     #[test]
@@ -485,7 +485,7 @@ mod tests {
             .into_iter()
             .map(|col| CircleEvaluation::new(domain, col))
             .collect();
-        let expected_claim = Claim { log_size: expected_log_size, trace: TraceType::Memory };
+        let expected_claim = Claim::<MemoryColumn>::new(expected_log_size);
 
         assert_eq!(claim, expected_claim);
         for col_index in 0..expected_trace.len() {
