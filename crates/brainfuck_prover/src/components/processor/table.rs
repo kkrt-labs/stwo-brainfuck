@@ -8,7 +8,7 @@ use stwo_prover::core::{
     poly::circle::{CanonicCoset, CircleEvaluation},
 };
 
-use crate::components::{Claim, TraceColumn, TraceError, TraceEval};
+use crate::components::{Claim, ProcessorClaim, TraceColumn, TraceError, TraceEval};
 
 /// Represents a single row in the Processor Table.
 ///
@@ -127,7 +127,7 @@ impl ProcessorTable {
     ///
     /// # Errors
     /// Returns `TraceError::EmptyTrace` if the table is empty.
-    pub fn trace_evaluation(&self) -> Result<(TraceEval, Claim<ProcessorColumn>), TraceError> {
+    pub fn trace_evaluation(&self) -> Result<(TraceEval, ProcessorClaim), TraceError> {
         let n_rows = self.table.len() as u32;
         if n_rows == 0 {
             return Err(TraceError::EmptyTrace);

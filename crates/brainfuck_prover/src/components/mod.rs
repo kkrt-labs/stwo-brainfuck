@@ -1,6 +1,7 @@
 use instruction::table::InstructionColumn;
 use io::table::IoColumn;
 use memory::table::MemoryColumn;
+use processor::table::ProcessorColumn;
 use stwo_prover::core::{
     backend::simd::SimdBackend,
     channel::Channel,
@@ -27,6 +28,9 @@ pub type InstructionClaim = Claim<InstructionColumn>;
 
 /// IO claim for the Trace.
 pub type IoClaim = Claim<IoColumn>;
+
+/// Processor claim for the Trace.
+pub type ProcessorClaim = Claim<ProcessorColumn>;
 
 /// Custom error type for the Trace.
 #[derive(Debug, Error, Eq, PartialEq)]
