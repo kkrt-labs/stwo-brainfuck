@@ -499,13 +499,13 @@ mod tests {
             "Trace should contain one column per register."
         );
 
-        let expected_clk_column = vec![BaseField::one(); 16];
-        let expected_ip_column = vec![BaseField::from(2); 16];
-        let expected_ci_column = vec![BaseField::from(3); 16];
-        let expected_ni_column = vec![BaseField::from(4); 16];
-        let expected_mp_column = vec![BaseField::from(5); 16];
-        let expected_mv_column = vec![BaseField::from(6); 16];
-        let expected_mvi_column = vec![BaseField::from(7); 16];
+        let expected_clk_column = vec![BaseField::one(); 1 << LOG_N_LANES];
+        let expected_ip_column = vec![BaseField::from(2); 1 << LOG_N_LANES];
+        let expected_ci_column = vec![BaseField::from(3); 1 << LOG_N_LANES];
+        let expected_ni_column = vec![BaseField::from(4); 1 << LOG_N_LANES];
+        let expected_mp_column = vec![BaseField::from(5); 1 << LOG_N_LANES];
+        let expected_mv_column = vec![BaseField::from(6); 1 << LOG_N_LANES];
+        let expected_mvi_column = vec![BaseField::from(7); 1 << LOG_N_LANES];
 
         assert_eq!(trace[ProcessorColumn::Clk.index()].to_cpu().values, expected_clk_column);
         assert_eq!(trace[ProcessorColumn::Ip.index()].to_cpu().values, expected_ip_column);
