@@ -650,8 +650,8 @@ mod tests {
 
         let num_1 = -PackedSecureField::one();
         let num_2 = PackedSecureField::zero();
-        let num_3 = num_1;
-        let num_4 = num_2;
+        let num_3 = -PackedSecureField::one();
+        let num_4 = PackedSecureField::zero();
 
         col_gen.write_frac(0, num_1, denoms[0]);
         col_gen.write_frac(1, num_2, denoms[1]);
