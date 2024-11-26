@@ -1,4 +1,4 @@
-use crate::components::{memory::component::Claim, TraceError, TraceEval};
+use crate::components::{Claim, Trace, TraceError, TraceEval};
 use brainfuck_vm::{
     instruction::VALID_INSTRUCTIONS_BF, machine::ProgramMemory, registers::Registers,
 };
@@ -171,7 +171,7 @@ impl InstructionTable {
         let trace = trace.into_iter().map(|col| CircleEvaluation::new(domain, col)).collect();
 
         // Return the evaluated trace and a claim containing the log size of the domain.
-        Ok((trace, Claim { log_size }))
+        Ok((trace, Claim { log_size, trace: Trace::Instruction }))
     }
 }
 
@@ -242,6 +242,8 @@ impl InstructionColumn {
 
 #[cfg(test)]
 mod tests {
+    use crate::components::{Claim, Trace};
+
     use super::*;
     use brainfuck_vm::{
         compiler::Compiler, instruction::InstructionType, test_helper::create_test_machine,
@@ -583,7 +585,7 @@ mod tests {
             .collect();
 
         // Create the expected claim.
-        let expected_claim = Claim { log_size: expected_log_size };
+        let expected_claim = Claim { log_size: expected_log_size, trace: Trace::Instruction };
 
         // Assert equality of the claim.
         assert_eq!(claim, expected_claim);
