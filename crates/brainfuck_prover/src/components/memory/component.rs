@@ -57,6 +57,7 @@ impl Claim {
 pub struct InteractionClaim {
     pub claimed_sum: SecureField,
 }
+
 impl InteractionClaim {
     /// Mix the sums from the logUp protocol into the Fiat-Shamir [`Channel`],
     /// to bound the proof to the trace.
