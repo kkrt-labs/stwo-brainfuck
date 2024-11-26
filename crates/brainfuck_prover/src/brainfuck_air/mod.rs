@@ -1,15 +1,18 @@
 use crate::components::{memory::table::MemoryTable, MemoryClaim};
 use brainfuck_vm::machine::Machine;
-use stwo_prover::core::{
-    air::{Component, ComponentProver},
-    backend::simd::SimdBackend,
-    channel::{Blake2sChannel, Channel},
-    pcs::{CommitmentSchemeProver, CommitmentSchemeVerifier, PcsConfig, TreeVec},
-    poly::circle::{CanonicCoset, PolyOps},
-    prover::{self, verify, ProvingError, StarkProof, VerificationError},
-    vcs::{
-        blake2_merkle::{Blake2sMerkleChannel, Blake2sMerkleHasher},
-        ops::MerkleHasher,
+use stwo_prover::{
+    constraint_framework::{INTERACTION_TRACE_IDX, ORIGINAL_TRACE_IDX, PREPROCESSED_TRACE_IDX},
+    core::{
+        air::{Component, ComponentProver},
+        backend::simd::SimdBackend,
+        channel::{Blake2sChannel, Channel},
+        pcs::{CommitmentSchemeProver, CommitmentSchemeVerifier, PcsConfig, TreeVec},
+        poly::circle::{CanonicCoset, PolyOps},
+        prover::{self, verify, ProvingError, StarkProof, VerificationError},
+        vcs::{
+            blake2_merkle::{Blake2sMerkleChannel, Blake2sMerkleHasher},
+            ops::MerkleHasher,
+        },
     },
 };
 
@@ -186,30 +189,43 @@ pub fn verify_brainfuck(
     let channel = &mut Blake2sChannel::default();
     let commitment_scheme_verifier =
         &mut CommitmentSchemeVerifier::<Blake2sMerkleChannel>::new(config);
-    let sizes = &claim.log_sizes();
+    let log_sizes = &claim.log_sizes();
 
-    // ┌──────────────────────────┐
-    // │   Interaction Phase 0    │
-    // └──────────────────────────┘
+    // ┌───────────────────────────────────────────────┐
+    // │   Interaction Phase 0 - Preprocessed Trace    │
+    // └───────────────────────────────────────────────┘
+
+    commitment_scheme_verifier.commit(
+        proof.commitments[PREPROCESSED_TRACE_IDX],
+        &log_sizes[PREPROCESSED_TRACE_IDX],
+        channel,
+    );
+
+    // ┌───────────────────────────────────────┐
+    // │    Interaction Phase 1 - Main Trace   │
+    // └───────────────────────────────────────┘
     claim.mix_into(channel);
-    commitment_scheme_verifier.commit(proof.commitments[0], &sizes[0], channel);
+    commitment_scheme_verifier.commit(
+        proof.commitments[ORIGINAL_TRACE_IDX],
+        &log_sizes[ORIGINAL_TRACE_IDX],
+        channel,
+    );
 
-    // ┌──────────────────────────┐
-    // │   Interaction Phase 1    │
-    // └──────────────────────────┘
+    // ┌───────────────────────────────────────────────┐
+    // │    Interaction Phase 2 - Interaction Trace    │
+    // └───────────────────────────────────────────────┘
+
     let interaction_elements = BrainfuckInteractionElements::draw(channel);
     // Check that the lookup sum is valid, otherwise throw
-    // TODO: panic! should be replaced by custom error
     if !lookup_sum_valid(&claim, &interaction_elements, &interaction_claim) {
         return Err(VerificationError::InvalidLookup("Invalid LogUp sum".to_string()));
     };
     interaction_claim.mix_into(channel);
-    commitment_scheme_verifier.commit(proof.commitments[1], &sizes[1], channel);
-
-    // ┌──────────────────────────┐
-    // │   Interaction Phase 2    │
-    // └──────────────────────────┘
-    commitment_scheme_verifier.commit(proof.commitments[2], &sizes[2], channel);
+    commitment_scheme_verifier.commit(
+        proof.commitments[INTERACTION_TRACE_IDX],
+        &log_sizes[INTERACTION_TRACE_IDX],
+        channel,
+    );
 
     // ┌──────────────────────────┐
     // │    Proof Verification    │
