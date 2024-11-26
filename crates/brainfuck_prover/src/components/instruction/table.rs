@@ -1,4 +1,4 @@
-use crate::components::{Claim, TraceColumn, TraceError, TraceEval};
+use crate::components::{Claim, InstructionClaim, TraceColumn, TraceError, TraceEval};
 use brainfuck_vm::{
     instruction::VALID_INSTRUCTIONS_BF, machine::ProgramMemory, registers::Registers,
 };
@@ -128,7 +128,7 @@ impl InstructionTable {
     ///
     /// # Errors
     /// Returns [`TraceError::EmptyTrace`] if the table is empty.
-    pub fn trace_evaluation(&self) -> Result<(TraceEval, Claim<InstructionColumn>), TraceError> {
+    pub fn trace_evaluation(&self) -> Result<(TraceEval, InstructionClaim), TraceError> {
         let n_rows = self.table.len() as u32;
         // If the table is empty, there is no data to evaluate, so return an error.
         if n_rows == 0 {

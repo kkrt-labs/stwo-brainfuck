@@ -1,4 +1,4 @@
-use crate::components::{Claim, TraceColumn, TraceEval};
+use crate::components::{Claim, IoClaim, TraceColumn, TraceEval};
 use brainfuck_vm::{instruction::InstructionType, registers::Registers};
 use stwo_prover::core::{
     backend::{
@@ -96,7 +96,7 @@ impl<const N: u32> IOTable<N> {
     /// # Returns
     /// A tuple containing the evaluated trace and claim for STARK proof.
     /// If the table is empty, returns an empty trace and a claim with a log size of 0.
-    pub fn trace_evaluation(&self) -> (TraceEval, Claim<IoColumn>) {
+    pub fn trace_evaluation(&self) -> (TraceEval, IoClaim) {
         let n_rows = self.table.len() as u32;
 
         // It is possible that the table is empty because the program has no input or output.
