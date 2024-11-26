@@ -1,7 +1,4 @@
-use crate::components::{
-    memory::table::{MemoryColumn, MemoryTable},
-    Claim,
-};
+use crate::components::{memory::table::MemoryTable, MemoryClaim};
 use brainfuck_vm::machine::Machine;
 use stwo_prover::core::{
     air::{Component, ComponentProver},
@@ -30,7 +27,7 @@ pub struct BrainfuckProof<H: MerkleHasher> {
 /// It includes the common claim values such as the initial and final states
 /// and the claim of each component.
 pub struct BrainfuckClaim {
-    pub memory: Claim<MemoryColumn>,
+    pub memory: MemoryClaim,
 }
 
 impl BrainfuckClaim {
