@@ -1,5 +1,5 @@
 use super::component::InteractionClaim;
-use crate::components::{Claim, TraceColumn, TraceError, TraceEval};
+use crate::components::{Claim, MemoryClaim, TraceColumn, TraceError, TraceEval};
 use brainfuck_vm::registers::Registers;
 use num_traits::One;
 use stwo_prover::{
@@ -203,7 +203,7 @@ impl MemoryTable {
     ///
     /// # Errors
     /// Returns [`TraceError::EmptyTrace`] if the table is empty.
-    pub fn trace_evaluation(&self) -> Result<(TraceEval, Claim<MemoryColumn>), TraceError> {
+    pub fn trace_evaluation(&self) -> Result<(TraceEval, MemoryClaim), TraceError> {
         let n_rows = self.table.len() as u32;
         if n_rows == 0 {
             return Err(TraceError::EmptyTrace);
