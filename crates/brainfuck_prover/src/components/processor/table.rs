@@ -101,8 +101,7 @@ impl ProcessorTable {
             for i in 1..=padding_offset {
                 self.add_row(ProcessorTableRow {
                     clk: last_row.clk + BaseField::from(i),
-                    ip: last_row.ip,
-                    ..Default::default()
+                    ..last_row.clone()
                 });
             }
         }
