@@ -510,9 +510,9 @@ mod tests {
         );
 
         // Expected values for the single row
-        let expected_ip_column = vec![BaseField::from(1); 16];
-        let expected_ci_column = vec![BaseField::from(43); 16];
-        let expected_ni_column = vec![BaseField::from(91); 16];
+        let expected_ip_column = vec![BaseField::from(1); 1 << LOG_N_LANES];
+        let expected_ci_column = vec![BaseField::from(43); 1 << LOG_N_LANES];
+        let expected_ni_column = vec![BaseField::from(91); 1 << LOG_N_LANES];
 
         // Check that the entire column matches expected values
         assert_eq!(
