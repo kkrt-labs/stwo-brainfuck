@@ -1,3 +1,4 @@
+use crate::components::{ProcessorClaim, TraceColumn, TraceError, TraceEval};
 use brainfuck_vm::registers::Registers;
 use stwo_prover::core::{
     backend::{
@@ -7,8 +8,6 @@ use stwo_prover::core::{
     fields::m31::BaseField,
     poly::circle::{CanonicCoset, CircleEvaluation},
 };
-
-use crate::components::{Claim, ProcessorClaim, TraceColumn, TraceError, TraceEval};
 
 /// Represents a single row in the Processor Table.
 ///
@@ -156,7 +155,7 @@ impl ProcessorTable {
         let trace = trace.into_iter().map(|col| CircleEvaluation::new(domain, col)).collect();
 
         // Return the evaluated trace and claim
-        Ok((trace, Claim::<ProcessorColumn>::new(log_size)))
+        Ok((trace, ProcessorClaim::new(log_size)))
     }
 }
 
@@ -595,7 +594,7 @@ mod tests {
                 .collect();
 
         // Create the expected claim
-        let expected_claim = Claim::<ProcessorColumn>::new(expected_log_size);
+        let expected_claim = ProcessorClaim::new(expected_log_size);
 
         // Assert equality of the claim
         assert_eq!(claim, expected_claim, "Claims should match the expected values.");
