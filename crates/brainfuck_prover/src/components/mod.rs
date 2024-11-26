@@ -30,7 +30,7 @@ pub struct Claim<T: TraceColumn> {
     /// Logarithmic size (`log2`) of the evaluated trace.
     pub log_size: u32,
     /// Marker for the trace type.
-    pub _marker: std::marker::PhantomData<T>,
+    _marker: std::marker::PhantomData<T>,
 }
 
 impl<T: TraceColumn> Claim<T> {
