@@ -1,5 +1,9 @@
 use super::table::MemoryColumn;
-use stwo_prover::core::{channel::Channel, fields::qm31::SecureField, pcs::TreeVec};
+use stwo_prover::core::{
+    channel::Channel,
+    fields::{qm31::SecureField, secure_column::SECURE_EXTENSION_DEGREE},
+    pcs::TreeVec,
+};
 
 /// The claim for the Memory component
 #[derive(Debug, Eq, PartialEq)]
@@ -28,7 +32,7 @@ impl Claim {
         // TODO: Add the preprocessed and interaction trace correct sizes
         let preprocessed_trace_log_sizes: Vec<u32> = vec![];
         let trace_log_sizes = vec![self.log_size; MemoryColumn::count()];
-        let interaction_trace_log_sizes: Vec<u32> = vec![];
+        let interaction_trace_log_sizes: Vec<u32> = vec![self.log_size; SECURE_EXTENSION_DEGREE];
         TreeVec::new(vec![
             preprocessed_trace_log_sizes,
             trace_log_sizes,
