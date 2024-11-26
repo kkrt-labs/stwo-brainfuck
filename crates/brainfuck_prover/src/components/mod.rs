@@ -29,7 +29,7 @@ pub enum TraceError {
 
 /// Represents the different trace types used in the Brainfuck STARK proving system.
 #[derive(Debug, Eq, PartialEq)]
-pub enum Trace {
+pub enum TraceType {
     /// Memory access trace.
     Memory,
     /// Instruction execution trace.
@@ -40,7 +40,7 @@ pub enum Trace {
     Processor,
 }
 
-impl Trace {
+impl TraceType {
     /// Returns the number of columns associated with the specific trace type.
     pub fn column_count(&self) -> usize {
         match self {
@@ -58,7 +58,7 @@ pub struct Claim {
     /// Logarithmic size (`log2`) of the evaluated trace.
     pub log_size: u32,
     /// Type of the associated trace.
-    pub trace: Trace,
+    pub trace: TraceType,
 }
 
 impl Claim {

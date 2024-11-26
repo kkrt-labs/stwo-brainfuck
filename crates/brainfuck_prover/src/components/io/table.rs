@@ -1,4 +1,4 @@
-use crate::components::{Claim, Trace, TraceEval};
+use crate::components::{Claim, TraceEval, TraceType};
 use brainfuck_vm::{instruction::InstructionType, registers::Registers};
 use stwo_prover::core::{
     backend::{
@@ -101,7 +101,7 @@ impl<const N: u32> IOTable<N> {
 
         // It is possible that the table is empty because the program has no input or output.
         if n_rows == 0 {
-            return (TraceEval::new(), Claim { log_size: 0, trace: Trace::Io });
+            return (TraceEval::new(), Claim { log_size: 0, trace: TraceType::Io });
         }
 
         // Compute `log_n_rows`, the base-2 logarithm of the number of rows.
@@ -126,7 +126,7 @@ impl<const N: u32> IOTable<N> {
         let trace = trace.into_iter().map(|col| CircleEvaluation::new(domain, col)).collect();
 
         // Return the evaluated trace and a claim containing the log size of the domain.
-        (trace, Claim { log_size, trace: Trace::Io })
+        (trace, Claim { log_size, trace: TraceType::Io })
     }
 }
 
@@ -181,9 +181,8 @@ impl IoColumn {
 
 #[cfg(test)]
 mod tests {
-    use crate::components::Trace;
-
     use super::*;
+    use crate::components::TraceType;
     use num_traits::One;
 
     type TestIOTable = IOTable<10>;
@@ -352,7 +351,7 @@ mod tests {
             expected_columns.into_iter().map(|col| CircleEvaluation::new(domain, col)).collect();
 
         // Create the expected claim.
-        let expected_claim = Claim { log_size: expected_log_size, trace: Trace::Io };
+        let expected_claim = Claim { log_size: expected_log_size, trace: TraceType::Io };
 
         // Assert equality of the claim.
         assert_eq!(claim, expected_claim, "The claim should match the expected claim.");
