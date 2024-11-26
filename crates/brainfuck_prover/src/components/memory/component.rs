@@ -55,6 +55,7 @@ impl Claim {
 /// of the Processor trace (which is the execution trace provided by the `brainfuck_vm`).
 #[derive(Debug, Eq, PartialEq)]
 pub struct InteractionClaim {
+    /// The computed sum of the logUp extension column, including padded rows.
     pub claimed_sum: SecureField,
 }
 
