@@ -276,9 +276,9 @@ impl MemoryColumn {
 
 /// The interaction elements drawn for the extension column of the Memory component.
 ///
-/// The logup protocol uses these elements to combine the values of the different
+/// The logUp protocol uses these elements to combine the values of the different
 /// registers of the main trace to create a random linear combination
-/// of them, and use it in the denominator of the fractions in the logup protocol.
+/// of them, and use it in the denominator of the fractions in the logUp protocol.
 ///
 /// There are 3 lookup elements in the Memory component, as only the 'real' registers
 /// are used: `clk`, `mp` and `mv`. `d` is used to eventually nullify the numerator.
@@ -294,7 +294,7 @@ impl MemoryElements {
     /// Draw random elements from the Fiat-Shamir [`Channel`].
     ///
     /// These elements are randomly secured, and will be use
-    /// to generate the interaction trace with the logup protocol.
+    /// to generate the interaction trace with the logUp protocol.
     pub fn draw(channel: &mut impl Channel) -> Self {
         Self(LookupElements::draw(channel))
     }
@@ -330,16 +330,16 @@ impl<F: Clone, EF: RelationEFTraitBound<F>> Relation<F, EF> for MemoryElements {
 /// The Processor component uses the other components:
 /// The Processor component multiplicities are then positive,
 /// and the Memory component multiplicities are negative
-/// in the logup protocol.
+/// in the logUp protocol.
 ///
-/// Only the 'real' rows are impacting the logup sum.
+/// Only the 'real' rows are impacting the logUp sum.
 /// Dummy rows are padded rows and rows filling the `clk` gaps
 /// which does not appear in the Processor main trace.
 ///
 ///
 /// # Returns
 /// - Interaction trace evaluation, to be commited.
-/// - Interaction claim: the total sum from the logup protocol,
+/// - Interaction claim: the total sum from the logUp protocol,
 /// to be mixed into the Fiat-Shamir [`Channel`].
 pub fn interaction_trace_evaluation(
     main_trace_eval: &TraceEval,
@@ -638,7 +638,7 @@ mod tests {
         let clk_col = &trace_eval[MemoryColumn::Clk.index()].data;
         let mp_col = &trace_eval[MemoryColumn::Mp.index()].data;
         let mv_column = &trace_eval[MemoryColumn::Mv.index()].data;
-        // Construct the denominator for each row of the logup column, from the main trace
+        // Construct the denominator for each row of the logUp column, from the main trace
         // evaluation.
         for vec_row in 0..1 << (log_size - LOG_N_LANES) {
             let clk = clk_col[vec_row];
@@ -676,7 +676,7 @@ mod tests {
     }
 
     // This test verifies that the dummy rows have no impact
-    // on the total sum of the logup protocol in the Memory component.
+    // on the total sum of the logUp protocol in the Memory component.
     // Indeed, the total sum computed by the Processor component won't
     // have the exact same dummy rows (the Memory component) adds extra
     // dummy rows to fill the `clk` jumps and enforce the sorting.

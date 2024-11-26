@@ -201,7 +201,7 @@ pub fn verify_brainfuck(
     // Check that the lookup sum is valid, otherwise throw
     // TODO: panic! should be replaced by custom error
     if !lookup_sum_valid(&claim, &interaction_elements, &interaction_claim) {
-        return Err(VerificationError::InvalidLookup("Invalid logup sum".to_string()));
+        return Err(VerificationError::InvalidLookup("Invalid LogUp sum".to_string()));
     };
     interaction_claim.mix_into(channel);
     commitment_scheme_verifier.commit(proof.commitments[1], &sizes[1], channel);
