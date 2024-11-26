@@ -1,9 +1,4 @@
-use super::table::MemoryColumn;
-use stwo_prover::core::{
-    channel::Channel,
-    fields::{qm31::SecureField, secure_column::SECURE_EXTENSION_DEGREE},
-    pcs::TreeVec,
-};
+use stwo_prover::core::{channel::Channel, fields::qm31::SecureField};
 
 /// The claim of the interaction phase 2 (with the logUp protocol).
 ///

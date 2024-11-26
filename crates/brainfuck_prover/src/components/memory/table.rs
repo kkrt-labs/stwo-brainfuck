@@ -267,11 +267,16 @@ impl MemoryColumn {
             Self::D => 3,
         }
     }
+
+    /// Returns the total number of columns in the Memory table
+    pub const fn column_count() -> usize {
+        4
+    }
 }
 
 impl TraceColumn for MemoryColumn {
     fn count() -> usize {
-        4
+        Self::column_count()
     }
 }
 
@@ -284,7 +289,7 @@ impl TraceColumn for MemoryColumn {
 /// There are 3 lookup elements in the Memory component, as only the 'real' registers
 /// are used: `clk`, `mp` and `mv`. `d` is used to eventually nullify the numerator.
 #[derive(Clone, Debug, Eq, PartialEq)]
-pub struct MemoryElements(LookupElements<{ MemoryColumn::count() - 1 }>);
+pub struct MemoryElements(LookupElements<{ MemoryColumn::column_count() - 1 }>);
 
 impl MemoryElements {
     /// Provides dummy lookup elements.
