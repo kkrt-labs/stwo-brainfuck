@@ -1,4 +1,4 @@
-use crate::components::{memory::component::Claim, TraceEval};
+use crate::components::{Claim, TraceColumn, TraceEval};
 use brainfuck_vm::{instruction::InstructionType, registers::Registers};
 use stwo_prover::core::{
     backend::{
@@ -96,12 +96,12 @@ impl<const N: u32> IOTable<N> {
     /// # Returns
     /// A tuple containing the evaluated trace and claim for STARK proof.
     /// If the table is empty, returns an empty trace and a claim with a log size of 0.
-    pub fn trace_evaluation(&self) -> (TraceEval, Claim) {
+    pub fn trace_evaluation(&self) -> (TraceEval, Claim<IoColumn>) {
         let n_rows = self.table.len() as u32;
 
         // It is possible that the table is empty because the program has no input or output.
         if n_rows == 0 {
-            return (TraceEval::new(), Claim { log_size: 0 });
+            return (TraceEval::new(), Claim::<IoColumn>::new(0));
         }
 
         // Compute `log_n_rows`, the base-2 logarithm of the number of rows.
@@ -116,7 +116,7 @@ impl<const N: u32> IOTable<N> {
 
         // Populate the column with data from the table rows.
         for (index, row) in self.table.iter().enumerate().take(1 << log_n_rows) {
-            trace[0].data[index] = row.mv.into();
+            trace[IoColumn::Io.index()].data[index] = row.mv.into();
         }
 
         // Create a circle domain using a canonical coset.
@@ -126,7 +126,7 @@ impl<const N: u32> IOTable<N> {
         let trace = trace.into_iter().map(|col| CircleEvaluation::new(domain, col)).collect();
 
         // Return the evaluated trace and a claim containing the log size of the domain.
-        (trace, Claim { log_size })
+        (trace, Claim::<IoColumn>::new(log_size))
     }
 }
 
@@ -157,6 +157,28 @@ pub type InputTable = IOTable<{ InstructionType::ReadChar.to_u32() }>;
 /// This table is made of the memory values (`mv` register) corresponding to
 /// outputs (when the current instruction `ci` equals '.').
 pub type OutputTable = IOTable<{ InstructionType::PutChar.to_u32() }>;
+
+/// Enum representing the column indices in the IO trace.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum IoColumn {
+    /// Column representing the input/output operations.
+    Io,
+}
+
+impl IoColumn {
+    /// Returns the index of the column in the IO table.
+    pub const fn index(self) -> usize {
+        match self {
+            Self::Io => 0,
+        }
+    }
+}
+
+impl TraceColumn for IoColumn {
+    fn count() -> usize {
+        1
+    }
+}
 
 #[cfg(test)]
 mod tests {
@@ -329,7 +351,7 @@ mod tests {
             expected_columns.into_iter().map(|col| CircleEvaluation::new(domain, col)).collect();
 
         // Create the expected claim.
-        let expected_claim = Claim { log_size: expected_log_size };
+        let expected_claim = Claim::<IoColumn>::new(expected_log_size);
 
         // Assert equality of the claim.
         assert_eq!(claim, expected_claim, "The claim should match the expected claim.");

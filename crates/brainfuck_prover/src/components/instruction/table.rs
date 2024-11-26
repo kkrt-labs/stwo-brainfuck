@@ -1,4 +1,4 @@
-use crate::components::{memory::component::Claim, TraceError, TraceEval};
+use crate::components::{Claim, TraceColumn, TraceError, TraceEval};
 use brainfuck_vm::{
     instruction::VALID_INSTRUCTIONS_BF, machine::ProgramMemory, registers::Registers,
 };
@@ -128,7 +128,7 @@ impl InstructionTable {
     ///
     /// # Errors
     /// Returns [`TraceError::EmptyTrace`] if the table is empty.
-    pub fn trace_evaluation(&self) -> Result<(TraceEval, Claim), TraceError> {
+    pub fn trace_evaluation(&self) -> Result<(TraceEval, Claim<InstructionColumn>), TraceError> {
         let n_rows = self.table.len() as u32;
         // If the table is empty, there is no data to evaluate, so return an error.
         if n_rows == 0 {
@@ -171,7 +171,7 @@ impl InstructionTable {
         let trace = trace.into_iter().map(|col| CircleEvaluation::new(domain, col)).collect();
 
         // Return the evaluated trace and a claim containing the log size of the domain.
-        Ok((trace, Claim { log_size }))
+        Ok((trace, Claim::<InstructionColumn>::new(log_size)))
     }
 }
 
@@ -233,9 +233,10 @@ impl InstructionColumn {
             Self::Ni => 2,
         }
     }
+}
 
-    /// Returns the total number of columns in the Instruction trace
-    pub const fn count() -> usize {
+impl TraceColumn for InstructionColumn {
+    fn count() -> usize {
         3
     }
 }
@@ -243,6 +244,7 @@ impl InstructionColumn {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::components::Claim;
     use brainfuck_vm::{
         compiler::Compiler, instruction::InstructionType, test_helper::create_test_machine,
     };
@@ -583,7 +585,7 @@ mod tests {
             .collect();
 
         // Create the expected claim.
-        let expected_claim = Claim { log_size: expected_log_size };
+        let expected_claim = Claim::<InstructionColumn>::new(expected_log_size);
 
         // Assert equality of the claim.
         assert_eq!(claim, expected_claim);

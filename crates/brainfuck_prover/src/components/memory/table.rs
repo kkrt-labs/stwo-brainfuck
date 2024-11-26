@@ -1,5 +1,5 @@
-use super::component::{Claim, InteractionClaim};
-use crate::components::{TraceError, TraceEval};
+use super::component::InteractionClaim;
+use crate::components::{Claim, TraceColumn, TraceError, TraceEval};
 use brainfuck_vm::registers::Registers;
 use num_traits::One;
 use stwo_prover::{
@@ -203,7 +203,7 @@ impl MemoryTable {
     ///
     /// # Errors
     /// Returns [`TraceError::EmptyTrace`] if the table is empty.
-    pub fn trace_evaluation(&self) -> Result<(TraceEval, Claim), TraceError> {
+    pub fn trace_evaluation(&self) -> Result<(TraceEval, Claim<MemoryColumn>), TraceError> {
         let n_rows = self.table.len() as u32;
         if n_rows == 0 {
             return Err(TraceError::EmptyTrace);
@@ -225,7 +225,7 @@ impl MemoryTable {
         let trace = trace.into_iter().map(|col| CircleEvaluation::new(domain, col)).collect();
 
         // TODO: Confirm that the log_size in `Claim` is `log_size`, including the SIMD lanes
-        Ok((trace, Claim { log_size }))
+        Ok((trace, Claim::<MemoryColumn>::new(log_size)))
     }
 }
 
@@ -269,8 +269,14 @@ impl MemoryColumn {
     }
 
     /// Returns the total number of columns in the Memory table
-    pub const fn count() -> usize {
+    pub const fn column_count() -> usize {
         4
+    }
+}
+
+impl TraceColumn for MemoryColumn {
+    fn count() -> usize {
+        Self::column_count()
     }
 }
 
@@ -283,7 +289,7 @@ impl MemoryColumn {
 /// There are 3 lookup elements in the Memory component, as only the 'real' registers
 /// are used: `clk`, `mp` and `mv`. `d` is used to eventually nullify the numerator.
 #[derive(Clone, Debug, Eq, PartialEq)]
-pub struct MemoryElements(LookupElements<{ MemoryColumn::count() - 1 }>);
+pub struct MemoryElements(LookupElements<{ MemoryColumn::column_count() - 1 }>);
 
 impl MemoryElements {
     /// Provides dummy lookup elements.
@@ -590,7 +596,7 @@ mod tests {
             .into_iter()
             .map(|col| CircleEvaluation::new(domain, col))
             .collect();
-        let expected_claim = Claim { log_size: expected_log_size };
+        let expected_claim = Claim::<MemoryColumn>::new(expected_log_size);
 
         assert_eq!(claim, expected_claim);
         for col_index in 0..expected_trace.len() {
