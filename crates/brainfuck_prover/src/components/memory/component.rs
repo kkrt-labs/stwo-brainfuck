@@ -12,8 +12,14 @@ use stwo_prover::{
     },
 };
 
+/// Implementation of `Component` and `ComponentProver`
+/// for the `SimdBackend` from the constraint framework provided by Stwo
 pub type MemoryComponent = FrameworkComponent<MemoryEval>;
 
+/// The AIR for the Memory component.
+///
+/// Constraints are defined through the `FrameworkEval`
+/// provided by the constraint framework of Stwo.
 pub struct MemoryEval {
     log_size: u32,
     memory_lookup_elements: MemoryElements,
@@ -26,14 +32,33 @@ impl MemoryEval {
 }
 
 impl FrameworkEval for MemoryEval {
+    /// Returns the log size from the main claim.
     fn log_size(&self) -> u32 {
         self.log_size
     }
 
+    /// The degree of the constraints is bounded by the size of the trace.
+    ///
+    /// Returns the ilog2 (upper) bound of the constraint degree for the component.
     fn max_constraint_log_degree_bound(&self) -> u32 {
         self.log_size + 1
     }
 
+    /// Defines the AIR for the Memory component
+    ///
+    /// Registers values from the current row (and potentially neighbors) are obtained through
+    /// masks: When you apply a mask, you target the current column and then pass to the next
+    /// one: the register order matters to correctly fetch them.
+    /// All required registers from a same column must be fetched in one call:
+    /// - Use `eval.next_trace_mask()` to get the current register from the main trace
+    ///   (`ORIGINAL_TRACE_IDX`)
+    /// - Use `eval.next_interaction_mask(interaction: usize, offsets: [isize; N])` to get multiple
+    ///   values from one register (e.g. the current one and the next one).
+    ///
+    /// Use `eval.add_constraint` to define a local constraint (boundary, transition).
+    /// Use `eval.add_to_relation` to define a global constraint for the logUp protocol.
+    ///
+    /// The logUp must be finalized with `eval.finalize_logup()`.
     #[allow(clippy::similar_names)]
     fn evaluate<E: EvalAtRow>(&self, mut eval: E) -> E {
         // Get the preprocessed column to check boundary constraints
