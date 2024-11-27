@@ -1,4 +1,7 @@
-use crate::components::{memory::table::MemoryTable, MemoryClaim};
+use crate::components::{
+    memory::table::{MemoryElements, MemoryTable},
+    MemoryClaim,
+};
 use brainfuck_vm::machine::Machine;
 use stwo_prover::core::{
     air::{Component, ComponentProver},
@@ -42,11 +45,15 @@ impl BrainfuckClaim {
 
 /// All the interaction elements (drawn from the channel)
 /// required by the various components during the interaction phase.
-pub struct BrainfuckInteractionElements;
+pub struct BrainfuckInteractionElements {
+    pub memory_lookup_elements: MemoryElements,
+}
 
 impl BrainfuckInteractionElements {
-    pub fn draw(_channel: &mut impl Channel) -> Self {
-        todo!();
+    /// Draw all the interaction elements needed for
+    /// all the components of the Brainfuck ZK-VM.
+    pub fn draw(channel: &mut impl Channel) -> Self {
+        Self { memory_lookup_elements: MemoryElements::draw(channel) }
     }
 }
 
