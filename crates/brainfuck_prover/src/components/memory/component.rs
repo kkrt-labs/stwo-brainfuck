@@ -1,8 +1,15 @@
 use super::table::MemoryElements;
 use crate::components::MemoryClaim;
+use num_traits::One;
 use stwo_prover::{
-    constraint_framework::{EvalAtRow, FrameworkComponent, FrameworkEval},
-    core::{channel::Channel, fields::qm31::SecureField},
+    constraint_framework::{
+        preprocessed_columns::PreprocessedColumn, EvalAtRow, FrameworkComponent, FrameworkEval,
+        RelationEntry, ORIGINAL_TRACE_IDX,
+    },
+    core::{
+        channel::Channel,
+        fields::{m31::BaseField, qm31::SecureField},
+    },
 };
 
 pub type MemoryComponent = FrameworkComponent<MemoryEval>;
@@ -37,8 +44,58 @@ impl FrameworkEval for MemoryEval {
         self.log_size + 1
     }
 
-    fn evaluate<E: EvalAtRow>(&self, mut _eval: E) -> E {
-        todo!()
+    #[allow(clippy::similar_names)]
+    fn evaluate<E: EvalAtRow>(&self, mut eval: E) -> E {
+        // Get the preprocessed column to check boundary constraints
+        let is_first = eval.get_preprocessed_column(PreprocessedColumn::IsFirst(self.log_size()));
+
+        // Get all the required registers' values
+        let [clk, next_clk] = eval.next_interaction_mask(ORIGINAL_TRACE_IDX, [0, 1]);
+        let [mp, next_mp] = eval.next_interaction_mask(ORIGINAL_TRACE_IDX, [0, 1]);
+        let [mv, next_mv] = eval.next_interaction_mask(ORIGINAL_TRACE_IDX, [0, 1]);
+        let [d, next_d] = eval.next_interaction_mask(ORIGINAL_TRACE_IDX, [0, 1]);
+
+        // Boundary constraints
+        eval.add_constraint(is_first.clone() * clk.clone());
+        eval.add_constraint(is_first.clone() * mp.clone());
+        eval.add_constraint(is_first.clone() * mv.clone());
+        eval.add_constraint(is_first * d.clone());
+
+        // `mp` increases by 0 or 1
+        eval.add_constraint(
+            (next_mp.clone() - mp.clone()) *
+                (next_mp.clone() - mp.clone() - BaseField::one().into()),
+        );
+
+        // If `mp` remains the same, `clk` increases by 1
+        eval.add_constraint(
+            (next_mp.clone() - mp.clone()) * (next_clk - clk.clone() - BaseField::one().into()),
+        );
+
+        // If `mp` increases by 1, then `mv` must be 0
+        eval.add_constraint(
+            (next_mp.clone() - mp.clone() - BaseField::one().into()) * next_mv.clone(),
+        );
+
+        // The next dummy is either 0 or 1
+        eval.add_constraint(next_d.clone() * (next_d - BaseField::one().into()));
+
+        // If `d` is set, then `mp` remains the same
+        eval.add_constraint(d.clone() * (next_mp - mp.clone()));
+
+        // If `d` is set, then `mv` remains the same
+        eval.add_constraint(d * (next_mv - mv.clone()));
+
+        // LogUp of `clk`, `mp` and `mv`
+        eval.add_to_relation(&[RelationEntry::new(
+            &self.memory_lookup_elements,
+            -E::EF::one(),
+            &[clk, mp, mv],
+        )]);
+
+        eval.finalize_logup();
+
+        eval
     }
 }
 
