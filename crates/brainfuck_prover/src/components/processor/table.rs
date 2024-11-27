@@ -1,5 +1,13 @@
+use crate::components::{ProcessorClaim, TraceColumn, TraceError, TraceEval};
 use brainfuck_vm::registers::Registers;
-use stwo_prover::core::fields::m31::BaseField;
+use stwo_prover::core::{
+    backend::{
+        simd::{column::BaseColumn, m31::LOG_N_LANES},
+        Column,
+    },
+    fields::m31::BaseField,
+    poly::circle::{CanonicCoset, CircleEvaluation},
+};
 
 /// Represents a single row in the Processor Table.
 ///
@@ -106,6 +114,49 @@ impl ProcessorTable {
             }
         }
     }
+
+    /// Transforms the [`ProcessorTable`] into a [`TraceEval`], to be committed when
+    /// generating a STARK proof.
+    ///
+    /// Converts the row-based table into columnar format and evaluates it over
+    /// the circle domain.
+    ///
+    /// # Returns
+    /// A tuple containing the evaluated trace and claim for STARK proof.
+    ///
+    /// # Errors
+    /// Returns `TraceError::EmptyTrace` if the table is empty.
+    pub fn trace_evaluation(&self) -> Result<(TraceEval, ProcessorClaim), TraceError> {
+        let n_rows = self.table.len() as u32;
+        if n_rows == 0 {
+            return Err(TraceError::EmptyTrace);
+        }
+
+        // Compute log size and adjust for SIMD lanes
+        let log_n_rows = n_rows.ilog2();
+        let log_size = log_n_rows + LOG_N_LANES;
+
+        // Initialize trace columns
+        let mut trace = vec![BaseColumn::zeros(1 << log_size); ProcessorColumn::count()];
+
+        // Fill columns with table data
+        for (index, row) in self.table.iter().enumerate().take(1 << log_n_rows) {
+            trace[ProcessorColumn::Clk.index()].data[index] = row.clk.into();
+            trace[ProcessorColumn::Ip.index()].data[index] = row.ip.into();
+            trace[ProcessorColumn::Ci.index()].data[index] = row.ci.into();
+            trace[ProcessorColumn::Ni.index()].data[index] = row.ni.into();
+            trace[ProcessorColumn::Mp.index()].data[index] = row.mp.into();
+            trace[ProcessorColumn::Mv.index()].data[index] = row.mv.into();
+            trace[ProcessorColumn::Mvi.index()].data[index] = row.mvi.into();
+        }
+
+        // Evaluate columns on the circle domain
+        let domain = CanonicCoset::new(log_size).circle_domain();
+        let trace = trace.into_iter().map(|col| CircleEvaluation::new(domain, col)).collect();
+
+        // Return the evaluated trace and claim
+        Ok((trace, ProcessorClaim::new(log_size)))
+    }
 }
 
 impl From<Vec<Registers>> for ProcessorTable {
@@ -117,6 +168,39 @@ impl From<Vec<Registers>> for ProcessorTable {
         processor_table.pad();
 
         processor_table
+    }
+}
+
+/// Enum representing the column indices in the Processor trace.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ProcessorColumn {
+    Clk,
+    Ip,
+    Ci,
+    Ni,
+    Mp,
+    Mv,
+    Mvi,
+}
+
+impl ProcessorColumn {
+    /// Returns the index of the column in the Processor trace.
+    pub const fn index(self) -> usize {
+        match self {
+            Self::Clk => 0,
+            Self::Ip => 1,
+            Self::Ci => 2,
+            Self::Ni => 3,
+            Self::Mp => 4,
+            Self::Mv => 5,
+            Self::Mvi => 6,
+        }
+    }
+}
+
+impl TraceColumn for ProcessorColumn {
+    fn count() -> usize {
+        7
     }
 }
 
@@ -382,5 +466,150 @@ mod tests {
 
         // Verify that the processor table is correct
         assert_eq!(processor_table, expected_processor_table);
+    }
+
+    #[test]
+    fn test_trace_evaluation_empty_processor_table() {
+        let processor_table = ProcessorTable::new();
+        let result = processor_table.trace_evaluation();
+
+        assert!(matches!(result, Err(TraceError::EmptyTrace)));
+    }
+
+    #[test]
+    #[allow(clippy::similar_names)]
+    fn test_trace_evaluation_single_row_processor_table() {
+        let mut processor_table = ProcessorTable::new();
+        processor_table.add_row(ProcessorTableRow {
+            clk: BaseField::one(),
+            ip: BaseField::from(2),
+            ci: BaseField::from(3),
+            ni: BaseField::from(4),
+            mp: BaseField::from(5),
+            mv: BaseField::from(6),
+            mvi: BaseField::from(7),
+        });
+
+        let (trace, claim) = processor_table.trace_evaluation().unwrap();
+
+        assert_eq!(claim.log_size, LOG_N_LANES, "Log size should include SIMD lanes.");
+        assert_eq!(
+            trace.len(),
+            ProcessorColumn::count(),
+            "Trace should contain one column per register."
+        );
+
+        let expected_clk_column = vec![BaseField::one(); 1 << LOG_N_LANES];
+        let expected_ip_column = vec![BaseField::from(2); 1 << LOG_N_LANES];
+        let expected_ci_column = vec![BaseField::from(3); 1 << LOG_N_LANES];
+        let expected_ni_column = vec![BaseField::from(4); 1 << LOG_N_LANES];
+        let expected_mp_column = vec![BaseField::from(5); 1 << LOG_N_LANES];
+        let expected_mv_column = vec![BaseField::from(6); 1 << LOG_N_LANES];
+        let expected_mvi_column = vec![BaseField::from(7); 1 << LOG_N_LANES];
+
+        assert_eq!(trace[ProcessorColumn::Clk.index()].to_cpu().values, expected_clk_column);
+        assert_eq!(trace[ProcessorColumn::Ip.index()].to_cpu().values, expected_ip_column);
+        assert_eq!(trace[ProcessorColumn::Ci.index()].to_cpu().values, expected_ci_column);
+        assert_eq!(trace[ProcessorColumn::Ni.index()].to_cpu().values, expected_ni_column);
+        assert_eq!(trace[ProcessorColumn::Mp.index()].to_cpu().values, expected_mp_column);
+        assert_eq!(trace[ProcessorColumn::Mv.index()].to_cpu().values, expected_mv_column);
+        assert_eq!(trace[ProcessorColumn::Mvi.index()].to_cpu().values, expected_mvi_column);
+    }
+
+    #[test]
+    #[allow(clippy::similar_names)]
+    fn test_trace_evaluation_processor_table_with_multiple_rows() {
+        let mut processor_table = ProcessorTable::new();
+
+        // Add rows to the processor table
+        let rows = vec![
+            ProcessorTableRow {
+                clk: BaseField::from(0),
+                ip: BaseField::from(1),
+                ci: BaseField::from(2),
+                ni: BaseField::from(3),
+                mp: BaseField::from(4),
+                mv: BaseField::from(5),
+                mvi: BaseField::from(6),
+            },
+            ProcessorTableRow {
+                clk: BaseField::from(1),
+                ip: BaseField::from(2),
+                ci: BaseField::from(3),
+                ni: BaseField::from(4),
+                mp: BaseField::from(5),
+                mv: BaseField::from(6),
+                mvi: BaseField::from(7),
+            },
+        ];
+
+        processor_table.add_rows(rows);
+
+        // Perform the trace evaluation
+        let (trace, claim) = processor_table.trace_evaluation().unwrap();
+
+        // Calculate the expected parameters
+        let expected_log_n_rows: u32 = 1; // log2(2 rows)
+        let expected_log_size = expected_log_n_rows + LOG_N_LANES;
+        let expected_size = 1 << expected_log_size;
+
+        // Construct the expected trace columns
+        let mut clk_column = BaseColumn::zeros(expected_size);
+        let mut ip_column = BaseColumn::zeros(expected_size);
+        let mut ci_column = BaseColumn::zeros(expected_size);
+        let mut ni_column = BaseColumn::zeros(expected_size);
+        let mut mp_column = BaseColumn::zeros(expected_size);
+        let mut mv_column = BaseColumn::zeros(expected_size);
+        let mut mvi_column = BaseColumn::zeros(expected_size);
+
+        clk_column.data[0] = BaseField::from(0).into();
+        clk_column.data[1] = BaseField::from(1).into();
+
+        ip_column.data[0] = BaseField::from(1).into();
+        ip_column.data[1] = BaseField::from(2).into();
+
+        ci_column.data[0] = BaseField::from(2).into();
+        ci_column.data[1] = BaseField::from(3).into();
+
+        ni_column.data[0] = BaseField::from(3).into();
+        ni_column.data[1] = BaseField::from(4).into();
+
+        mp_column.data[0] = BaseField::from(4).into();
+        mp_column.data[1] = BaseField::from(5).into();
+
+        mv_column.data[0] = BaseField::from(5).into();
+        mv_column.data[1] = BaseField::from(6).into();
+
+        mvi_column.data[0] = BaseField::from(6).into();
+        mvi_column.data[1] = BaseField::from(7).into();
+
+        // Create the expected domain for evaluation
+        let domain = CanonicCoset::new(expected_log_size).circle_domain();
+
+        // Transform expected columns into CircleEvaluation
+        let expected_trace: TraceEval =
+            vec![clk_column, ip_column, ci_column, ni_column, mp_column, mv_column, mvi_column]
+                .into_iter()
+                .map(|col| CircleEvaluation::new(domain, col))
+                .collect();
+
+        // Create the expected claim
+        let expected_claim = ProcessorClaim::new(expected_log_size);
+
+        // Assert equality of the claim
+        assert_eq!(claim, expected_claim, "Claims should match the expected values.");
+
+        // Assert equality of the trace
+        for col_index in 0..expected_trace.len() {
+            assert_eq!(
+                trace[col_index].domain, expected_trace[col_index].domain,
+                "Domains of trace columns should match."
+            );
+            assert_eq!(
+                trace[col_index].to_cpu().values,
+                expected_trace[col_index].to_cpu().values,
+                "Values of trace columns should match."
+            );
+        }
     }
 }

@@ -1,4 +1,4 @@
-use crate::components::{Claim, InstructionClaim, TraceColumn, TraceError, TraceEval};
+use crate::components::{InstructionClaim, TraceColumn, TraceError, TraceEval};
 use brainfuck_vm::{
     instruction::VALID_INSTRUCTIONS_BF, machine::ProgramMemory, registers::Registers,
 };
@@ -171,7 +171,7 @@ impl InstructionTable {
         let trace = trace.into_iter().map(|col| CircleEvaluation::new(domain, col)).collect();
 
         // Return the evaluated trace and a claim containing the log size of the domain.
-        Ok((trace, Claim::<InstructionColumn>::new(log_size)))
+        Ok((trace, InstructionClaim::new(log_size)))
     }
 }
 
@@ -244,7 +244,6 @@ impl TraceColumn for InstructionColumn {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::components::Claim;
     use brainfuck_vm::{
         compiler::Compiler, instruction::InstructionType, test_helper::create_test_machine,
     };
@@ -511,9 +510,9 @@ mod tests {
         );
 
         // Expected values for the single row
-        let expected_ip_column = vec![BaseField::from(1); 16];
-        let expected_ci_column = vec![BaseField::from(43); 16];
-        let expected_ni_column = vec![BaseField::from(91); 16];
+        let expected_ip_column = vec![BaseField::from(1); 1 << LOG_N_LANES];
+        let expected_ci_column = vec![BaseField::from(43); 1 << LOG_N_LANES];
+        let expected_ni_column = vec![BaseField::from(91); 1 << LOG_N_LANES];
 
         // Check that the entire column matches expected values
         assert_eq!(
@@ -585,7 +584,7 @@ mod tests {
             .collect();
 
         // Create the expected claim.
-        let expected_claim = Claim::<InstructionColumn>::new(expected_log_size);
+        let expected_claim = InstructionClaim::new(expected_log_size);
 
         // Assert equality of the claim.
         assert_eq!(claim, expected_claim);

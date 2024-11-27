@@ -1,5 +1,5 @@
 use super::component::InteractionClaim;
-use crate::components::{Claim, MemoryClaim, TraceColumn, TraceError, TraceEval};
+use crate::components::{MemoryClaim, TraceColumn, TraceError, TraceEval};
 use brainfuck_vm::registers::Registers;
 use num_traits::One;
 use stwo_prover::{
@@ -225,7 +225,7 @@ impl MemoryTable {
         let trace = trace.into_iter().map(|col| CircleEvaluation::new(domain, col)).collect();
 
         // TODO: Confirm that the log_size in `Claim` is `log_size`, including the SIMD lanes
-        Ok((trace, Claim::<MemoryColumn>::new(log_size)))
+        Ok((trace, MemoryClaim::new(log_size)))
     }
 }
 
@@ -596,7 +596,7 @@ mod tests {
             .into_iter()
             .map(|col| CircleEvaluation::new(domain, col))
             .collect();
-        let expected_claim = Claim::<MemoryColumn>::new(expected_log_size);
+        let expected_claim = MemoryClaim::new(expected_log_size);
 
         assert_eq!(claim, expected_claim);
         for col_index in 0..expected_trace.len() {
