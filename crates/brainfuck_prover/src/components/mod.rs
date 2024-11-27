@@ -73,7 +73,7 @@ impl<T: TraceColumn> Claim<T> {
     /// NOTE: Currently only the main trace is provided.
     pub fn log_sizes(&self) -> TreeVec<Vec<u32>> {
         // TODO: Add the preprocessed and interaction trace correct sizes
-        let preprocessed_trace_log_sizes: Vec<u32> = vec![];
+        let preprocessed_trace_log_sizes: Vec<u32> = vec![self.log_size];
         let trace_log_sizes = vec![self.log_size; T::count()];
         let interaction_trace_log_sizes: Vec<u32> = vec![];
         TreeVec::new(vec![
