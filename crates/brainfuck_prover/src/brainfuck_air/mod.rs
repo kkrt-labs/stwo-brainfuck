@@ -1,5 +1,8 @@
 use crate::components::{
-    memory::table::{MemoryElements, MemoryTable},
+    memory::{
+        self,
+        table::{interaction_trace_evaluation, MemoryElements, MemoryTable},
+    },
     MemoryClaim,
 };
 use brainfuck_vm::machine::Machine;
@@ -57,14 +60,17 @@ impl BrainfuckInteractionElements {
     }
 }
 
-/// All the claims from the second phase (interaction phase 1).
+/// All the claims from the second phase (interaction phase 2).
 ///
 /// Mainly the claims on global relations (lookup, permutation, evaluation).
-pub struct BrainfuckInteractionClaim;
+pub struct BrainfuckInteractionClaim {
+    memory: memory::component::InteractionClaim,
+}
 
 impl BrainfuckInteractionClaim {
-    pub fn mix_into(&self, _channel: &mut impl Channel) {
-        todo!();
+    /// Mix the claimed sums of every components in the Fiat-Shamir [`Channel`].
+    pub fn mix_into(&self, channel: &mut impl Channel) {
+        self.memory.mix_into(channel);
     }
 }
 
@@ -148,12 +154,13 @@ pub fn prove_brainfuck(
     let vm_trace = inputs.trace();
     let (memory_trace, memory_claim) = MemoryTable::from(vm_trace).trace_evaluation().unwrap();
 
-    tree_builder.extend_evals(memory_trace);
+    tree_builder.extend_evals(memory_trace.clone());
 
     let claim = BrainfuckClaim { memory: memory_claim };
 
-    // Commit to the claim and the trace.
+    // Mix the claim into the Fiat-Shamir channel.
     claim.mix_into(channel);
+    // Commit the main trace.
     tree_builder.commit(channel);
 
     // ┌───────────────────────────────────────────────┐
@@ -164,10 +171,18 @@ pub fn prove_brainfuck(
     let interaction_elements = BrainfuckInteractionElements::draw(channel);
 
     // Generate the interaction trace and the BrainfuckInteractionClaim
-    let tree_builder = commitment_scheme.tree_builder();
+    let mut tree_builder = commitment_scheme.tree_builder();
 
-    let interaction_claim = BrainfuckInteractionClaim {};
+    let (memory_interaction_trace_eval, memory_interaction_claim) =
+        interaction_trace_evaluation(&memory_trace, &interaction_elements.memory_lookup_elements);
+
+    tree_builder.extend_evals(memory_interaction_trace_eval);
+
+    let interaction_claim = BrainfuckInteractionClaim { memory: memory_interaction_claim };
+
+    // Mix the interaction claim into the Fiat-Shamir channel.
     interaction_claim.mix_into(channel);
+    // Commit the interaction trace.
     tree_builder.commit(channel);
 
     // ┌──────────────────────────┐
