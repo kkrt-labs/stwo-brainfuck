@@ -14,24 +14,14 @@ use stwo_prover::{
 
 pub type MemoryComponent = FrameworkComponent<MemoryEval>;
 
-#[allow(dead_code)]
 pub struct MemoryEval {
     log_size: u32,
     memory_lookup_elements: MemoryElements,
-    claimed_sum: SecureField,
 }
 
 impl MemoryEval {
-    pub const fn new(
-        claim: &MemoryClaim,
-        memory_lookup_elements: MemoryElements,
-        interaction_claim: &InteractionClaim,
-    ) -> Self {
-        Self {
-            log_size: claim.log_size,
-            memory_lookup_elements,
-            claimed_sum: interaction_claim.claimed_sum,
-        }
+    pub const fn new(claim: &MemoryClaim, memory_lookup_elements: MemoryElements) -> Self {
+        Self { log_size: claim.log_size, memory_lookup_elements }
     }
 }
 
