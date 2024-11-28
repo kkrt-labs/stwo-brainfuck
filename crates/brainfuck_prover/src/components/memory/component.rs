@@ -87,10 +87,8 @@ impl FrameworkEval for MemoryEval {
             (next_mp.clone() - mp.clone()) * (next_clk - clk.clone() - BaseField::one().into()),
         );
 
-        // If `mp` increases by 1, then `mv` must be 0
-        eval.add_constraint(
-            (next_mp.clone() - mp.clone() - BaseField::one().into()) * next_mv.clone(),
-        );
+        // If `mp` increases by 1, then `next_mv` must be 0
+        eval.add_constraint((next_mp.clone() - mp.clone()) * next_mv.clone());
 
         // The next dummy is either 0 or 1
         eval.add_constraint(next_d.clone() * (next_d - BaseField::one().into()));
@@ -165,7 +163,9 @@ mod tests {
         let trace_vm = machine.trace();
 
         // Construct the IsFirst preprocessed column
-        let preprocessed_trace = vec![gen_is_first(LOG_SIZE)];
+        let is_first_col = gen_is_first(LOG_SIZE);
+        let is_first_col2 = gen_is_first(LOG_SIZE);
+        let preprocessed_trace = vec![is_first_col, is_first_col2];
 
         // Construct the main trace from the execution trace
         let table = MemoryTable::from(trace_vm);
