@@ -112,11 +112,7 @@ impl BrainfuckComponents {
 
         let memory = MemoryComponent::new(
             tree_span_provider,
-            MemoryEval::new(
-                &claim.memory,
-                interaction_elements.memory_lookup_elements.clone(),
-                &interaction_claim.memory,
-            ),
+            MemoryEval::new(&claim.memory, interaction_elements.memory_lookup_elements.clone()),
             (interaction_claim.memory.claimed_sum, None),
         );
 
