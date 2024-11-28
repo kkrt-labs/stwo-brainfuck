@@ -188,7 +188,7 @@ impl MemoryTable {
         }
     }
 
-    /// Transforms the [`MemoryTable`] into [`super::super::TraceEval`], to be commited when
+    /// Transforms the [`MemoryTable`] into [`super::super::TraceEval`], to be committed when
     /// generating a STARK proof.
     ///
     /// The [`MemoryTable`] is transformed from an array of rows (one element = one step of all
@@ -280,7 +280,7 @@ impl TraceColumn for MemoryColumn {
     }
 }
 
-/// The interaction elements drawn for the extension column of the Memory component.
+/// The interaction elements are drawn for the extension column of the Memory component.
 ///
 /// The logUp protocol uses these elements to combine the values of the different
 /// registers of the main trace to create a random linear combination
@@ -344,7 +344,7 @@ impl<F: Clone, EF: RelationEFTraitBound<F>> Relation<F, EF> for MemoryElements {
 ///
 ///
 /// # Returns
-/// - Interaction trace evaluation, to be commited.
+/// - Interaction trace evaluation, to be committed.
 /// - Interaction claim: the total sum from the logUp protocol,
 /// to be mixed into the Fiat-Shamir [`Channel`].
 pub fn interaction_trace_evaluation(
@@ -620,7 +620,7 @@ mod tests {
         // - Real row
         // - Dummy row (filling the `clk` value)
         // - Real row
-        // - Dummy row (padding to power of 2)
+        // - Dummy row (padding to the power of 2)
         let rows = vec![
             MemoryTableRow::new(BaseField::zero(), BaseField::from(43), BaseField::from(91)),
             MemoryTableRow::new_dummy(BaseField::one(), BaseField::from(43), BaseField::from(91)),
