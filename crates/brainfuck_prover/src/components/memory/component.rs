@@ -56,7 +56,7 @@ pub struct InteractionClaim {
 
 impl InteractionClaim {
     /// Mix the sums from the logUp protocol into the Fiat-Shamir [`Channel`],
-    /// to bound the proof to the trace.
+    /// to bind the proof to the trace.
     pub fn mix_into(&self, channel: &mut impl Channel) {
         channel.mix_felts(&[self.claimed_sum]);
     }
