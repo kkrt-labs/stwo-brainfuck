@@ -1,13 +1,17 @@
 use crate::components::{
     memory::{
         self,
+        component::{MemoryComponent, MemoryEval},
         table::{interaction_trace_evaluation, MemoryElements, MemoryTable},
     },
     MemoryClaim,
 };
 use brainfuck_vm::machine::Machine;
 use stwo_prover::{
-    constraint_framework::{INTERACTION_TRACE_IDX, ORIGINAL_TRACE_IDX, PREPROCESSED_TRACE_IDX},
+    constraint_framework::{
+        preprocessed_columns::PreprocessedColumn, TraceLocationAllocator, INTERACTION_TRACE_IDX,
+        ORIGINAL_TRACE_IDX, PREPROCESSED_TRACE_IDX,
+    },
     core::{
         air::{Component, ComponentProver},
         backend::simd::SimdBackend,
@@ -90,26 +94,43 @@ pub fn lookup_sum_valid(
 ///
 /// Components are used by the prover as a `ComponentProver`,
 /// and by the verifier as a `Component`.
-pub struct BrainfuckComponents;
+pub struct BrainfuckComponents {
+    memory: MemoryComponent,
+}
 
 impl BrainfuckComponents {
     /// Initializes all the Brainfuck components from the claims generated from the trace.
     pub fn new(
-        _claim: &BrainfuckClaim,
-        _interaction_elements: &BrainfuckInteractionElements,
-        _interaction_claim: &BrainfuckInteractionClaim,
+        claim: &BrainfuckClaim,
+        interaction_elements: &BrainfuckInteractionElements,
+        interaction_claim: &BrainfuckInteractionClaim,
     ) -> Self {
-        todo!();
+        let memory_is_first_column = PreprocessedColumn::IsFirst(claim.memory.log_size);
+
+        let tree_span_provider =
+            &mut TraceLocationAllocator::new_with_preproccessed_columnds(&[memory_is_first_column]);
+
+        let memory = MemoryComponent::new(
+            tree_span_provider,
+            MemoryEval::new(
+                &claim.memory,
+                interaction_elements.memory_lookup_elements.clone(),
+                &interaction_claim.memory,
+            ),
+            (interaction_claim.memory.claimed_sum, None),
+        );
+
+        Self { memory }
     }
 
     /// Returns the `ComponentProver` of each components, used by the prover.
     pub fn provers(&self) -> Vec<&dyn ComponentProver<SimdBackend>> {
-        todo!();
+        vec![&self.memory]
     }
 
     /// Returns the `Component` of each components, used by the verifier.
     pub fn components(&self) -> Vec<&dyn Component> {
-        todo!();
+        self.provers().into_iter().map(|component| component as &dyn Component).collect()
     }
 }
 
@@ -194,10 +215,9 @@ pub fn prove_brainfuck(
     let component_builder =
         BrainfuckComponents::new(&claim, &interaction_elements, &interaction_claim);
     let components = component_builder.provers();
-    let _proof = prover::prove::<SimdBackend, _>(&components, channel, commitment_scheme)?;
+    let proof = prover::prove::<SimdBackend, _>(&components, channel, commitment_scheme)?;
 
-    // Ok(BrainfuckProof { claim, interaction_claim, proof })
-    todo!();
+    Ok(BrainfuckProof { claim, interaction_claim, proof })
 }
 
 /// Verify a given STARK proof of a Brainfuck program execution with corresponding claim.
