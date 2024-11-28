@@ -133,3 +133,68 @@ impl InteractionClaim {
         channel.mix_felts(&[self.claimed_sum]);
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use crate::components::memory::{
+        component::MemoryEval,
+        table::{interaction_trace_evaluation, MemoryElements, MemoryTable},
+    };
+    use brainfuck_vm::{compiler::Compiler, test_helper::create_test_machine};
+    use stwo_prover::{
+        constraint_framework::{
+            assert_constraints, preprocessed_columns::gen_is_first, FrameworkEval,
+        },
+        core::{
+            pcs::TreeVec,
+            poly::circle::{CanonicCoset, CircleEvaluation},
+        },
+    };
+
+    #[test]
+    fn test_memory_constraints() {
+        const LOG_SIZE: u32 = 9;
+
+        // Get an execution trace from a valid Brainfuck program
+        let code = "+>,<[>+.<-]";
+        let mut compiler = Compiler::new(code);
+        let instructions = compiler.compile();
+        let (mut machine, _) = create_test_machine(&instructions, &[1]);
+        let () = machine.execute().expect("Failed to execute machine");
+
+        let trace_vm = machine.trace();
+
+        // Construct the IsFirst preprocessed column
+        let preprocessed_trace = vec![gen_is_first(LOG_SIZE)];
+
+        // Construct the main trace from the execution trace
+        let table = MemoryTable::from(trace_vm);
+        let (main_trace, claim) = table.trace_evaluation().unwrap();
+
+        // Draw Interaction elements
+        let memory_lookup_elements = MemoryElements::dummy();
+
+        // Generate interaction trace
+        let (interaction_trace, interaction_claim) =
+            interaction_trace_evaluation(&main_trace, &memory_lookup_elements);
+
+        // Create the trace evaluation TreeVec
+        let trace = TreeVec::new(vec![preprocessed_trace, main_trace, interaction_trace]);
+
+        // Interpolate the trace for the evaluation
+        let trace_polys = trace.map_cols(CircleEvaluation::interpolate);
+
+        // Get the Memory AIR evaluator
+        let memory_eval = MemoryEval::new(&claim, memory_lookup_elements);
+
+        // Assert that the constraints are valid for a valid Brainfuck program.
+        assert_constraints(
+            &trace_polys,
+            CanonicCoset::new(LOG_SIZE),
+            |eval| {
+                memory_eval.evaluate(eval);
+            },
+            (interaction_claim.claimed_sum, None),
+        );
+    }
+}
