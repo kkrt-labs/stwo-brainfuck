@@ -97,12 +97,13 @@ impl FrameworkEval for MemoryEval {
         eval.add_constraint(d.clone() * (next_mp - mp.clone()));
 
         // If `d` is set, then `mv` remains the same
-        eval.add_constraint(d * (next_mv - mv.clone()));
+        eval.add_constraint(d.clone() * (next_mv - mv.clone()));
 
         // LogUp of `clk`, `mp` and `mv`
+        let multiplicity = E::EF::from(d) - E::EF::one();
         eval.add_to_relation(&[RelationEntry::new(
             &self.memory_lookup_elements,
-            -E::EF::one(),
+            multiplicity,
             &[clk, mp, mv],
         )]);
 
