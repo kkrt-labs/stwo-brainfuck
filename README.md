@@ -6,7 +6,7 @@
 
 - Capacity of generating and verifying a proof for arbitrary Brainfuck programs.
 - Understanding of using Stwo for building ZK-VMs
-- Understanding of mordern AIR (RAP) design for (C)STARK-based systems.
+- Understanding of modern AIR (RAP) design for (C)STARK-based systems.
 
 ## Design choices
 
@@ -28,7 +28,7 @@ We try to follow these guidelines.
 
 ## Acknowledgements
 
-The constraints used here relies on work made by Alan Szepieniec[^3]
+The constraints used here rely on work made by Alan Szepieniec[^3]
 and sibling article from Neptune Cash[^4].
 The Brainfuck compiler and interpreter have been adapted from rkdud007[^5]
 
