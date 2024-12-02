@@ -157,7 +157,7 @@ const LOG_MAX_ROWS: u32 = 20;
 ///
 /// Therefore, we generate all log sizes that we
 /// want to support, so that the verifier can be
-/// provided a merkle root it can trusts, for a claim
+/// provided a merkle root it can trust, for a claim
 /// of any dynamic size.
 ///
 /// Ideally, we should cover all possible log sizes, between
