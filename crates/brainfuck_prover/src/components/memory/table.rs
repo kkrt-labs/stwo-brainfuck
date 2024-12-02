@@ -114,6 +114,7 @@ impl From<Vec<Registers>> for MemoryTable {
 }
 
 // Separated from `Vec<Registers> for MemoryTable` to facilitate tests.
+// It is assumed that [`MemoryIntermediateTable`] is sorted and padded to the next power of two.
 impl From<MemoryIntermediateTable> for MemoryTable {
     fn from(mut intermediate_table: MemoryIntermediateTable) -> Self {
         let mut memory_table = Self::new();
