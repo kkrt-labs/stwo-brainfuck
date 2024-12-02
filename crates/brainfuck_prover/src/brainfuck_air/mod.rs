@@ -148,7 +148,7 @@ impl BrainfuckComponents {
 /// Means that the ZK-VM does not accept programs with more than 2^20 steps (1M steps).
 const LOG_MAX_ROWS: u32 = 20;
 
-/// Log sizes of the preproprecessed columns
+/// Log sizes of the preprocessed columns
 /// used for enforcing boundary constraints.
 ///
 /// Preprocessed columns are generated ahead of time,
