@@ -15,7 +15,12 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: bnjbvr/cargo-machete@main
+      - uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: nightly-2024-01-04
+      - uses: Swatinem/rust-cache@v2
+      - run: cargo install --locked cargo-machete
+      - run: cargo machete
 
   run-brainfuck-vm-unit-tests:
     runs-on: ubuntu-latest
@@ -25,7 +30,7 @@ jobs:
         with:
           toolchain: nightly-2024-01-04
       - uses: Swatinem/rust-cache@v2
-      - run: cargo +nightly-2024-01-04 test --lib
+      - run: cargo test --test '*' --lib
 
   run-brainfuck-vm-integration-tests:
     runs-on: ubuntu-latest
@@ -35,7 +40,7 @@ jobs:
         with:
           toolchain: nightly-2024-01-04
       - uses: Swatinem/rust-cache@v2
-      - run: cargo +nightly-2024-01-04 test --test '*'
+      - run: cargo test --test '*'
 
   all-tests:
     runs-on: ubuntu-latest
