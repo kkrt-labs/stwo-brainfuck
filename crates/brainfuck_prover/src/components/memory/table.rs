@@ -18,75 +18,6 @@ use stwo_prover::{
     },
 };
 
-/// Represents a single row in the Memory Table.
-///
-/// The Memory Table stores:
-/// - The clock cycle counter (`clk`),
-/// - The memory pointer (`mp`),
-/// - The memory value (`mv`),
-/// - The dummy column flag (`d`).
-#[derive(Debug, Default, PartialEq, Eq, Clone)]
-pub struct MemoryTableRow {
-    /// Clock cycle counter: the current step.
-    clk: BaseField,
-    /// Memory pointer: points to a memory cell.
-    mp: BaseField,
-    /// Memory value: value of the cell pointer by `mp` - values in [0..2^31 - 1)
-    mv: BaseField,
-    /// Dummy: Flag whether the row is a dummy one or not
-    d: BaseField,
-}
-
-impl MemoryTableRow {
-    /// Creates a row for the [`MemoryTable`] which is considered 'real'.
-    ///
-    /// A 'real' row, is a row that is part of the execution trace from the Brainfuck program
-    /// execution.
-    pub fn new(clk: BaseField, mp: BaseField, mv: BaseField) -> Self {
-        Self { clk, mp, mv, ..Default::default() }
-    }
-
-    /// Creates a row for the [`MemoryTable`] which is considered 'dummy'.
-    ///
-    /// A 'dummy' row, is a row that is not part of the execution trace from the Brainfuck program
-    /// execution.
-    /// They are used for padding and filling the `clk` gaps after sorting by `mp`, to enforce the
-    /// correct sorting.
-    pub fn new_dummy(clk: BaseField, mp: BaseField, mv: BaseField) -> Self {
-        Self { clk, mp, mv, d: BaseField::one() }
-    }
-
-    /// Getter for the `clk` field.
-    pub const fn clk(&self) -> BaseField {
-        self.clk
-    }
-
-    /// Getter for the `mp` field.
-    pub const fn mp(&self) -> BaseField {
-        self.mp
-    }
-
-    /// Getter for the `mv` field.
-    pub const fn mv(&self) -> BaseField {
-        self.mv
-    }
-
-    /// Getter for the `d` field.
-    pub const fn d(&self) -> BaseField {
-        self.d
-    }
-}
-
-impl From<(&Registers, bool)> for MemoryTableRow {
-    fn from((registers, is_dummy): (&Registers, bool)) -> Self {
-        if is_dummy {
-            Self::new_dummy(registers.clk, registers.mp, registers.mv)
-        } else {
-            Self::new(registers.clk, registers.mp, registers.mv)
-        }
-    }
-}
-
 /// Represents the Memory Table, which holds the required registers
 /// for the Memory component.
 ///
@@ -96,6 +27,18 @@ impl From<(&Registers, bool)> for MemoryTableRow {
 ///
 /// To enforce the sorting on clk, all clk jumped are erased by adding dummy rows.
 /// A dummy column flags them.
+///
+/// To ease constraints evaluation, each row of the Memory component
+/// contains the current row and the next row in natural order.
+/// This is done to avoid having to do costly bit-reversals, as constraints
+/// are evaluated on the evaluation of the trace which is ordered in
+/// a bit-reversed manner over the circle domain once the polynomials are interpolated.
+///
+/// The preliminary work to extract the fields from the execution trace,
+/// the sorting and the padding is done through the [`MemoryIntermediateTable`] struct.
+///
+/// Once done, we can build the Memory table from it, by pairing the consecutive
+/// [`MemoryTableEntry`] in [`MemoryTableRow`].
 #[derive(Debug, Default, PartialEq, Eq, Clone)]
 pub struct MemoryTable {
     /// A vector of [`MemoryTableRow`] representing the table rows.
@@ -111,11 +54,6 @@ impl MemoryTable {
         Self::default()
     }
 
-    /// Getter for the `table` field.
-    pub const fn table(&self) -> &Vec<MemoryTableRow> {
-        &self.table
-    }
-
     /// Adds a new row to the Memory Table.
     ///
     /// # Arguments
@@ -126,77 +64,16 @@ impl MemoryTable {
         self.table.push(row);
     }
 
-    /// Adds multiple rows to the Memory Table.
+    /// Transforms the [`MemoryTable`] into [`super::super::TraceEval`], to be commited
+    /// when generating a STARK proof.
+    ///
+    /// The [`MemoryTable`] is transformed from an array of consecutive rows (one
+    /// element = one step of all registers) to an array of columns (one element = all steps of
+    /// one register). It is then evaluated on the circle domain.
     ///
     /// # Arguments
-    /// * `rows` - A vector of [`MemoryTableRow`] to add to the table.
-    ///
-    /// This method extends the `table` vector with the provided rows.
-    fn add_rows(&mut self, rows: Vec<MemoryTableRow>) {
-        self.table.extend(rows);
-    }
-
-    /// Sorts in-place the existing [`MemoryTableRow`] rows in the Memory Table by `mp`, then `clk`.
-    ///
-    /// Having the rows sorted is required to ensure a correct proof generation (such that the
-    /// constraints can be verified).
-    fn sort(&mut self) {
-        self.table.sort_by_key(|x| (x.mp, x.clk));
-    }
-
-    /// Fills the jumps in `clk` with dummy rows.
-    ///
-    /// Required to ensure the correct sorting of the [`MemoryTable`] in the constraints.
-    ///
-    /// Does nothing if the table is empty.
-    fn complete_with_dummy_rows(&mut self) {
-        let mut new_table = Vec::with_capacity(self.table.len());
-        if let Some(mut prev_row) = self.table.first() {
-            for row in &self.table {
-                let next_clk = prev_row.clk + BaseField::one();
-                if row.mp == prev_row.mp && row.clk > next_clk {
-                    let mut clk = next_clk;
-                    while clk < row.clk {
-                        new_table.push(MemoryTableRow::new_dummy(clk, prev_row.mp, prev_row.mv));
-                        clk += BaseField::one();
-                    }
-                }
-                new_table.push(row.clone());
-                prev_row = row;
-            }
-            new_table.shrink_to_fit();
-            self.table = new_table;
-        }
-    }
-
-    /// Pads the memory table with dummy rows up to the next power of two length.
-    ///
-    /// Each dummy row preserves the last memory pointer and value while incrementing the clock.
-    ///
-    /// Does nothing if the table is empty.
-    fn pad(&mut self) {
-        if let Some(last_row) = self.table.last().cloned() {
-            let trace_len = self.table.len();
-            let padding_offset = (trace_len.next_power_of_two() - trace_len) as u32;
-            for i in 1..=padding_offset {
-                self.add_row(MemoryTableRow::new_dummy(
-                    last_row.clk + BaseField::from(i),
-                    last_row.mp,
-                    last_row.mv,
-                ));
-            }
-        }
-    }
-
-    /// Transforms the [`MemoryTable`] into [`super::super::TraceEval`], to be committed when
-    /// generating a STARK proof.
-    ///
-    /// The [`MemoryTable`] is transformed from an array of rows (one element = one step of all
-    /// registers) to an array of columns (one element = all steps of one register).
-    /// It is then evaluated on the circle domain.
-    ///
-    /// # Arguments
-    /// * memory - The [`MemoryTable`] containing the sorted and padded trace as an array of rows.
+    /// * memory - The [`MemoryTable`] containing the sorted and padded trace as an array of
+    ///   consecutive rows.
     ///
     /// # Returns
     /// A tuple containing the evaluated trace and claim for STARK proof.
@@ -209,38 +86,277 @@ impl MemoryTable {
             return Err(TraceError::EmptyTrace);
         }
         let log_n_rows = n_rows.ilog2();
-        // TODO: Confirm that the log_size used for evaluation on Circle domain is the log_size of
-        // the table plus the SIMD lanes
         let log_size = log_n_rows + LOG_N_LANES;
         let mut trace = vec![BaseColumn::zeros(1 << log_size); MemoryColumn::count()];
 
         for (vec_row, row) in self.table.iter().enumerate().take(1 << log_n_rows) {
-            trace[MemoryColumn::Clk.index()].data[vec_row] = row.clk().into();
-            trace[MemoryColumn::Mp.index()].data[vec_row] = row.mp().into();
-            trace[MemoryColumn::Mv.index()].data[vec_row] = row.mv().into();
-            trace[MemoryColumn::D.index()].data[vec_row] = row.d().into();
+            trace[MemoryColumn::Clk.index()].data[vec_row] = row.clk.into();
+            trace[MemoryColumn::Mp.index()].data[vec_row] = row.mp.into();
+            trace[MemoryColumn::Mv.index()].data[vec_row] = row.mv.into();
+            trace[MemoryColumn::D.index()].data[vec_row] = row.d.into();
+            trace[MemoryColumn::NextClk.index()].data[vec_row] = row.next_clk.into();
+            trace[MemoryColumn::NextMp.index()].data[vec_row] = row.next_mp.into();
+            trace[MemoryColumn::NextMv.index()].data[vec_row] = row.next_mv.into();
+            trace[MemoryColumn::NextD.index()].data[vec_row] = row.next_d.into();
         }
 
         let domain = CanonicCoset::new(log_size).circle_domain();
         let trace = trace.into_iter().map(|col| CircleEvaluation::new(domain, col)).collect();
 
-        // TODO: Confirm that the log_size in `Claim` is `log_size`, including the SIMD lanes
         Ok((trace, MemoryClaim::new(log_size)))
     }
 }
 
 impl From<Vec<Registers>> for MemoryTable {
     fn from(registers: Vec<Registers>) -> Self {
+        MemoryIntermediateTable::from(registers).into()
+    }
+}
+
+// Separated from `Vec<Registers> for MemoryTable` to facilitate tests.
+impl From<MemoryIntermediateTable> for MemoryTable {
+    fn from(mut intermediate_table: MemoryIntermediateTable) -> Self {
         let mut memory_table = Self::new();
 
-        let memory_rows = registers.iter().map(|reg| (reg, false).into()).collect();
-        memory_table.add_rows(memory_rows);
+        if intermediate_table.table.is_empty() {
+            return memory_table;
+        }
 
-        memory_table.sort();
-        memory_table.complete_with_dummy_rows();
-        memory_table.pad();
+        let last_entry = intermediate_table.table.last().unwrap();
+        let next_dummy_entry = MemoryTableEntry::new_dummy(
+            last_entry.clk + BaseField::one(),
+            last_entry.mp,
+            last_entry.mv,
+        );
 
+        intermediate_table.add_entry(next_dummy_entry);
+
+        for window in intermediate_table.table.windows(2) {
+            match window {
+                [entry_1, entry_2] => {
+                    let row = MemoryTableRow::new(entry_1, entry_2);
+                    memory_table.add_row(row);
+                }
+                _ => panic!("Empty window"),
+            }
+        }
         memory_table
+    }
+}
+
+/// Represents a single row of the [`MemoryTable`]
+///
+/// Two consecutive [`MemoryTableEntry`] flattened.
+///
+/// To avoid bit-reversals when evaluating transition constraints,
+/// the two consecutives rows on which transition constraints are evaluated
+/// are flattened into a single row.
+#[derive(Debug, Default, PartialEq, Eq, Clone)]
+pub struct MemoryTableRow {
+    /// Clock cycle counter: the current step.
+    clk: BaseField,
+    /// Memory pointer: points to a memory cell.
+    mp: BaseField,
+    /// Memory value: value of the cell pointer by `mp` - values in [0..2^31 - 1)
+    mv: BaseField,
+    /// Dummy: Flag whether the current entry is a dummy one or not
+    d: BaseField,
+    /// Next Clock cycle counter.
+    next_clk: BaseField,
+    /// Next Memory pointer.
+    next_mp: BaseField,
+    /// Memory value.
+    next_mv: BaseField,
+    /// Next Dummy.
+    next_d: BaseField,
+}
+
+impl MemoryTableRow {
+    /// Creates a row for the [`MemoryIntermediateTable`] which is considered 'real'.
+    ///
+    /// A 'real' row, is a row that is part of the execution trace from the Brainfuck program
+    /// execution.
+    pub const fn new(entry_1: &MemoryTableEntry, entry_2: &MemoryTableEntry) -> Self {
+        Self {
+            clk: entry_1.clk,
+            mp: entry_1.mp,
+            mv: entry_1.mv,
+            d: entry_1.d,
+            next_clk: entry_2.clk,
+            next_mp: entry_2.mp,
+            next_mv: entry_2.mv,
+            next_d: entry_2.d,
+        }
+    }
+}
+
+/// An intermediate representation of the trace, between the execution trace and the trace for the
+/// Memory component.
+///
+/// It allows extracting the required fields from the execution trace provided by the Brainfuck
+/// Virtual Machine, then sorting by `mp` as a primary key and by `clk` as a secondary key.
+///
+/// To enforce the sorting on clk, all clk jumped are erased by adding dummy entries.
+/// A dummy column flags these entries.
+///
+/// To be used by [`MemoryTable`].
+#[derive(Debug, Default, PartialEq, Eq, Clone)]
+struct MemoryIntermediateTable {
+    /// A vector of [`MemoryTableEntry`] representing the table entries.
+    table: Vec<MemoryTableEntry>,
+}
+
+impl MemoryIntermediateTable {
+    /// Creates a new, empty [`MemoryIntermediateTable`].
+    ///
+    /// # Returns
+    /// A new instance of [`MemoryIntermediateTable`] with an empty table.
+    fn new() -> Self {
+        Self::default()
+    }
+
+    /// Adds a new entry to the Memory Table.
+    ///
+    /// # Arguments
+    /// * `entry` - The [`MemoryTableEntry`] to add to the table.
+    ///
+    /// This method pushes a new [`MemoryTableEntry`] onto the `table` vector.
+    fn add_entry(&mut self, entry: MemoryTableEntry) {
+        self.table.push(entry);
+    }
+
+    /// Adds multiple entries to the Memory Table.
+    ///
+    /// # Arguments
+    /// * `entries` - A vector of [`MemoryTableEntry`] to add to the table.
+    ///
+    /// This method extends the `table` vector with the provided rows.
+    fn add_entries(&mut self, entries: Vec<MemoryTableEntry>) {
+        self.table.extend(entries);
+    }
+
+    /// Sorts in-place the existing [`MemoryTableEntry`] rows in the Memory Table by `mp`, then
+    /// `clk`.
+    ///
+    /// Having the entries sorted is required to ensure a correct proof generation (such that the
+    /// constraints can be verified).
+    fn sort(&mut self) {
+        self.table.sort_by_key(|x| (x.mp, x.clk));
+    }
+
+    /// Fills the jumps in `clk` with dummy entries.
+    ///
+    /// Required to ensure the correct sorting of the [`MemoryIntermediateTable`] in the
+    /// constraints.
+    ///
+    /// Does nothing if the table is empty.
+    fn complete_with_dummy_entries(&mut self) {
+        let mut new_table = Vec::with_capacity(self.table.len());
+        if let Some(mut prev_entry) = self.table.first() {
+            for entry in &self.table {
+                let next_clk = prev_entry.clk + BaseField::one();
+                if entry.mp == prev_entry.mp && entry.clk > next_clk {
+                    let mut clk = next_clk;
+                    while clk < entry.clk {
+                        new_table.push(MemoryTableEntry::new_dummy(
+                            clk,
+                            prev_entry.mp,
+                            prev_entry.mv,
+                        ));
+                        clk += BaseField::one();
+                    }
+                }
+                new_table.push(entry.clone());
+                prev_entry = entry;
+            }
+            new_table.shrink_to_fit();
+            self.table = new_table;
+        }
+    }
+
+    /// Pads the memory table with dummy entries up to the next power of two length.
+    ///
+    /// Each dummy entry preserves the last memory pointer and value, while incrementing the clock.
+    ///
+    /// Does nothing if the table is empty.
+    fn pad(&mut self) {
+        if let Some(last_entry) = self.table.last().cloned() {
+            let trace_len = self.table.len();
+            let padding_offset = (trace_len.next_power_of_two() - trace_len) as u32;
+            for i in 1..=padding_offset {
+                self.add_entry(MemoryTableEntry::new_dummy(
+                    last_entry.clk + BaseField::from(i),
+                    last_entry.mp,
+                    last_entry.mv,
+                ));
+            }
+        }
+    }
+}
+
+impl From<Vec<Registers>> for MemoryIntermediateTable {
+    fn from(registers: Vec<Registers>) -> Self {
+        let mut intermediate_table = Self::new();
+
+        let memory_entries = registers.iter().map(|reg| (reg, false).into()).collect();
+        intermediate_table.add_entries(memory_entries);
+
+        intermediate_table.sort();
+        intermediate_table.complete_with_dummy_entries();
+        intermediate_table.pad();
+
+        intermediate_table
+    }
+}
+
+/// Represents a single row of the [`MemoryIntermediateTable`].
+///
+/// Represents the registers used by the Memory Table of a single step from the execution trace.
+///
+/// The Memory Table Intermediate stores:
+/// - The clock cycle counter (`clk`),
+/// - The memory pointer (`mp`),
+/// - The memory value (`mv`),
+/// - The dummy column flag (`d`).
+#[derive(Debug, Default, PartialEq, Eq, Clone)]
+pub struct MemoryTableEntry {
+    /// Clock cycle counter: the current step.
+    clk: BaseField,
+    /// Memory pointer: points to a memory cell.
+    mp: BaseField,
+    /// Memory value: value of the cell pointer by `mp` - values in [0..2^31 - 1)
+    mv: BaseField,
+    /// Dummy: Flag whether the row is a dummy one or not
+    d: BaseField,
+}
+
+impl MemoryTableEntry {
+    /// Creates an entry for the [`MemoryIntermediateTable`] which is considered 'real'.
+    ///
+    /// A 'real' entry, is an entry that is part of the execution trace from the Brainfuck program
+    /// execution.
+    pub fn new(clk: BaseField, mp: BaseField, mv: BaseField) -> Self {
+        Self { clk, mp, mv, ..Default::default() }
+    }
+
+    /// Creates an entry for the [`MemoryIntermediateTable`] which is considered 'dummy'.
+    ///
+    /// A 'dummy' entry, is an entry that is not part of the execution trace from the Brainfuck
+    /// program execution.
+    /// They are used for padding and filling the `clk` gaps after sorting by `mp`, to enforce the
+    /// correct sorting.
+    pub fn new_dummy(clk: BaseField, mp: BaseField, mv: BaseField) -> Self {
+        Self { clk, mp, mv, d: BaseField::one() }
+    }
+}
+
+impl From<(&Registers, bool)> for MemoryTableEntry {
+    fn from((registers, is_dummy): (&Registers, bool)) -> Self {
+        if is_dummy {
+            Self::new_dummy(registers.clk, registers.mp, registers.mv)
+        } else {
+            Self::new(registers.clk, registers.mp, registers.mv)
+        }
     }
 }
 
@@ -255,6 +371,14 @@ pub enum MemoryColumn {
     Mv,
     /// Index of the `d` register column in the Memory trace.
     D,
+    /// Index of the `next_clk` register column in the Memory trace.
+    NextClk,
+    /// Index of the `next_mp` register column in the Memory trace.
+    NextMp,
+    /// Index of the `next_mv` register column in the Memory trace.
+    NextMv,
+    /// Index of the `next_d` register column in the Memory trace.
+    NextD,
 }
 
 impl MemoryColumn {
@@ -265,12 +389,16 @@ impl MemoryColumn {
             Self::Mp => 1,
             Self::Mv => 2,
             Self::D => 3,
+            Self::NextClk => 4,
+            Self::NextMp => 5,
+            Self::NextMv => 6,
+            Self::NextD => 7,
         }
     }
 
     /// Returns the total number of columns in the Memory table
     pub const fn column_count() -> usize {
-        4
+        8
     }
 }
 
@@ -279,6 +407,9 @@ impl TraceColumn for MemoryColumn {
         Self::column_count()
     }
 }
+
+/// The number of random elements necessary for the Memory lookup argument.
+const MEMORY_LOOKUP_ELEMENTS: usize = 3;
 
 /// The interaction elements are drawn for the extension column of the Memory component.
 ///
@@ -289,7 +420,7 @@ impl TraceColumn for MemoryColumn {
 /// There are 3 lookup elements in the Memory component, as only the 'real' registers
 /// are used: `clk`, `mp` and `mv`. `d` is used to eventually nullify the numerator.
 #[derive(Clone, Debug, Eq, PartialEq)]
-pub struct MemoryElements(LookupElements<{ MemoryColumn::column_count() - 1 }>);
+pub struct MemoryElements(LookupElements<MEMORY_LOOKUP_ELEMENTS>);
 
 impl MemoryElements {
     /// Provides dummy lookup elements.
@@ -326,7 +457,7 @@ impl<F: Clone, EF: RelationEFTraitBound<F>> Relation<F, EF> for MemoryElements {
 
     /// Returns the number interaction elements.
     fn get_size(&self) -> usize {
-        MemoryColumn::count() - 1
+        MEMORY_LOOKUP_ELEMENTS
     }
 }
 
@@ -347,10 +478,15 @@ impl<F: Clone, EF: RelationEFTraitBound<F>> Relation<F, EF> for MemoryElements {
 /// - Interaction trace evaluation, to be committed.
 /// - Interaction claim: the total sum from the logUp protocol,
 /// to be mixed into the Fiat-Shamir [`Channel`].
+#[allow(clippy::similar_names)]
 pub fn interaction_trace_evaluation(
     main_trace_eval: &TraceEval,
     lookup_elements: &MemoryElements,
-) -> (TraceEval, InteractionClaim) {
+) -> Result<(TraceEval, InteractionClaim), TraceError> {
+    if main_trace_eval.is_empty() {
+        return Err(TraceError::EmptyTrace)
+    }
+
     let log_size = main_trace_eval[0].domain.log_size();
 
     let mut logup_gen = LogupTraceGenerator::new(log_size);
@@ -360,22 +496,31 @@ pub fn interaction_trace_evaluation(
     let mp_col = &main_trace_eval[MemoryColumn::Mp.index()].data;
     let mv_column = &main_trace_eval[MemoryColumn::Mv.index()].data;
     let d_col = &main_trace_eval[MemoryColumn::D.index()].data;
+    let next_clk_col = &main_trace_eval[MemoryColumn::NextClk.index()].data;
+    let next_mp_col = &main_trace_eval[MemoryColumn::NextMp.index()].data;
+    let next_mv_column = &main_trace_eval[MemoryColumn::NextMv.index()].data;
+    let next_d_col = &main_trace_eval[MemoryColumn::NextD.index()].data;
     for vec_row in 0..1 << (log_size - LOG_N_LANES) {
         let clk = clk_col[vec_row];
         let mp = mp_col[vec_row];
         let mv = mv_column[vec_row];
+        let next_clk = next_clk_col[vec_row];
+        let next_mp = next_mp_col[vec_row];
+        let next_mv = next_mv_column[vec_row];
         // Set the fraction numerator to 0 if it is a dummy row (d = 1), otherwise set it to -1.
-        let is_dummy_num = PackedSecureField::from(d_col[vec_row]) - PackedSecureField::one();
+        let num_1 = PackedSecureField::from(d_col[vec_row]) - PackedSecureField::one();
+        let num_2 = PackedSecureField::from(next_d_col[vec_row]) - PackedSecureField::one();
         // Only the common registers with the processor table are part of the extension column.
-        let denom: PackedSecureField = lookup_elements.combine(&[clk, mp, mv]);
-        col_gen.write_frac(vec_row, is_dummy_num, denom);
+        let denom_1: PackedSecureField = lookup_elements.combine(&[clk, mp, mv]);
+        let denom_2: PackedSecureField = lookup_elements.combine(&[next_clk, next_mp, next_mv]);
+        col_gen.write_frac(vec_row, num_1 * denom_2 + num_2 * denom_1, denom_1 * denom_2);
     }
 
     col_gen.finalize_col();
 
     let (trace, claimed_sum) = logup_gen.finalize_last();
 
-    (trace, InteractionClaim { claimed_sum })
+    Ok((trace, InteractionClaim { claimed_sum }))
 }
 
 #[cfg(test)]
@@ -384,28 +529,63 @@ mod tests {
     use num_traits::Zero;
 
     #[test]
-    fn test_memory_row_new() {
-        let row = MemoryTableRow::new(BaseField::zero(), BaseField::from(43), BaseField::from(91));
-        let expected_row = MemoryTableRow {
+    fn test_memory_entry_new() {
+        let entry =
+            MemoryTableEntry::new(BaseField::zero(), BaseField::from(43), BaseField::from(91));
+        let expected_entry = MemoryTableEntry {
             clk: BaseField::zero(),
             mp: BaseField::from(43),
             mv: BaseField::from(91),
             d: BaseField::zero(),
         };
-        assert_eq!(row, expected_row);
+        assert_eq!(entry, expected_entry);
     }
 
     #[test]
-    fn test_memory_row_new_dummy() {
-        let row =
-            MemoryTableRow::new_dummy(BaseField::zero(), BaseField::from(43), BaseField::from(91));
-        let expected_row = MemoryTableRow {
+    fn test_memory_entry_new_dummy() {
+        let entry = MemoryTableEntry::new_dummy(
+            BaseField::zero(),
+            BaseField::from(43),
+            BaseField::from(91),
+        );
+        let expected_entry = MemoryTableEntry {
             clk: BaseField::zero(),
             mp: BaseField::from(43),
             mv: BaseField::from(91),
             d: BaseField::one(),
         };
+        assert_eq!(entry, expected_entry);
+    }
+
+    #[test]
+    fn test_memory_row_new() {
+        let entry_1: MemoryTableEntry =
+            MemoryTableEntry::new(BaseField::zero(), BaseField::from(43), BaseField::from(91));
+        let entry_2: MemoryTableEntry =
+            MemoryTableEntry::new_dummy(BaseField::one(), BaseField::from(3), BaseField::from(9));
+
+        let row = MemoryTableRow::new(&entry_1, &entry_2);
+
+        let expected_row = MemoryTableRow {
+            clk: BaseField::zero(),
+            mp: BaseField::from(43),
+            mv: BaseField::from(91),
+            d: BaseField::zero(),
+            next_clk: BaseField::one(),
+            next_mp: BaseField::from(3),
+            next_mv: BaseField::from(9),
+            next_d: BaseField::one(),
+        };
         assert_eq!(row, expected_row);
+    }
+
+    #[test]
+    fn test_memory_intermediate_table_new() {
+        let intermediate_table = MemoryIntermediateTable::new();
+        assert!(
+            intermediate_table.table.is_empty(),
+            "Memory intermediate table should be empty upon initialization."
+        );
     }
 
     #[test]
@@ -415,161 +595,178 @@ mod tests {
     }
 
     #[test]
-    fn test_add_row() {
-        let mut memory_table = MemoryTable::new();
-        // Create a row to add to the table
-        let row = MemoryTableRow::new(BaseField::zero(), BaseField::from(43), BaseField::from(91));
-        // Add the row to the table
-        memory_table.add_row(row.clone());
-        // Check that the table contains the added row
-        assert_eq!(memory_table.table, vec![row], "Added row should match the expected row.");
-    }
-
-    #[test]
-    fn test_add_dummy_row() {
-        let mut memory_table = MemoryTable::new();
+    fn test_add_entry() {
+        let mut intermediate_table = MemoryIntermediateTable::new();
         // Create a row to add to the table
         let row =
-            MemoryTableRow::new_dummy(BaseField::zero(), BaseField::from(43), BaseField::from(91));
+            MemoryTableEntry::new(BaseField::zero(), BaseField::from(43), BaseField::from(91));
         // Add the row to the table
-        memory_table.add_row(row.clone());
+        intermediate_table.add_entry(row.clone());
         // Check that the table contains the added row
-        assert_eq!(memory_table.table, vec![row], "Added row should match the expected row.");
+        assert_eq!(intermediate_table.table, vec![row], "Added row should match the expected row.");
     }
 
     #[test]
-    fn test_add_multiple_rows() {
-        let mut memory_table = MemoryTable::new();
-        // Create a vector of rows to add to the table
-        let rows = vec![
-            MemoryTableRow::new(BaseField::zero(), BaseField::from(43), BaseField::from(91)),
-            MemoryTableRow::new(BaseField::one(), BaseField::from(91), BaseField::from(9)),
-            MemoryTableRow::new(BaseField::from(43), BaseField::from(62), BaseField::from(43)),
+    fn test_add_dummy_entry() {
+        let mut intermediate_table = MemoryIntermediateTable::new();
+        // Create a row to add to the table
+        let entry = MemoryTableEntry::new_dummy(
+            BaseField::zero(),
+            BaseField::from(43),
+            BaseField::from(91),
+        );
+        // Add the row to the table
+        intermediate_table.add_entry(entry.clone());
+        // Check that the table contains the added row
+        assert_eq!(
+            intermediate_table.table,
+            vec![entry],
+            "Added row should match the expected row."
+        );
+    }
+
+    #[test]
+    fn test_add_multiple_entries() {
+        let mut intermediate_table = MemoryIntermediateTable::new();
+        // Create a vector of entries to add to the table
+        let entries = vec![
+            MemoryTableEntry::new(BaseField::zero(), BaseField::from(43), BaseField::from(91)),
+            MemoryTableEntry::new(BaseField::one(), BaseField::from(91), BaseField::from(9)),
+            MemoryTableEntry::new(BaseField::from(43), BaseField::from(62), BaseField::from(43)),
         ];
-        // Add the rows to the table
-        memory_table.add_rows(rows.clone());
-        // Check that the table contains the added rows
-        assert_eq!(memory_table, MemoryTable { table: rows });
+        // Add the entries to the table
+        intermediate_table.add_entries(entries.clone());
+        // Check that the table contains the added entries
+        assert_eq!(intermediate_table, MemoryIntermediateTable { table: entries });
     }
 
     #[test]
     fn test_sort() {
-        let mut memory_table = MemoryTable::new();
-        let row1 = MemoryTableRow::new(BaseField::zero(), BaseField::zero(), BaseField::zero());
-        let row2 = MemoryTableRow::new(BaseField::one(), BaseField::zero(), BaseField::zero());
-        let row3 = MemoryTableRow::new(BaseField::zero(), BaseField::one(), BaseField::zero());
-        memory_table.add_rows(vec![row3.clone(), row1.clone(), row2.clone()]);
+        let mut intermediate_table = MemoryIntermediateTable::new();
+        let entry_1 =
+            MemoryTableEntry::new(BaseField::zero(), BaseField::zero(), BaseField::zero());
+        let entry_2 = MemoryTableEntry::new(BaseField::one(), BaseField::zero(), BaseField::zero());
+        let entry_3 = MemoryTableEntry::new(BaseField::zero(), BaseField::one(), BaseField::zero());
+        intermediate_table.add_entries(vec![entry_3.clone(), entry_1.clone(), entry_2.clone()]);
 
-        let mut expected_memory_table = MemoryTable::new();
-        expected_memory_table.add_rows(vec![row1, row2, row3]);
+        let mut expected_memory_table = MemoryIntermediateTable::new();
+        expected_memory_table.add_entries(vec![entry_1, entry_2, entry_3]);
 
-        memory_table.sort();
+        intermediate_table.sort();
 
-        assert_eq!(memory_table, expected_memory_table);
+        assert_eq!(intermediate_table, expected_memory_table);
     }
 
     #[test]
-    fn test_empty_complete_wih_dummy_rows() {
-        let mut memory_table = MemoryTable::new();
-        memory_table.complete_with_dummy_rows();
+    fn test_empty_complete_wih_dummy_entries() {
+        let mut intermediate_table = MemoryIntermediateTable::new();
+        intermediate_table.complete_with_dummy_entries();
 
-        assert_eq!(memory_table, MemoryTable::new());
+        assert_eq!(intermediate_table, MemoryIntermediateTable::new());
     }
 
     #[test]
-    fn test_complete_wih_dummy_rows() {
-        let mut memory_table = MemoryTable::new();
-        let row1 = MemoryTableRow::new(BaseField::zero(), BaseField::zero(), BaseField::zero());
-        let row2 = MemoryTableRow::new(BaseField::zero(), BaseField::one(), BaseField::zero());
-        let row3 = MemoryTableRow::new(BaseField::from(5), BaseField::one(), BaseField::one());
-        memory_table.add_rows(vec![row3.clone(), row1.clone(), row2.clone()]);
-        memory_table.sort();
-        memory_table.complete_with_dummy_rows();
+    fn test_complete_wih_dummy_entries() {
+        let mut intermediate_table = MemoryIntermediateTable::new();
+        let row1 = MemoryTableEntry::new(BaseField::zero(), BaseField::zero(), BaseField::zero());
+        let row2 = MemoryTableEntry::new(BaseField::zero(), BaseField::one(), BaseField::zero());
+        let row3 = MemoryTableEntry::new(BaseField::from(5), BaseField::one(), BaseField::one());
+        intermediate_table.add_entries(vec![row3.clone(), row1.clone(), row2.clone()]);
+        intermediate_table.sort();
+        intermediate_table.complete_with_dummy_entries();
 
-        let mut expected_memory_table = MemoryTable::new();
-        expected_memory_table.add_rows(vec![
+        let mut expected_memory_table = MemoryIntermediateTable::new();
+        expected_memory_table.add_entries(vec![
             row1,
             row2,
-            MemoryTableRow::new_dummy(BaseField::one(), BaseField::one(), BaseField::zero()),
-            MemoryTableRow::new_dummy(BaseField::from(2), BaseField::one(), BaseField::zero()),
-            MemoryTableRow::new_dummy(BaseField::from(3), BaseField::one(), BaseField::zero()),
-            MemoryTableRow::new_dummy(BaseField::from(4), BaseField::one(), BaseField::zero()),
+            MemoryTableEntry::new_dummy(BaseField::one(), BaseField::one(), BaseField::zero()),
+            MemoryTableEntry::new_dummy(BaseField::from(2), BaseField::one(), BaseField::zero()),
+            MemoryTableEntry::new_dummy(BaseField::from(3), BaseField::one(), BaseField::zero()),
+            MemoryTableEntry::new_dummy(BaseField::from(4), BaseField::one(), BaseField::zero()),
             row3,
         ]);
 
-        assert_eq!(memory_table, expected_memory_table);
+        assert_eq!(intermediate_table, expected_memory_table);
     }
 
     #[test]
     fn test_pad_empty() {
-        let mut memory_table = MemoryTable::new();
-        memory_table.pad();
-        assert_eq!(memory_table, MemoryTable::new());
+        let mut intermediate_table = MemoryIntermediateTable::new();
+        intermediate_table.pad();
+        assert_eq!(intermediate_table, MemoryIntermediateTable::new());
     }
 
     #[test]
     fn test_pad() {
-        let mut memory_table = MemoryTable::new();
-        let row1 = MemoryTableRow::new(BaseField::zero(), BaseField::zero(), BaseField::zero());
-        let row2 = MemoryTableRow::new(BaseField::one(), BaseField::one(), BaseField::zero());
-        let row3 = MemoryTableRow::new(BaseField::from(2), BaseField::one(), BaseField::one());
-        memory_table.add_rows(vec![row1.clone(), row2.clone(), row3.clone()]);
+        let mut intermediate_table = MemoryIntermediateTable::new();
+        let row1 = MemoryTableEntry::new(BaseField::zero(), BaseField::zero(), BaseField::zero());
+        let row2 = MemoryTableEntry::new(BaseField::one(), BaseField::one(), BaseField::zero());
+        let row3 = MemoryTableEntry::new(BaseField::from(2), BaseField::one(), BaseField::one());
+        intermediate_table.add_entries(vec![row1.clone(), row2.clone(), row3.clone()]);
 
-        memory_table.pad();
+        intermediate_table.pad();
 
-        let dummy_row =
-            MemoryTableRow::new_dummy(BaseField::from(3), BaseField::one(), BaseField::one());
-        let mut expected_memory_table = MemoryTable::new();
-        expected_memory_table.add_rows(vec![row1, row2, row3, dummy_row]);
+        let dummy_entry =
+            MemoryTableEntry::new_dummy(BaseField::from(3), BaseField::one(), BaseField::one());
+        let mut expected_memory_table = MemoryIntermediateTable::new();
+        expected_memory_table.add_entries(vec![row1, row2, row3, dummy_entry]);
 
-        assert_eq!(memory_table, expected_memory_table);
+        assert_eq!(intermediate_table, expected_memory_table);
     }
 
     #[test]
-    fn test_from_registers() {
-        let reg1 = Registers::default();
-        let reg2 = Registers { clk: BaseField::one(), mp: BaseField::one(), ..Default::default() };
-        let reg3 = Registers {
+    fn test_memory_intermediate_table_from_registers() {
+        let reg_1 = Registers::default();
+        let reg_2 = Registers { clk: BaseField::one(), mp: BaseField::one(), ..Default::default() };
+        let reg_3 = Registers {
             clk: BaseField::from(5),
             mp: BaseField::one(),
             mv: BaseField::one(),
             ..Default::default()
         };
-        let registers: Vec<Registers> = vec![reg3, reg1, reg2];
+        let registers: Vec<Registers> = vec![reg_3, reg_1, reg_2];
 
-        let row1 = MemoryTableRow::default();
-        let row2 = MemoryTableRow::new(BaseField::one(), BaseField::one(), BaseField::zero());
-        let row3 = MemoryTableRow::new(BaseField::from(5), BaseField::one(), BaseField::one());
+        let entry_1 = MemoryTableEntry::default();
+        let entry_2 = MemoryTableEntry::new(BaseField::one(), BaseField::one(), BaseField::zero());
+        let entry_3 = MemoryTableEntry::new(BaseField::from(5), BaseField::one(), BaseField::one());
 
-        let dummy_row1 =
-            MemoryTableRow::new_dummy(BaseField::from(6), BaseField::one(), BaseField::one());
-        let dummy_row2 =
-            MemoryTableRow::new_dummy(BaseField::from(7), BaseField::one(), BaseField::one());
-        let mut expected_memory_table = MemoryTable::new();
-        expected_memory_table.add_rows(vec![
-            row1,
-            row2,
-            MemoryTableRow::new_dummy(BaseField::from(2), BaseField::one(), BaseField::zero()),
-            MemoryTableRow::new_dummy(BaseField::from(3), BaseField::one(), BaseField::zero()),
-            MemoryTableRow::new_dummy(BaseField::from(4), BaseField::one(), BaseField::zero()),
-            row3,
-            dummy_row1,
-            dummy_row2,
+        let dummy_entry_1 =
+            MemoryTableEntry::new_dummy(BaseField::from(6), BaseField::one(), BaseField::one());
+        let dummy_entry_2 =
+            MemoryTableEntry::new_dummy(BaseField::from(7), BaseField::one(), BaseField::one());
+        let mut expected_memory_table = MemoryIntermediateTable::new();
+        expected_memory_table.add_entries(vec![
+            entry_1,
+            entry_2,
+            MemoryTableEntry::new_dummy(BaseField::from(2), BaseField::one(), BaseField::zero()),
+            MemoryTableEntry::new_dummy(BaseField::from(3), BaseField::one(), BaseField::zero()),
+            MemoryTableEntry::new_dummy(BaseField::from(4), BaseField::one(), BaseField::zero()),
+            entry_3,
+            dummy_entry_1,
+            dummy_entry_2,
         ]);
 
-        assert_eq!(MemoryTable::from(registers), expected_memory_table);
+        assert_eq!(MemoryIntermediateTable::from(registers), expected_memory_table);
+    }
+
+    #[test]
+    fn test_empty_trace_evaluation() {
+        let registers = vec![];
+        let trace_eval = MemoryTable::from(registers).trace_evaluation();
+
+        assert!(matches!(trace_eval, Err(TraceError::EmptyTrace)));
     }
 
     #[test]
     fn test_trace_evaluation() {
-        let mut memory_table = MemoryTable::new();
+        let mut intermediate_table = MemoryIntermediateTable::new();
         let rows = vec![
-            MemoryTableRow::new(BaseField::zero(), BaseField::from(43), BaseField::from(91)),
-            MemoryTableRow::new(BaseField::one(), BaseField::from(91), BaseField::from(9)),
+            MemoryTableEntry::new(BaseField::zero(), BaseField::from(43), BaseField::from(91)),
+            MemoryTableEntry::new(BaseField::one(), BaseField::from(91), BaseField::from(9)),
         ];
-        memory_table.add_rows(rows);
+        intermediate_table.add_entries(rows);
 
-        let (trace, claim) = memory_table.trace_evaluation().unwrap();
+        let (trace, claim) = MemoryTable::from(intermediate_table).trace_evaluation().unwrap();
 
         let expected_log_n_rows: u32 = 1;
         let expected_log_size = expected_log_n_rows + LOG_N_LANES;
@@ -606,35 +803,38 @@ mod tests {
     }
 
     #[test]
-    fn test_evaluate_empty_trace() {
-        let memory_table = MemoryTable::new();
-        let run = memory_table.trace_evaluation();
+    fn test_empty_interaction_trace_evaluation() {
+        let empty_eval = vec![];
+        let lookup_elements = MemoryElements::dummy();
+        let interaction_trace_eval = interaction_trace_evaluation(&empty_eval, &lookup_elements);
 
-        assert!(matches!(run, Err(TraceError::EmptyTrace)));
+        assert!(matches!(interaction_trace_eval, Err(TraceError::EmptyTrace)));
     }
 
     #[test]
     fn test_interaction_trace_evaluation() {
-        let mut memory_table = MemoryTable::new();
+        let mut intermediate_table = MemoryIntermediateTable::new();
         // Trace rows are:
         // - Real row
         // - Dummy row (filling the `clk` value)
         // - Real row
         // - Dummy row (padding to the power of 2)
         let rows = vec![
-            MemoryTableRow::new(BaseField::zero(), BaseField::from(43), BaseField::from(91)),
-            MemoryTableRow::new_dummy(BaseField::one(), BaseField::from(43), BaseField::from(91)),
-            MemoryTableRow::new(BaseField::from(2), BaseField::from(91), BaseField::from(9)),
-            MemoryTableRow::new_dummy(BaseField::from(2), BaseField::from(91), BaseField::from(9)),
+            MemoryTableEntry::new(BaseField::zero(), BaseField::zero(), BaseField::zero()),
+            MemoryTableEntry::new_dummy(BaseField::one(), BaseField::one(), BaseField::zero()),
+            MemoryTableEntry::new(BaseField::from(2), BaseField::one(), BaseField::zero()),
+            MemoryTableEntry::new_dummy(BaseField::from(3), BaseField::one(), BaseField::zero()),
         ];
-        memory_table.add_rows(rows);
+        intermediate_table.add_entries(rows);
+
+        let memory_table = MemoryTable::from(intermediate_table);
 
         let (trace_eval, claim) = memory_table.trace_evaluation().unwrap();
 
         let lookup_elements = MemoryElements::dummy();
 
         let (interaction_trace_eval, interaction_claim) =
-            interaction_trace_evaluation(&trace_eval, &lookup_elements);
+            interaction_trace_evaluation(&trace_eval, &lookup_elements).unwrap();
 
         let log_size = trace_eval[0].domain.log_size();
         let mut logup_gen = LogupTraceGenerator::new(log_size);
@@ -654,15 +854,15 @@ mod tests {
             denoms[vec_row] = denom;
         }
 
-        let num_1 = -PackedSecureField::one();
-        let num_2 = PackedSecureField::zero();
-        let num_3 = -PackedSecureField::one();
-        let num_4 = PackedSecureField::zero();
+        let num_0 = -PackedSecureField::one();
+        let num_1 = PackedSecureField::zero();
+        let num_2 = -PackedSecureField::one();
+        let num_3 = PackedSecureField::zero();
 
-        col_gen.write_frac(0, num_1, denoms[0]);
-        col_gen.write_frac(1, num_2, denoms[1]);
-        col_gen.write_frac(2, num_3, denoms[2]);
-        col_gen.write_frac(3, num_4, denoms[3]);
+        col_gen.write_frac(0, num_0 * denoms[1] + num_1 * denoms[0], denoms[0] * denoms[1]);
+        col_gen.write_frac(1, num_1 * denoms[2] + num_2 * denoms[1], denoms[1] * denoms[2]);
+        col_gen.write_frac(2, num_2 * denoms[3] + num_3 * denoms[2], denoms[2] * denoms[3]);
+        col_gen.write_frac(3, num_3, denoms[3]);
 
         col_gen.finalize_col();
         let (expected_interaction_trace_eval, expected_claimed_sum) = logup_gen.finalize_last();
@@ -687,9 +887,9 @@ mod tests {
     // have the exact same dummy rows (the Memory component) adds extra
     // dummy rows to fill the `clk` jumps and enforce the sorting.
     #[test]
-    fn test_dummy_rows_impact_on_interaction_trace_evaluation() {
-        let mut memory_table = MemoryTable::new();
-        let mut real_memory_table = MemoryTable::new();
+    fn test_interaction_trace_evaluation_dummy_rows_effect() {
+        let mut intermediate_table = MemoryIntermediateTable::new();
+        let mut real_intermediate_table = MemoryIntermediateTable::new();
 
         // Trace rows are:
         // - Real row
@@ -697,31 +897,37 @@ mod tests {
         // - Real row
         // - Dummy row (padding to power of 2)
         let rows = vec![
-            MemoryTableRow::new(BaseField::zero(), BaseField::from(43), BaseField::from(91)),
-            MemoryTableRow::new_dummy(BaseField::one(), BaseField::from(43), BaseField::from(91)),
-            MemoryTableRow::new(BaseField::from(2), BaseField::from(91), BaseField::from(9)),
-            MemoryTableRow::new_dummy(BaseField::from(2), BaseField::from(91), BaseField::from(9)),
+            MemoryTableEntry::new(BaseField::zero(), BaseField::from(43), BaseField::from(91)),
+            MemoryTableEntry::new_dummy(BaseField::one(), BaseField::from(43), BaseField::from(91)),
+            MemoryTableEntry::new(BaseField::from(2), BaseField::from(91), BaseField::from(9)),
+            MemoryTableEntry::new_dummy(
+                BaseField::from(2),
+                BaseField::from(91),
+                BaseField::from(9),
+            ),
         ];
-        memory_table.add_rows(rows);
+        intermediate_table.add_entries(rows);
 
         // Trace rows are:
         // - Real row
         // - Real row
         let real_rows = vec![
-            MemoryTableRow::new(BaseField::zero(), BaseField::from(43), BaseField::from(91)),
-            MemoryTableRow::new(BaseField::from(2), BaseField::from(91), BaseField::from(9)),
+            MemoryTableEntry::new(BaseField::zero(), BaseField::from(43), BaseField::from(91)),
+            MemoryTableEntry::new(BaseField::from(2), BaseField::from(91), BaseField::from(9)),
         ];
-        real_memory_table.add_rows(real_rows);
+        real_intermediate_table.add_entries(real_rows);
 
-        let (trace_eval, _) = memory_table.trace_evaluation().unwrap();
-        let (new_trace_eval, _) = real_memory_table.trace_evaluation().unwrap();
+        let (trace_eval, _) = MemoryTable::from(intermediate_table).trace_evaluation().unwrap();
+        let (new_trace_eval, _) =
+            MemoryTable::from(real_intermediate_table).trace_evaluation().unwrap();
 
         let lookup_elements = MemoryElements::dummy();
 
-        let (_, interaction_claim) = interaction_trace_evaluation(&trace_eval, &lookup_elements);
+        let (_, interaction_claim) =
+            interaction_trace_evaluation(&trace_eval, &lookup_elements).unwrap();
 
         let (_, new_interaction_claim) =
-            interaction_trace_evaluation(&new_trace_eval, &lookup_elements);
+            interaction_trace_evaluation(&new_trace_eval, &lookup_elements).unwrap();
 
         assert_eq!(interaction_claim, new_interaction_claim,);
     }

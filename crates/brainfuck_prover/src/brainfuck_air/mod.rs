@@ -198,7 +198,8 @@ pub fn prove_brainfuck(
     let mut tree_builder = commitment_scheme.tree_builder();
 
     let (memory_interaction_trace_eval, memory_interaction_claim) =
-        interaction_trace_evaluation(&memory_trace, &interaction_elements.memory_lookup_elements);
+        interaction_trace_evaluation(&memory_trace, &interaction_elements.memory_lookup_elements)
+            .unwrap();
 
     tree_builder.extend_evals(memory_interaction_trace_eval);
 
