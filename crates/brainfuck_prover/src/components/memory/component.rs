@@ -4,7 +4,7 @@ use num_traits::One;
 use stwo_prover::{
     constraint_framework::{
         preprocessed_columns::PreprocessedColumn, EvalAtRow, FrameworkComponent, FrameworkEval,
-        RelationEntry, ORIGINAL_TRACE_IDX,
+        RelationEntry,
     },
     core::{
         channel::Channel,
@@ -65,10 +65,14 @@ impl FrameworkEval for MemoryEval {
         let is_first = eval.get_preprocessed_column(PreprocessedColumn::IsFirst(self.log_size()));
 
         // Get all the required registers' values
-        let [clk, next_clk] = eval.next_interaction_mask(ORIGINAL_TRACE_IDX, [0, 1]);
-        let [mp, next_mp] = eval.next_interaction_mask(ORIGINAL_TRACE_IDX, [0, 1]);
-        let [mv, next_mv] = eval.next_interaction_mask(ORIGINAL_TRACE_IDX, [0, 1]);
-        let [d, next_d] = eval.next_interaction_mask(ORIGINAL_TRACE_IDX, [0, 1]);
+        let clk = eval.next_trace_mask();
+        let mp = eval.next_trace_mask();
+        let mv = eval.next_trace_mask();
+        let d = eval.next_trace_mask();
+        let next_clk = eval.next_trace_mask();
+        let next_mp = eval.next_trace_mask();
+        let next_mv = eval.next_trace_mask();
+        let next_d = eval.next_trace_mask();
 
         // Boundary constraints
         eval.add_constraint(is_first.clone() * clk.clone());
@@ -84,28 +88,34 @@ impl FrameworkEval for MemoryEval {
 
         // If `mp` remains the same, `clk` increases by 1
         eval.add_constraint(
-            (next_mp.clone() - mp.clone()) * (next_clk - clk.clone() - BaseField::one().into()),
+            (next_mp.clone() - mp.clone() - BaseField::one().into()) *
+                (next_clk.clone() - clk.clone() - BaseField::one().into()),
         );
 
         // If `mp` increases by 1, then `next_mv` must be 0
         eval.add_constraint((next_mp.clone() - mp.clone()) * next_mv.clone());
 
         // The next dummy is either 0 or 1
-        eval.add_constraint(next_d.clone() * (next_d - BaseField::one().into()));
+        eval.add_constraint(next_d.clone() * (next_d.clone() - BaseField::one().into()));
 
         // If `d` is set, then `mp` remains the same
-        eval.add_constraint(d.clone() * (next_mp - mp.clone()));
+        eval.add_constraint(d.clone() * (next_mp.clone() - mp.clone()));
 
         // If `d` is set, then `mv` remains the same
-        eval.add_constraint(d.clone() * (next_mv - mv.clone()));
+        eval.add_constraint(d.clone() * (next_mv.clone() - mv.clone()));
 
         // LogUp of `clk`, `mp` and `mv`
-        let multiplicity = E::EF::from(d) - E::EF::one();
-        eval.add_to_relation(&[RelationEntry::new(
-            &self.memory_lookup_elements,
-            multiplicity,
-            &[clk, mp, mv],
-        )]);
+        let multiplicity_row = E::EF::from(d) - E::EF::one();
+        // LogUp of `next_clk`, `next_mp` and `next_mv`
+        let multiplicity_next_row = E::EF::from(next_d) - E::EF::one();
+        eval.add_to_relation(&[
+            RelationEntry::new(&self.memory_lookup_elements, multiplicity_row, &[clk, mp, mv]),
+            RelationEntry::new(
+                &self.memory_lookup_elements,
+                multiplicity_next_row,
+                &[next_clk, next_mp, next_mv],
+            ),
+        ]);
 
         eval.finalize_logup();
 
@@ -127,7 +137,7 @@ pub struct InteractionClaim {
 
 impl InteractionClaim {
     /// Mix the sums from the logUp protocol into the Fiat-Shamir [`Channel`],
-    /// to bind the proof to the trace.
+    /// to bound the proof to the trace.
     pub fn mix_into(&self, channel: &mut impl Channel) {
         channel.mix_felts(&[self.claimed_sum]);
     }
@@ -165,8 +175,8 @@ mod tests {
 
         // Construct the IsFirst preprocessed column
         let is_first_col = gen_is_first(LOG_SIZE);
-        let is_first_col2 = gen_is_first(LOG_SIZE);
-        let preprocessed_trace = vec![is_first_col, is_first_col2];
+        let is_first_col_2 = gen_is_first(LOG_SIZE);
+        let preprocessed_trace = vec![is_first_col, is_first_col_2];
 
         // Construct the main trace from the execution trace
         let table = MemoryTable::from(trace_vm);
