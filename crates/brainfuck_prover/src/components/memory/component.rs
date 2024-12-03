@@ -87,6 +87,9 @@ impl FrameworkEval for MemoryEval {
         );
 
         // If `mp` remains the same, `clk` increases by 1
+        // Note: `mp` increases by 0 or 1, if `mp` increases, then the
+        // constraints on `clk` increasing should be void, hence the
+        // (`next_mp` - `mp` - 1)
         eval.add_constraint(
             (next_mp.clone() - mp.clone() - BaseField::one().into()) *
                 (next_clk.clone() - clk.clone() - BaseField::one().into()),
@@ -149,12 +152,17 @@ mod tests {
         component::MemoryEval,
         table::{interaction_trace_evaluation, MemoryElements, MemoryTable},
     };
-    use brainfuck_vm::{compiler::Compiler, test_helper::create_test_machine};
+    use brainfuck_vm::{
+        compiler::Compiler, registers::Registers, test_helper::create_test_machine,
+    };
+    use num_traits::One;
     use stwo_prover::{
         constraint_framework::{
             assert_constraints, preprocessed_columns::gen_is_first, FrameworkEval,
         },
         core::{
+            channel::Blake2sChannel,
+            fields::m31::BaseField,
             pcs::TreeVec,
             poly::circle::{CanonicCoset, CircleEvaluation},
         },
@@ -199,6 +207,406 @@ mod tests {
         let memory_eval = MemoryEval::new(&claim, memory_lookup_elements);
 
         // Assert that the constraints are valid for a valid Brainfuck program.
+        assert_constraints(
+            &trace_polys,
+            CanonicCoset::new(LOG_SIZE),
+            |eval| {
+                memory_eval.evaluate(eval);
+            },
+            (interaction_claim.claimed_sum, None),
+        );
+    }
+
+    #[test]
+    #[should_panic = "assertion `left == right` failed: row: 0
+  left: (1 + 0i) + (0 + 0i)u
+ right: (0 + 0i) + (0 + 0i)u"]
+    fn test_invalid_boundary_clk() {
+        const LOG_SIZE: u32 = 4;
+
+        let is_first_col = gen_is_first(LOG_SIZE);
+        let preprocessed_trace_eval = vec![is_first_col];
+
+        let registers = vec![Registers { clk: BaseField::one(), ..Default::default() }];
+        let memory_table = MemoryTable::from(registers);
+        let (main_trace_eval, claim) = memory_table.trace_evaluation().unwrap();
+
+        // Required to use `MemoryElements::draw(channel: &mut impl Channel)`
+        // because `MemoryElements::dummy()` returns a denominator of 0
+        // for a `MemoryTableEntry {1, 0, 0, 0}`
+        let channel = &mut Blake2sChannel::default();
+        let memory_lookup_elements = MemoryElements::draw(channel);
+
+        let (interaction_trace_eval, interaction_claim) =
+            interaction_trace_evaluation(&main_trace_eval, &memory_lookup_elements).unwrap();
+
+        let trace =
+            TreeVec::new(vec![preprocessed_trace_eval, main_trace_eval, interaction_trace_eval]);
+
+        let trace_polys = trace.map_cols(CircleEvaluation::interpolate);
+
+        let memory_eval = MemoryEval::new(&claim, memory_lookup_elements);
+
+        assert_constraints(
+            &trace_polys,
+            CanonicCoset::new(LOG_SIZE),
+            |eval| {
+                memory_eval.evaluate(eval);
+            },
+            (interaction_claim.claimed_sum, None),
+        );
+    }
+
+    #[test]
+    #[should_panic = "assertion `left == right` failed: row: 0
+  left: (1 + 0i) + (0 + 0i)u
+ right: (0 + 0i) + (0 + 0i)u"]
+    fn test_invalid_boundary_mp() {
+        const LOG_SIZE: u32 = 4;
+
+        let is_first_col = gen_is_first(LOG_SIZE);
+        let preprocessed_trace_eval = vec![is_first_col];
+
+        let registers = vec![Registers { mp: BaseField::one(), ..Default::default() }];
+        let memory_table = MemoryTable::from(registers);
+        let (main_trace_eval, claim) = memory_table.trace_evaluation().unwrap();
+
+        let channel = &mut Blake2sChannel::default();
+        let memory_lookup_elements = MemoryElements::draw(channel);
+
+        let (interaction_trace_eval, interaction_claim) =
+            interaction_trace_evaluation(&main_trace_eval, &memory_lookup_elements).unwrap();
+
+        let trace =
+            TreeVec::new(vec![preprocessed_trace_eval, main_trace_eval, interaction_trace_eval]);
+
+        let trace_polys = trace.map_cols(CircleEvaluation::interpolate);
+
+        let memory_eval = MemoryEval::new(&claim, memory_lookup_elements);
+
+        assert_constraints(
+            &trace_polys,
+            CanonicCoset::new(LOG_SIZE),
+            |eval| {
+                memory_eval.evaluate(eval);
+            },
+            (interaction_claim.claimed_sum, None),
+        );
+    }
+
+    #[test]
+    #[should_panic = "assertion `left == right` failed: row: 0
+  left: (1 + 0i) + (0 + 0i)u
+ right: (0 + 0i) + (0 + 0i)u"]
+    fn test_invalid_boundary_mv() {
+        const LOG_SIZE: u32 = 4;
+
+        let is_first_col = gen_is_first(LOG_SIZE);
+        let preprocessed_trace_eval = vec![is_first_col];
+
+        let registers = vec![Registers { mv: BaseField::one(), ..Default::default() }];
+        let memory_table = MemoryTable::from(registers);
+        let (main_trace_eval, claim) = memory_table.trace_evaluation().unwrap();
+
+        let channel = &mut Blake2sChannel::default();
+        let memory_lookup_elements = MemoryElements::draw(channel);
+
+        let (interaction_trace_eval, interaction_claim) =
+            interaction_trace_evaluation(&main_trace_eval, &memory_lookup_elements).unwrap();
+
+        let trace =
+            TreeVec::new(vec![preprocessed_trace_eval, main_trace_eval, interaction_trace_eval]);
+
+        let trace_polys = trace.map_cols(CircleEvaluation::interpolate);
+
+        let memory_eval = MemoryEval::new(&claim, memory_lookup_elements);
+
+        assert_constraints(
+            &trace_polys,
+            CanonicCoset::new(LOG_SIZE),
+            |eval| {
+                memory_eval.evaluate(eval);
+            },
+            (interaction_claim.claimed_sum, None),
+        );
+    }
+
+    #[test]
+    #[should_panic = "assertion `left == right` failed: row: 0
+  left: (1 + 0i) + (0 + 0i)u
+ right: (0 + 0i) + (0 + 0i)u"]
+    fn test_invalid_boundary_d() {
+        const LOG_SIZE: u32 = 4;
+
+        let is_first_col = gen_is_first(LOG_SIZE);
+        let preprocessed_trace_eval = vec![is_first_col];
+
+        let registers = vec![Default::default()];
+        let mut memory_table = MemoryTable::from(registers);
+        // We must manually modify the value of d as rows from `Vec<Registers>` are assumed real.
+        memory_table.table[0].d = BaseField::one();
+        let (main_trace_eval, claim) = memory_table.trace_evaluation().unwrap();
+
+        let channel = &mut Blake2sChannel::default();
+        let memory_lookup_elements = MemoryElements::draw(channel);
+
+        let (interaction_trace_eval, interaction_claim) =
+            interaction_trace_evaluation(&main_trace_eval, &memory_lookup_elements).unwrap();
+
+        let trace =
+            TreeVec::new(vec![preprocessed_trace_eval, main_trace_eval, interaction_trace_eval]);
+
+        let trace_polys = trace.map_cols(CircleEvaluation::interpolate);
+
+        let memory_eval = MemoryEval::new(&claim, memory_lookup_elements);
+
+        assert_constraints(
+            &trace_polys,
+            CanonicCoset::new(LOG_SIZE),
+            |eval| {
+                memory_eval.evaluate(eval);
+            },
+            (interaction_claim.claimed_sum, None),
+        );
+    }
+
+    #[test]
+    #[should_panic = "assertion `left == right` failed: row: 0
+  left: (2 + 0i) + (0 + 0i)u
+ right: (0 + 0i) + (0 + 0i)u"]
+    fn test_invalid_transition_mp_increase() {
+        const LOG_SIZE: u32 = 5;
+
+        let is_first_col = gen_is_first(LOG_SIZE);
+        let preprocessed_trace_eval = vec![is_first_col];
+
+        // `mp` should increase by 0 or 1, here it increases by 2.
+        let registers =
+            vec![Default::default(), Registers { mp: BaseField::from(2), ..Default::default() }];
+        let memory_table = MemoryTable::from(registers);
+        let (main_trace_eval, claim) = memory_table.trace_evaluation().unwrap();
+
+        let memory_lookup_elements = MemoryElements::dummy();
+
+        let (interaction_trace_eval, interaction_claim) =
+            interaction_trace_evaluation(&main_trace_eval, &memory_lookup_elements).unwrap();
+
+        let trace =
+            TreeVec::new(vec![preprocessed_trace_eval, main_trace_eval, interaction_trace_eval]);
+
+        let trace_polys = trace.map_cols(CircleEvaluation::interpolate);
+
+        let memory_eval = MemoryEval::new(&claim, memory_lookup_elements);
+
+        assert_constraints(
+            &trace_polys,
+            CanonicCoset::new(LOG_SIZE),
+            |eval| {
+                memory_eval.evaluate(eval);
+            },
+            (interaction_claim.claimed_sum, None),
+        );
+    }
+
+    #[test]
+    #[should_panic = "assertion `left == right` failed: row: 0
+  left: (1 + 0i) + (0 + 0i)u
+ right: (0 + 0i) + (0 + 0i)u"]
+    fn test_invalid_transition_clk_increase() {
+        const LOG_SIZE: u32 = 5;
+
+        let is_first_col = gen_is_first(LOG_SIZE);
+        let preprocessed_trace_eval = vec![is_first_col];
+
+        // `mp` remains the same, but `clk` is not increased by 1.
+        let registers = vec![Default::default(), Default::default()];
+        let memory_table = MemoryTable::from(registers);
+        let (main_trace_eval, claim) = memory_table.trace_evaluation().unwrap();
+
+        let channel = &mut Blake2sChannel::default();
+        let memory_lookup_elements = MemoryElements::draw(channel);
+
+        let (interaction_trace_eval, interaction_claim) =
+            interaction_trace_evaluation(&main_trace_eval, &memory_lookup_elements).unwrap();
+
+        let trace =
+            TreeVec::new(vec![preprocessed_trace_eval, main_trace_eval, interaction_trace_eval]);
+
+        let trace_polys = trace.map_cols(CircleEvaluation::interpolate);
+
+        let memory_eval = MemoryEval::new(&claim, memory_lookup_elements);
+
+        assert_constraints(
+            &trace_polys,
+            CanonicCoset::new(LOG_SIZE),
+            |eval| {
+                memory_eval.evaluate(eval);
+            },
+            (interaction_claim.claimed_sum, None),
+        );
+    }
+
+    #[test]
+    #[should_panic = "assertion `left == right` failed: row: 0
+  left: (1 + 0i) + (0 + 0i)u
+ right: (0 + 0i) + (0 + 0i)u"]
+    fn test_invalid_transition_mp_increase_next_mv() {
+        const LOG_SIZE: u32 = 5;
+
+        let is_first_col = gen_is_first(LOG_SIZE);
+        let preprocessed_trace_eval = vec![is_first_col];
+
+        // `mp` increases by 1, but `next_mv` is not 0.
+        let registers = vec![
+            Default::default(),
+            Registers { mp: BaseField::one(), mv: BaseField::one(), ..Default::default() },
+        ];
+        let memory_table = MemoryTable::from(registers);
+        let (main_trace_eval, claim) = memory_table.trace_evaluation().unwrap();
+
+        let channel = &mut Blake2sChannel::default();
+        let memory_lookup_elements = MemoryElements::draw(channel);
+
+        let (interaction_trace_eval, interaction_claim) =
+            interaction_trace_evaluation(&main_trace_eval, &memory_lookup_elements).unwrap();
+
+        let trace =
+            TreeVec::new(vec![preprocessed_trace_eval, main_trace_eval, interaction_trace_eval]);
+
+        let trace_polys = trace.map_cols(CircleEvaluation::interpolate);
+
+        let memory_eval = MemoryEval::new(&claim, memory_lookup_elements);
+
+        assert_constraints(
+            &trace_polys,
+            CanonicCoset::new(LOG_SIZE),
+            |eval| {
+                memory_eval.evaluate(eval);
+            },
+            (interaction_claim.claimed_sum, None),
+        );
+    }
+
+    #[test]
+    #[should_panic = "assertion `left == right` failed: row: 0
+  left: (2 + 0i) + (0 + 0i)u
+ right: (0 + 0i) + (0 + 0i)u"]
+    fn test_invalid_transition_next_dummy() {
+        const LOG_SIZE: u32 = 5;
+
+        let is_first_col = gen_is_first(LOG_SIZE);
+        let preprocessed_trace_eval = vec![is_first_col];
+
+        // The next dummy register flag `next_d` is set to 2.
+        let registers =
+            vec![Default::default(), Registers { mp: BaseField::one(), ..Default::default() }];
+        let mut memory_table = MemoryTable::from(registers);
+        memory_table.table[0].next_d = BaseField::from(2);
+        let (main_trace_eval, claim) = memory_table.trace_evaluation().unwrap();
+
+        let channel = &mut Blake2sChannel::default();
+        let memory_lookup_elements = MemoryElements::draw(channel);
+
+        let (interaction_trace_eval, interaction_claim) =
+            interaction_trace_evaluation(&main_trace_eval, &memory_lookup_elements).unwrap();
+
+        let trace =
+            TreeVec::new(vec![preprocessed_trace_eval, main_trace_eval, interaction_trace_eval]);
+
+        let trace_polys = trace.map_cols(CircleEvaluation::interpolate);
+
+        let memory_eval = MemoryEval::new(&claim, memory_lookup_elements);
+
+        assert_constraints(
+            &trace_polys,
+            CanonicCoset::new(LOG_SIZE),
+            |eval| {
+                memory_eval.evaluate(eval);
+            },
+            (interaction_claim.claimed_sum, None),
+        );
+    }
+
+    #[test]
+    #[should_panic = "assertion `left == right` failed: row: 1
+  left: (1 + 0i) + (0 + 0i)u
+ right: (0 + 0i) + (0 + 0i)u"]
+    fn test_invalid_transition_d_mp() {
+        const LOG_SIZE: u32 = 5;
+
+        let is_first_col = gen_is_first(LOG_SIZE);
+        let is_first_col_2 = gen_is_first(LOG_SIZE);
+        let preprocessed_trace_eval = vec![is_first_col, is_first_col_2];
+
+        // We create a table with 2 real entries
+        // The second row will be padded,
+        // We set first entry of the second row as a dummy one (`d` = 1)
+        // And we modify the second entry of the second row to have `next_mp` different from `mp`
+        let registers =
+            vec![Default::default(), Registers { mp: BaseField::one(), ..Default::default() }];
+        let mut memory_table = MemoryTable::from(registers);
+        memory_table.table[1].d = BaseField::one();
+        memory_table.table[1].next_mp = BaseField::from(2);
+        let (main_trace_eval, claim) = memory_table.trace_evaluation().unwrap();
+
+        let channel = &mut Blake2sChannel::default();
+        let memory_lookup_elements = MemoryElements::draw(channel);
+
+        let (interaction_trace_eval, interaction_claim) =
+            interaction_trace_evaluation(&main_trace_eval, &memory_lookup_elements).unwrap();
+
+        let trace =
+            TreeVec::new(vec![preprocessed_trace_eval, main_trace_eval, interaction_trace_eval]);
+
+        let trace_polys = trace.map_cols(CircleEvaluation::interpolate);
+
+        let memory_eval = MemoryEval::new(&claim, memory_lookup_elements);
+
+        assert_constraints(
+            &trace_polys,
+            CanonicCoset::new(LOG_SIZE),
+            |eval| {
+                memory_eval.evaluate(eval);
+            },
+            (interaction_claim.claimed_sum, None),
+        );
+    }
+
+    #[test]
+    #[should_panic = "assertion `left == right` failed: row: 1
+  left: (1 + 0i) + (0 + 0i)u
+ right: (0 + 0i) + (0 + 0i)u"]
+    fn test_invalid_transition_d_mv() {
+        const LOG_SIZE: u32 = 5;
+
+        let is_first_col = gen_is_first(LOG_SIZE);
+        let is_first_col_2 = gen_is_first(LOG_SIZE);
+        let preprocessed_trace_eval = vec![is_first_col, is_first_col_2];
+
+        // We create a table with 2 real entries
+        // The second row will be padded,
+        // We set first entry of the second row as a dummy one (`d` = 1)
+        // And we modify the second entry of the second row to have `next_mv` different from `mv`
+        let registers =
+            vec![Default::default(), Registers { mp: BaseField::one(), ..Default::default() }];
+        let mut memory_table = MemoryTable::from(registers);
+        memory_table.table[1].d = BaseField::one();
+        memory_table.table[1].next_mv = BaseField::one();
+        let (main_trace_eval, claim) = memory_table.trace_evaluation().unwrap();
+
+        let channel = &mut Blake2sChannel::default();
+        let memory_lookup_elements = MemoryElements::draw(channel);
+
+        let (interaction_trace_eval, interaction_claim) =
+            interaction_trace_evaluation(&main_trace_eval, &memory_lookup_elements).unwrap();
+
+        let trace =
+            TreeVec::new(vec![preprocessed_trace_eval, main_trace_eval, interaction_trace_eval]);
+
+        let trace_polys = trace.map_cols(CircleEvaluation::interpolate);
+
+        let memory_eval = MemoryEval::new(&claim, memory_lookup_elements);
+
         assert_constraints(
             &trace_polys,
             CanonicCoset::new(LOG_SIZE),
