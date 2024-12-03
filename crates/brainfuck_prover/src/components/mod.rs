@@ -5,7 +5,7 @@ use processor::table::ProcessorColumn;
 use stwo_prover::core::{
     backend::simd::SimdBackend,
     channel::Channel,
-    fields::m31::BaseField,
+    fields::{m31::BaseField, secure_column::SECURE_EXTENSION_DEGREE},
     pcs::TreeVec,
     poly::{circle::CircleEvaluation, BitReversedOrder},
     ColumnVec,
@@ -75,7 +75,7 @@ impl<T: TraceColumn> Claim<T> {
         // TODO: Add the preprocessed and interaction trace correct sizes
         let preprocessed_trace_log_sizes: Vec<u32> = vec![self.log_size];
         let trace_log_sizes = vec![self.log_size; T::count()];
-        let interaction_trace_log_sizes: Vec<u32> = vec![];
+        let interaction_trace_log_sizes: Vec<u32> = vec![self.log_size; SECURE_EXTENSION_DEGREE];
         TreeVec::new(vec![
             preprocessed_trace_log_sizes,
             trace_log_sizes,
