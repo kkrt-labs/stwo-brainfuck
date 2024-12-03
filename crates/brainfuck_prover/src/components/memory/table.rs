@@ -25,7 +25,7 @@ use stwo_prover::{
 /// from the execution trace provided by the Brainfuck Virtual Machine,
 /// then sorting by `mp` as a primary key and by `clk` as a secondary key.
 ///
-/// To enforce the sorting on clk, all clk jumped are erased by adding dummy rows.
+/// To enforce the sorting on `clk`, all `clk` jumped are erased by adding dummy rows.
 /// A dummy column flags them.
 ///
 /// To ease constraints evaluation, each row of the Memory component
@@ -166,7 +166,7 @@ pub struct MemoryTableRow {
     next_clk: BaseField,
     /// Next Memory pointer.
     next_mp: BaseField,
-    /// Memory value.
+    /// Next Memory value.
     next_mv: BaseField,
     /// Next Dummy.
     next_d: BaseField,
@@ -197,7 +197,7 @@ impl MemoryTableRow {
 /// It allows extracting the required fields from the execution trace provided by the Brainfuck
 /// Virtual Machine, then sorting by `mp` as a primary key and by `clk` as a secondary key.
 ///
-/// To enforce the sorting on clk, all clk jumped are erased by adding dummy entries.
+/// To enforce the sorting on `clk`, all `clk` jumped are erased by adding dummy entries.
 /// A dummy column flags these entries.
 ///
 /// To be used by [`MemoryTable`].
@@ -560,9 +560,9 @@ mod tests {
 
     #[test]
     fn test_memory_row_new() {
-        let entry_1: MemoryTableEntry =
+        let entry_1 =
             MemoryTableEntry::new(BaseField::zero(), BaseField::from(43), BaseField::from(91));
-        let entry_2: MemoryTableEntry =
+        let entry_2 =
             MemoryTableEntry::new_dummy(BaseField::one(), BaseField::from(3), BaseField::from(9));
 
         let row = MemoryTableRow::new(&entry_1, &entry_2);
@@ -725,7 +725,7 @@ mod tests {
             mv: BaseField::one(),
             ..Default::default()
         };
-        let registers: Vec<Registers> = vec![reg_3, reg_1, reg_2];
+        let registers = vec![reg_3, reg_1, reg_2];
 
         let entry_1 = MemoryTableEntry::default();
         let entry_2 = MemoryTableEntry::new(BaseField::one(), BaseField::one(), BaseField::zero());
