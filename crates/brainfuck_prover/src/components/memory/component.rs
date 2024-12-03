@@ -46,14 +46,12 @@ impl FrameworkEval for MemoryEval {
 
     /// Defines the AIR for the Memory component
     ///
-    /// Registers values from the current row (and potentially neighbors) are obtained through
-    /// masks: When you apply a mask, you target the current column and then pass to the next
+    /// Registers values from the current row are obtained through masks.
+    /// When you apply a mask, you target the current column and then pass to the next
     /// one: the register order matters to correctly fetch them.
-    /// All required registers from a same column must be fetched in one call:
+    ///
     /// - Use `eval.next_trace_mask()` to get the current register from the main trace
     ///   (`ORIGINAL_TRACE_IDX`)
-    /// - Use `eval.next_interaction_mask(interaction: usize, offsets: [isize; N])` to get multiple
-    ///   values from one register (e.g. the current one and the next one).
     ///
     /// Use `eval.add_constraint` to define a local constraint (boundary, transition).
     /// Use `eval.add_to_relation` to define a global constraint for the logUp protocol.
