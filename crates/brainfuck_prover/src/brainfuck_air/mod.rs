@@ -9,8 +9,8 @@ use crate::components::{
 use brainfuck_vm::machine::Machine;
 use stwo_prover::{
     constraint_framework::{
-        preprocessed_columns::PreprocessedColumn, TraceLocationAllocator, INTERACTION_TRACE_IDX,
-        ORIGINAL_TRACE_IDX, PREPROCESSED_TRACE_IDX,
+        preprocessed_columns::{gen_is_first, PreprocessedColumn},
+        TraceLocationAllocator, INTERACTION_TRACE_IDX, ORIGINAL_TRACE_IDX, PREPROCESSED_TRACE_IDX,
     },
     core::{
         air::{Component, ComponentProver},
@@ -49,7 +49,13 @@ impl BrainfuckClaim {
     }
 
     pub fn log_sizes(&self) -> TreeVec<Vec<u32>> {
-        self.memory.log_sizes()
+        let mut log_sizes = self.memory.log_sizes();
+
+        // We overwrite the preprocessed column claim to have all log sizes
+        // in the merkle root for the verification.
+        log_sizes[PREPROCESSED_TRACE_IDX] = IS_FIRST_LOG_SIZES.to_vec();
+
+        log_sizes
     }
 }
 
@@ -105,10 +111,13 @@ impl BrainfuckComponents {
         interaction_elements: &BrainfuckInteractionElements,
         interaction_claim: &BrainfuckInteractionClaim,
     ) -> Self {
-        let memory_is_first_column = PreprocessedColumn::IsFirst(claim.memory.log_size);
-
-        let tree_span_provider =
-            &mut TraceLocationAllocator::new_with_preproccessed_columnds(&[memory_is_first_column]);
+        let tree_span_provider = &mut TraceLocationAllocator::new_with_preproccessed_columnds(
+            &IS_FIRST_LOG_SIZES
+                .iter()
+                .copied()
+                .map(PreprocessedColumn::IsFirst)
+                .collect::<Vec<_>>(),
+        );
 
         let memory = MemoryComponent::new(
             tree_span_provider,
@@ -134,6 +143,22 @@ impl BrainfuckComponents {
 ///
 /// Means that the ZK-VM does not accept programs with more than 2^20 steps (1M steps).
 const LOG_MAX_ROWS: u32 = 20;
+
+/// Log sizes of the preprocessed columns
+/// used for enforcing boundary constraints.
+///
+/// Preprocessed columns are generated ahead of time,
+/// so at this moment we don't know the log size
+/// of the main and interaction traces.
+///
+/// Therefore, we generate all log sizes that we
+/// want to support, so that the verifier can be
+/// provided a merkle root it can trust, for a claim
+/// of any dynamic size.
+///
+/// Ideally, we should cover all possible log sizes, between
+/// 1 and `LOG_MAX_ROW`
+const IS_FIRST_LOG_SIZES: [u32; 4] = [10, 9, 8, 5];
 
 /// Generate a STARK proof of the given Brainfuck program execution.
 ///
@@ -161,8 +186,12 @@ pub fn prove_brainfuck(
     // │   Interaction Phase 0 - Preprocessed Trace    │
     // └───────────────────────────────────────────────┘
 
-    // Generate constant columns (e.g. is_first)
-    let tree_builder = commitment_scheme.tree_builder();
+    // Generate all preprocessed columns
+    let mut tree_builder = commitment_scheme.tree_builder();
+
+    tree_builder.extend_evals(IS_FIRST_LOG_SIZES.iter().copied().map(gen_is_first::<SimdBackend>));
+
+    // Commit the preprocessed trace
     tree_builder.commit(channel);
 
     // ┌───────────────────────────────────────┐
@@ -194,7 +223,8 @@ pub fn prove_brainfuck(
     let mut tree_builder = commitment_scheme.tree_builder();
 
     let (memory_interaction_trace_eval, memory_interaction_claim) =
-        interaction_trace_evaluation(&memory_trace, &interaction_elements.memory_lookup_elements);
+        interaction_trace_evaluation(&memory_trace, &interaction_elements.memory_lookup_elements)
+            .unwrap();
 
     tree_builder.extend_evals(memory_interaction_trace_eval);
 
