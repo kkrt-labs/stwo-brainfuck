@@ -187,7 +187,7 @@ mod tests {
 
         // Generate interaction trace
         let (interaction_trace, interaction_claim) =
-            interaction_trace_evaluation(&main_trace, &memory_lookup_elements);
+            interaction_trace_evaluation(&main_trace, &memory_lookup_elements).unwrap();
 
         // Create the trace evaluation TreeVec
         let trace = TreeVec::new(vec![preprocessed_trace, main_trace, interaction_trace]);
