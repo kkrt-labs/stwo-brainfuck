@@ -181,6 +181,13 @@ pub enum ProcessorColumn {
     Mp,
     Mv,
     Mvi,
+    NextClk,
+    NextIp,
+    NextCi,
+    NextNi,
+    NextMp,
+    NextMv,
+    NextMvi,
 }
 
 impl ProcessorColumn {
@@ -194,13 +201,20 @@ impl ProcessorColumn {
             Self::Mp => 4,
             Self::Mv => 5,
             Self::Mvi => 6,
+            Self::NextClk => 7,
+            Self::NextIp => 8,
+            Self::NextCi => 9,
+            Self::NextNi => 10,
+            Self::NextMp => 11,
+            Self::NextMv => 12,
+            Self::NextMvi => 13,
         }
     }
 }
 
 impl TraceColumn for ProcessorColumn {
     fn count() -> usize {
-        7
+        14
     }
 }
 
