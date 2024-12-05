@@ -357,17 +357,17 @@ mod tests {
     use num_traits::{One, Zero};
 
     #[test]
-    fn test_instruction_table_new() {
-        let instruction_table = InstructionIntermediateTable::new();
+    fn test_instruction_intermediate_table_new() {
+        let instruction_intermediate_table = InstructionIntermediateTable::new();
         assert!(
-            instruction_table.table.is_empty(),
+            instruction_intermediate_table.table.is_empty(),
             "Instruction table should be empty upon initialization."
         );
     }
 
     #[test]
-    fn test_add_row() {
-        let mut instruction_table = InstructionIntermediateTable::new();
+    fn test_add_entry() {
+        let mut instruction_intermediate_table = InstructionIntermediateTable::new();
         // Create a entry to add to the table
         let entry = InstructionTableEntry {
             ip: BaseField::zero(),
@@ -375,10 +375,10 @@ mod tests {
             ni: BaseField::from(91),
         };
         // Add the entry to the table
-        instruction_table.add_entry(entry.clone());
+        instruction_intermediate_table.add_entry(entry.clone());
         // Check that the table contains the added entry
         assert_eq!(
-            instruction_table.table,
+            instruction_intermediate_table.table,
             vec![entry],
             "Added entry should match the expected entry."
         );
@@ -386,7 +386,7 @@ mod tests {
 
     #[test]
     fn test_add_multiple_entries() {
-        let mut instruction_table = InstructionIntermediateTable::new();
+        let mut instruction_intermediate_table = InstructionIntermediateTable::new();
         // Create a vector of entries to add to the table
         let entries = vec![
             InstructionTableEntry {
@@ -406,9 +406,9 @@ mod tests {
             },
         ];
         // Add the entries to the table
-        instruction_table.add_entries(entries.clone());
+        instruction_intermediate_table.add_entries(entries.clone());
         // Check that the table contains the added entries
-        assert_eq!(instruction_table, InstructionIntermediateTable { table: entries });
+        assert_eq!(instruction_intermediate_table, InstructionIntermediateTable { table: entries });
     }
 
     #[test]
@@ -417,15 +417,15 @@ mod tests {
         let registers = vec![];
 
         // Convert to InstructionIntermediateTable and ensure sorting
-        let instruction_table =
+        let instruction_intermediate_table =
             InstructionIntermediateTable::from((registers, &Default::default()));
 
         // Check that the table is empty
-        assert!(instruction_table.table.is_empty());
+        assert!(instruction_intermediate_table.table.is_empty());
     }
 
     #[test]
-    fn test_instruction_table_from_registers_example_program() {
+    fn test_instruction_intermediate_table_from_registers_example_program() {
         // Create a small program and compile it
         let code = "+>,<[>+.<-]";
         let mut compiler = Compiler::new(code);
@@ -438,7 +438,8 @@ mod tests {
         let trace = machine.trace();
 
         // Convert the trace to an `InstructionIntermediateTable`
-        let instruction_table: InstructionIntermediateTable = (trace, machine.program()).into();
+        let instruction_intermediate_table: InstructionIntermediateTable =
+            (trace, machine.program()).into();
 
         // Create the expected `InstructionIntermediateTable`
         let ins_0 = InstructionTableEntry {
@@ -509,7 +510,7 @@ mod tests {
             10
         ];
 
-        let mut expected_instruction_table = InstructionIntermediateTable {
+        let mut expected_instruction_intermediate_table = InstructionIntermediateTable {
             table: vec![
                 ins_0.clone(),
                 ins_0,
@@ -536,10 +537,10 @@ mod tests {
             ],
         };
 
-        expected_instruction_table.add_entries(padded_entries);
+        expected_instruction_intermediate_table.add_entries(padded_entries);
 
         // Verify that the instruction table is correct
-        assert_eq!(instruction_table, expected_instruction_table);
+        assert_eq!(instruction_intermediate_table, expected_instruction_intermediate_table);
     }
 
     #[test]
@@ -557,7 +558,8 @@ mod tests {
         let trace = machine.trace();
 
         // Convert the trace to an `InstructionIntermediateTable`
-        let instruction_table: InstructionIntermediateTable = (trace, machine.program()).into();
+        let instruction_intermediate_table: InstructionIntermediateTable =
+            (trace, machine.program()).into();
 
         let ins_0 = InstructionTableEntry {
             ip: BaseField::zero(),
@@ -585,13 +587,13 @@ mod tests {
             };
             4
         ];
-        let mut expected_instruction_table =
+        let mut expected_instruction_intermediate_table =
             InstructionIntermediateTable { table: vec![ins_0.clone(), ins_0, ins_2, ins_3] };
 
-        expected_instruction_table.add_entries(padded_entries);
+        expected_instruction_intermediate_table.add_entries(padded_entries);
 
-        // Verify that the instruction table is correct
-        assert_eq!(instruction_table, expected_instruction_table);
+        // Verify that the instruction intermediate table is correct
+        assert_eq!(instruction_intermediate_table, expected_instruction_intermediate_table);
     }
 
     #[test]
