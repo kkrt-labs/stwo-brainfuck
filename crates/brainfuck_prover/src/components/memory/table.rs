@@ -87,7 +87,7 @@ impl MemoryTable {
         }
         let log_n_rows = n_rows.ilog2();
         let log_size = log_n_rows + LOG_N_LANES;
-        let mut trace = vec![BaseColumn::zeros(1 << log_size); MemoryColumn::count()];
+        let mut trace = vec![BaseColumn::zeros(1 << log_size); MemoryColumn::count().0];
 
         for (vec_row, row) in self.table.iter().enumerate().take(1 << log_n_rows) {
             trace[MemoryColumn::Clk.index()].data[vec_row] = row.clk.into();
@@ -396,16 +396,11 @@ impl MemoryColumn {
             Self::NextD => 7,
         }
     }
-
-    /// Returns the total number of columns in the Memory table
-    pub const fn column_count() -> usize {
-        8
-    }
 }
 
 impl TraceColumn for MemoryColumn {
-    fn count() -> usize {
-        Self::column_count()
+    fn count() -> (usize, usize) {
+        (8, 1)
     }
 }
 

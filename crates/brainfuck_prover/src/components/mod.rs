@@ -72,10 +72,11 @@ impl<T: TraceColumn> Claim<T> {
     ///
     /// NOTE: Currently only the main trace is provided.
     pub fn log_sizes(&self) -> TreeVec<Vec<u32>> {
-        // TODO: Add the preprocessed and interaction trace correct sizes
+        let (main_trace_cols, interaction_trace_cols) = T::count();
         let preprocessed_trace_log_sizes: Vec<u32> = vec![self.log_size];
-        let trace_log_sizes = vec![self.log_size; T::count()];
-        let interaction_trace_log_sizes: Vec<u32> = vec![self.log_size; SECURE_EXTENSION_DEGREE];
+        let trace_log_sizes = vec![self.log_size; main_trace_cols];
+        let interaction_trace_log_sizes: Vec<u32> =
+            vec![self.log_size; SECURE_EXTENSION_DEGREE * interaction_trace_cols];
         TreeVec::new(vec![
             preprocessed_trace_log_sizes,
             trace_log_sizes,
@@ -93,5 +94,8 @@ impl<T: TraceColumn> Claim<T> {
 /// Represents columns of a trace.
 pub trait TraceColumn {
     /// Returns the number of columns associated with the specific trace type.
-    fn count() -> usize;
+    ///
+    /// Main trace columns: first element of the tuple
+    /// Interaction trace columns: second element of the tuple
+    fn count() -> (usize, usize);
 }

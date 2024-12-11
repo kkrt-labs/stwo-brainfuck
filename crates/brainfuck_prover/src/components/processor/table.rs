@@ -76,7 +76,7 @@ impl ProcessorTable {
         let log_size = log_n_rows + LOG_N_LANES;
 
         // Initialize trace columns
-        let mut trace = vec![BaseColumn::zeros(1 << log_size); ProcessorColumn::count()];
+        let mut trace = vec![BaseColumn::zeros(1 << log_size); ProcessorColumn::count().0];
 
         // Fill columns with table data
         for (index, row) in self.table.iter().enumerate().take(1 << log_n_rows) {
@@ -366,8 +366,8 @@ impl ProcessorColumn {
 }
 
 impl TraceColumn for ProcessorColumn {
-    fn count() -> usize {
-        14
+    fn count() -> (usize, usize) {
+        (14, 4)
     }
 }
 
@@ -762,7 +762,7 @@ mod tests {
         assert_eq!(claim.log_size, LOG_N_LANES, "Log size should include SIMD lanes.");
         assert_eq!(
             trace.len(),
-            ProcessorColumn::count(),
+            ProcessorColumn::count().0,
             "Trace should contain one column per register."
         );
 
