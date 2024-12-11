@@ -1,10 +1,16 @@
-use crate::components::{IoClaim, TraceColumn, TraceEval};
+use crate::components::{
+    memory::component::InteractionClaim, IoClaim, TraceColumn, TraceError, TraceEval,
+};
 use brainfuck_vm::{instruction::InstructionType, registers::Registers};
+use num_traits::One;
 use stwo_prover::{
-    constraint_framework::{logup::LookupElements, Relation, RelationEFTraitBound},
+    constraint_framework::{
+        logup::{LogupTraceGenerator, LookupElements},
+        Relation, RelationEFTraitBound,
+    },
     core::{
         backend::{
-            simd::{column::BaseColumn, m31::LOG_N_LANES},
+            simd::{column::BaseColumn, m31::LOG_N_LANES, qm31::PackedSecureField},
             Column,
         },
         channel::Channel,
@@ -246,6 +252,46 @@ impl<F: Clone, EF: RelationEFTraitBound<F>> Relation<F, EF> for IoElements {
     fn get_size(&self) -> usize {
         IO_LOOKUP_ELEMENTS
     }
+}
+
+/// Creates the interaction trace from the main trace evaluation
+/// and the interaction elements for the I/O components.
+///
+/// The Processor component uses the other components:
+/// The Processor component multiplicities are then positive,
+/// and the I/O components' multiplicities are negative
+/// in the logUp protocol.
+///
+/// # Returns
+/// - Interaction trace evaluation, to be committed.
+/// - Interaction claim: the total sum from the logUp protocol,
+/// to be mixed into the Fiat-Shamir [`Channel`].
+#[allow(clippy::similar_names)]
+pub fn interaction_trace_evaluation(
+    main_trace_eval: &TraceEval,
+    lookup_elements: &IoElements,
+) -> Result<(TraceEval, InteractionClaim), TraceError> {
+    // If the main trace of the I/O components is empty, then we claimed that it's log size is zero.
+    let log_size =
+        if main_trace_eval.is_empty() { 0 } else { main_trace_eval[0].domain.log_size() };
+
+    let mut logup_gen = LogupTraceGenerator::new(log_size);
+    let mut col_gen = logup_gen.new_col();
+
+    let mv_col = &main_trace_eval[IoColumn::Io.index()].data;
+    for (vec_row, mv) in mv_col.iter().enumerate().take(1 << (log_size - LOG_N_LANES)) {
+        // We want to prove that the I/O table is a sublist (ordered set inclusion) of the Processor
+        // table. Therefore we set the index of the row into the numerator of the fraction.
+        let num = -PackedSecureField::one() * PackedSecureField::broadcast(vec_row.into());
+        let denom: PackedSecureField = lookup_elements.combine(&[*mv]);
+        col_gen.write_frac(vec_row, num, denom);
+    }
+
+    col_gen.finalize_col();
+
+    let (trace, claimed_sum) = logup_gen.finalize_last();
+
+    Ok((trace, InteractionClaim { claimed_sum }))
 }
 
 #[cfg(test)]
