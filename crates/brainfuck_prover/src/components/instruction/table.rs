@@ -12,54 +12,19 @@ use stwo_prover::core::{
     poly::circle::{CanonicCoset, CircleEvaluation},
 };
 
-/// Represents a single row in the Instruction Table.
+/// Represents the Instruction Table, which holds the required registers
+/// for the Instruction component.
 ///
-/// The Instruction Table stores:
-/// - The instruction pointer (`ip`),
-/// - The current instruction (`ci`),
-/// - The next instruction (`ni`).
-#[derive(Debug, Default, PartialEq, Eq, Clone)]
-pub struct InstructionTableRow {
-    /// Instruction pointer: points to the current instruction in the program.
-    ip: BaseField,
-    /// Current instruction: the instruction at the current instruction pointer.
-    ci: BaseField,
-    /// Next instruction:
-    /// - The instruction that follows `ci` in the program,
-    /// - 0 if out of bounds.
-    ni: BaseField,
-}
-
-impl InstructionTableRow {
-    /// Get the instruction pointer.
-    pub const fn ip(&self) -> BaseField {
-        self.ip
-    }
-
-    /// Get the current instruction.
-    pub const fn ci(&self) -> BaseField {
-        self.ci
-    }
-
-    /// Get the next instruction.
-    pub const fn ni(&self) -> BaseField {
-        self.ni
-    }
-}
-
-impl From<&Registers> for InstructionTableRow {
-    fn from(registers: &Registers) -> Self {
-        Self { ip: registers.ip, ci: registers.ci, ni: registers.ni }
-    }
-}
-
-/// Represents the Instruction Table, which holds the instruction sequence
-/// for the Brainfuck virtual machine.
+/// To ease constraints evaluation, each row of the Instruction component
+/// contains the current row and the next row in natural order.
+/// This is done to avoid having to do costly bit-reversals, as constraints
+/// are evaluated on the evaluation of the trace which is ordered in
+/// a bit-reversed manner over the circle domain once the polynomials are interpolated.
 ///
-/// The Instruction Table is constructed by concatenating the program's list of
-/// instructions with the execution trace, and then sorting by instruction
-/// pointer and cycle. It is used to verify that the program being executed
-/// matches the correct instruction sequence.
+/// The preliminary work to extract the fields from the execution trace,
+/// the sorting and the padding is done through the [`InstructionIntermediateTable`] struct.
+///
+/// Once done, we can build the Instruction table from it, by pairing the consecutive entries.
 #[derive(Debug, Default, PartialEq, Eq, Clone)]
 pub struct InstructionTable {
     /// A vector of [`InstructionTableRow`] representing the table rows.
@@ -71,8 +36,8 @@ impl InstructionTable {
     ///
     /// # Returns
     /// A new instance of [`InstructionTable`] with an empty table.
-    pub const fn new() -> Self {
-        Self { table: Vec::new() }
+    pub fn new() -> Self {
+        Self::default()
     }
 
     /// Adds a new row to the Instruction Table.
@@ -85,42 +50,11 @@ impl InstructionTable {
         self.table.push(row);
     }
 
-    /// Adds multiple rows to the Instruction Table.
-    ///
-    /// # Arguments
-    /// * `rows` - A vector of [`InstructionTableRow`] to add to the table.
-    ///
-    /// This method extends the `table` vector with the provided rows.
-    fn add_rows(&mut self, rows: Vec<InstructionTableRow>) {
-        self.table.extend(rows);
-    }
-
-    /// Pads the instruction table with dummy rows up to the next power of two length.
-    ///
-    /// Each dummy row preserves the last instruction pointer
-    /// with current and next instructions `ci` and `ni` set to zero.
-    ///
-    /// Does nothing if the table is empty.
-    fn pad(&mut self) {
-        if let Some(last_row) = self.table.last().cloned() {
-            let trace_len = self.table.len();
-            let padding_offset = (trace_len.next_power_of_two() - trace_len) as u32;
-            for _ in 1..=padding_offset {
-                self.add_row(InstructionTableRow { ip: last_row.ip, ..Default::default() });
-            }
-        }
-    }
-
-    /// Get the instruction table.
-    pub const fn table(&self) -> &Vec<InstructionTableRow> {
-        &self.table
-    }
-
-    /// Transforms the [`InstructionTable`] into a [`TraceEval`], to be committed when
+    /// Transforms the [`InstructionIntermediateTable`] into a [`TraceEval`], to be committed when
     /// generating a STARK proof.
     ///
-    /// The [`InstructionTable`] is transformed from an array of rows (one element = one step
-    /// of all registers) to an array of columns (one element = all steps of one register).
+    /// The [`InstructionIntermediateTable`] is transformed from an array of rows (one element = one
+    /// step of all registers) to an array of columns (one element = all steps of one register).
     /// It is then evaluated on the circle domain.
     ///
     /// # Returns
@@ -155,9 +89,12 @@ impl InstructionTable {
         // - Map the `ci` value to the second column.
         // - Map the `ni` value to the third column.
         for (index, row) in self.table.iter().enumerate().take(1 << log_n_rows) {
-            trace[InstructionColumn::Ip.index()].data[index] = row.ip().into();
-            trace[InstructionColumn::Ci.index()].data[index] = row.ci().into();
-            trace[InstructionColumn::Ni.index()].data[index] = row.ni().into();
+            trace[InstructionColumn::Ip.index()].data[index] = row.ip.into();
+            trace[InstructionColumn::Ci.index()].data[index] = row.ci.into();
+            trace[InstructionColumn::Ni.index()].data[index] = row.ni.into();
+            trace[InstructionColumn::NextIp.index()].data[index] = row.next_ip.into();
+            trace[InstructionColumn::NextCi.index()].data[index] = row.next_ci.into();
+            trace[InstructionColumn::NextNi.index()].data[index] = row.next_ni.into();
         }
 
         // Create a circle domain using a canonical coset.
@@ -176,6 +113,140 @@ impl InstructionTable {
 }
 
 impl From<(Vec<Registers>, &ProgramMemory)> for InstructionTable {
+    fn from((registers, program): (Vec<Registers>, &ProgramMemory)) -> Self {
+        InstructionIntermediateTable::from((registers, program)).into()
+    }
+}
+
+// Separated from `Vec<Registers> for InstructionTable` to facilitate tests.
+// It is assumed that [`InstructionIntermediateTable`] is sorted and padded to the next power of
+// two.
+impl From<InstructionIntermediateTable> for InstructionTable {
+    fn from(mut intermediate_table: InstructionIntermediateTable) -> Self {
+        let mut instruction_table = Self::new();
+
+        if intermediate_table.table.is_empty() {
+            return instruction_table;
+        }
+
+        let last_entry = intermediate_table.table.last().unwrap();
+        let next_dummy_entry = InstructionTableEntry { ip: last_entry.ip, ..Default::default() };
+
+        intermediate_table.add_entry(next_dummy_entry);
+
+        for window in intermediate_table.table.windows(2) {
+            match window {
+                [entry_1, entry_2] => {
+                    let row = InstructionTableRow::new(entry_1, entry_2);
+                    instruction_table.add_row(row);
+                }
+                _ => panic!("Empty window"),
+            }
+        }
+        instruction_table
+    }
+}
+
+/// Represents a single row of the [`InstructionTable`]
+///
+/// Two consecutive [`InstructionTableEntry`] flattened.
+///
+/// To avoid bit-reversals when evaluating transition constraints,
+/// the two consecutives rows on which transition constraints are evaluated
+/// are flattened into a single row.
+#[derive(Debug, Default, PartialEq, Eq, Clone)]
+pub struct InstructionTableRow {
+    /// Instruction pointer: points to the current instruction in the program.
+    ip: BaseField,
+    /// Current instruction: the instruction at the current instruction pointer.
+    ci: BaseField,
+    /// Next instruction
+    ni: BaseField,
+    /// Next Instruction pointer
+    next_ip: BaseField,
+    /// Next Current instruction
+    next_ci: BaseField,
+    /// Next Next instruction
+    next_ni: BaseField,
+}
+
+impl InstructionTableRow {
+    /// Creates a row for the [`InstructionIntermediateTable`] which is considered 'real'.
+    ///
+    /// A 'real' row, is a row that is part of the execution trace from the Brainfuck program
+    /// execution.
+    pub const fn new(entry_1: &InstructionTableEntry, entry_2: &InstructionTableEntry) -> Self {
+        Self {
+            ip: entry_1.ip,
+            ci: entry_1.ci,
+            ni: entry_1.ni,
+            next_ip: entry_1.ip,
+            next_ci: entry_2.ci,
+            next_ni: entry_2.ni,
+        }
+    }
+}
+
+/// Represents the Instruction Table, which holds the instruction sequence
+/// for the Brainfuck virtual machine.
+///
+/// The Instruction Table is constructed by concatenating the program's list of
+/// instructions with the execution trace, and then sorting by instruction
+/// pointer and cycle. It is used to verify that the program being executed
+/// matches the correct instruction sequence.
+#[derive(Debug, Default, PartialEq, Eq, Clone)]
+pub struct InstructionIntermediateTable {
+    /// A vector of [`InstructionTableEntry`] representing the table entries.
+    table: Vec<InstructionTableEntry>,
+}
+
+impl InstructionIntermediateTable {
+    /// Creates a new, empty [`InstructionIntermediateTable`].
+    ///
+    /// # Returns
+    /// A new instance of [`InstructionIntermediateTable`] with an empty table.
+    const fn new() -> Self {
+        Self { table: Vec::new() }
+    }
+
+    /// Adds a new entry to the Instruction Table.
+    ///
+    /// # Arguments
+    /// * `entry` - The [`InstructionTableEntry`] to add to the table.
+    ///
+    /// This method pushes a new [`InstructionTableEntry`] onto the `table` vector.
+    fn add_entry(&mut self, entry: InstructionTableEntry) {
+        self.table.push(entry);
+    }
+
+    /// Adds multiple entries to the Instruction Table.
+    ///
+    /// # Arguments
+    /// * `entries` - A vector of [`InstructionTableEntry`] to add to the table.
+    ///
+    /// This method extends the `table` vector with the provided entries.
+    fn add_entries(&mut self, entries: Vec<InstructionTableEntry>) {
+        self.table.extend(entries);
+    }
+
+    /// Pads the instruction table with dummy entries up to the next power of two length.
+    ///
+    /// Each dummy entry preserves the last instruction pointer
+    /// with current and next instructions `ci` and `ni` set to zero.
+    ///
+    /// Does nothing if the table is empty.
+    fn pad(&mut self) {
+        if let Some(last_entry) = self.table.last().cloned() {
+            let trace_len = self.table.len();
+            let padding_offset = (trace_len.next_power_of_two() - trace_len) as u32;
+            for _ in 1..=padding_offset {
+                self.add_entry(InstructionTableEntry { ip: last_entry.ip, ..Default::default() });
+            }
+        }
+    }
+}
+
+impl From<(Vec<Registers>, &ProgramMemory)> for InstructionIntermediateTable {
     fn from((execution_trace, program_memory): (Vec<Registers>, &ProgramMemory)) -> Self {
         let mut program = Vec::new();
 
@@ -205,11 +276,38 @@ impl From<(Vec<Registers>, &ProgramMemory)> for InstructionTable {
         let instruction_rows = sorted_registers.iter().map(Into::into).collect();
 
         let mut instruction_table = Self::new();
-        instruction_table.add_rows(instruction_rows);
+        instruction_table.add_entries(instruction_rows);
 
         instruction_table.pad();
 
         instruction_table
+    }
+}
+
+/// Represents a single entry of the [`InstructionIntermediateTable`].
+///
+/// Represents the registers used by the Instruction Table of a single step from the execution
+/// trace.
+///
+/// The Instruction Table stores:
+/// - The instruction pointer (`ip`),
+/// - The current instruction (`ci`),
+/// - The next instruction (`ni`).
+#[derive(Debug, Default, PartialEq, Eq, Clone)]
+pub struct InstructionTableEntry {
+    /// Instruction pointer: points to the current instruction in the program.
+    ip: BaseField,
+    /// Current instruction: the instruction at the current instruction pointer.
+    ci: BaseField,
+    /// Next instruction:
+    /// - The instruction that follows `ci` in the program,
+    /// - 0 if out of bounds.
+    ni: BaseField,
+}
+
+impl From<&Registers> for InstructionTableEntry {
+    fn from(registers: &Registers) -> Self {
+        Self { ip: registers.ip, ci: registers.ci, ni: registers.ni }
     }
 }
 
@@ -222,6 +320,12 @@ pub enum InstructionColumn {
     Ci,
     /// Index of the `ni` register column in the Instruction trace.
     Ni,
+    /// Index of the `next_ip` register column in the Instruction trace.
+    NextIp,
+    /// Index of the `next_ci` register column in the Instruction trace.
+    NextCi,
+    /// Index of the `next_ni` register column in the Instruction trace.
+    NextNi,
 }
 
 impl InstructionColumn {
@@ -231,13 +335,16 @@ impl InstructionColumn {
             Self::Ip => 0,
             Self::Ci => 1,
             Self::Ni => 2,
+            Self::NextIp => 3,
+            Self::NextCi => 4,
+            Self::NextNi => 5,
         }
     }
 }
 
 impl TraceColumn for InstructionColumn {
     fn count() -> usize {
-        3
+        6
     }
 }
 
@@ -250,54 +357,58 @@ mod tests {
     use num_traits::{One, Zero};
 
     #[test]
-    fn test_instruction_table_new() {
-        let instruction_table = InstructionTable::new();
+    fn test_instruction_intermediate_table_new() {
+        let instruction_intermediate_table = InstructionIntermediateTable::new();
         assert!(
-            instruction_table.table.is_empty(),
+            instruction_intermediate_table.table.is_empty(),
             "Instruction table should be empty upon initialization."
         );
     }
 
     #[test]
-    fn test_add_row() {
-        let mut instruction_table = InstructionTable::new();
-        // Create a row to add to the table
-        let row = InstructionTableRow {
+    fn test_add_entry() {
+        let mut instruction_intermediate_table = InstructionIntermediateTable::new();
+        // Create a entry to add to the table
+        let entry = InstructionTableEntry {
             ip: BaseField::zero(),
             ci: BaseField::from(43),
             ni: BaseField::from(91),
         };
-        // Add the row to the table
-        instruction_table.add_row(row.clone());
-        // Check that the table contains the added row
-        assert_eq!(instruction_table.table, vec![row], "Added row should match the expected row.");
+        // Add the entry to the table
+        instruction_intermediate_table.add_entry(entry.clone());
+        // Check that the table contains the added entry
+        assert_eq!(
+            instruction_intermediate_table.table,
+            vec![entry],
+            "Added entry should match the expected entry."
+        );
     }
 
     #[test]
-    fn test_add_multiple_rows() {
-        let mut instruction_table = InstructionTable::new();
-        // Create a vector of rows to add to the table
-        let rows = vec![
-            InstructionTableRow {
+    fn test_add_multiple_entries() {
+        let mut instruction_intermediate_table = InstructionIntermediateTable::new();
+        // Create a vector of entries to add to the table
+        let entries = vec![
+            InstructionTableEntry {
                 ip: BaseField::zero(),
                 ci: BaseField::from(43),
                 ni: BaseField::from(91),
             },
-            InstructionTableRow {
+            InstructionTableEntry {
                 ip: BaseField::one(),
                 ci: BaseField::from(91),
                 ni: BaseField::from(9),
             },
-            InstructionTableRow {
+            InstructionTableEntry {
                 ip: BaseField::from(2),
                 ci: BaseField::from(62),
                 ni: BaseField::from(43),
             },
         ];
-        // Add the rows to the table
-        instruction_table.add_rows(rows.clone());
-        // Check that the table contains the added rows
-        assert_eq!(instruction_table, InstructionTable { table: rows });
+        // Add the entries to the table
+        instruction_intermediate_table.add_entries(entries.clone());
+        // Check that the table contains the added entries
+        assert_eq!(instruction_intermediate_table, InstructionIntermediateTable { table: entries });
     }
 
     #[test]
@@ -305,15 +416,16 @@ mod tests {
         // Create an empty vector of registers
         let registers = vec![];
 
-        // Convert to InstructionTable and ensure sorting
-        let instruction_table = InstructionTable::from((registers, &Default::default()));
+        // Convert to InstructionIntermediateTable and ensure sorting
+        let instruction_intermediate_table =
+            InstructionIntermediateTable::from((registers, &Default::default()));
 
         // Check that the table is empty
-        assert!(instruction_table.table.is_empty());
+        assert!(instruction_intermediate_table.table.is_empty());
     }
 
     #[test]
-    fn test_instruction_table_from_registers_example_program() {
+    fn test_instruction_intermediate_table_from_registers_example_program() {
         // Create a small program and compile it
         let code = "+>,<[>+.<-]";
         let mut compiler = Compiler::new(code);
@@ -325,71 +437,72 @@ mod tests {
         // Get the trace of the executed program
         let trace = machine.trace();
 
-        // Convert the trace to an `InstructionTable`
-        let instruction_table: InstructionTable = (trace, machine.program()).into();
+        // Convert the trace to an `InstructionIntermediateTable`
+        let instruction_intermediate_table: InstructionIntermediateTable =
+            (trace, machine.program()).into();
 
-        // Create the expected `InstructionTable`
-        let ins_0 = InstructionTableRow {
+        // Create the expected `InstructionIntermediateTable`
+        let ins_0 = InstructionTableEntry {
             ip: BaseField::zero(),
             ci: InstructionType::Plus.to_base_field(),
             ni: InstructionType::Right.to_base_field(),
         };
 
-        let ins_1 = InstructionTableRow {
+        let ins_1 = InstructionTableEntry {
             ip: BaseField::one(),
             ci: InstructionType::Right.to_base_field(),
             ni: InstructionType::ReadChar.to_base_field(),
         };
 
-        let ins_2 = InstructionTableRow {
+        let ins_2 = InstructionTableEntry {
             ip: BaseField::from(2),
             ci: InstructionType::ReadChar.to_base_field(),
             ni: InstructionType::Left.to_base_field(),
         };
 
-        let ins_3 = InstructionTableRow {
+        let ins_3 = InstructionTableEntry {
             ip: BaseField::from(3),
             ci: InstructionType::Left.to_base_field(),
             ni: InstructionType::JumpIfZero.to_base_field(),
         };
-        let ins_4 = InstructionTableRow {
+        let ins_4 = InstructionTableEntry {
             ip: BaseField::from(4),
             ci: InstructionType::JumpIfZero.to_base_field(),
             ni: BaseField::from(12),
         };
-        let ins_6 = InstructionTableRow {
+        let ins_6 = InstructionTableEntry {
             ip: BaseField::from(6),
             ci: InstructionType::Right.to_base_field(),
             ni: InstructionType::Plus.to_base_field(),
         };
-        let ins_7 = InstructionTableRow {
+        let ins_7 = InstructionTableEntry {
             ip: BaseField::from(7),
             ci: InstructionType::Plus.to_base_field(),
             ni: InstructionType::PutChar.to_base_field(),
         };
-        let ins_8 = InstructionTableRow {
+        let ins_8 = InstructionTableEntry {
             ip: BaseField::from(8),
             ci: InstructionType::PutChar.to_base_field(),
             ni: InstructionType::Left.to_base_field(),
         };
-        let ins_9 = InstructionTableRow {
+        let ins_9 = InstructionTableEntry {
             ip: BaseField::from(9),
             ci: InstructionType::Left.to_base_field(),
             ni: InstructionType::Minus.to_base_field(),
         };
-        let inst_10 = InstructionTableRow {
+        let inst_10 = InstructionTableEntry {
             ip: BaseField::from(10),
             ci: InstructionType::Minus.to_base_field(),
             ni: InstructionType::JumpIfNotZero.to_base_field(),
         };
-        let ins_11 = InstructionTableRow {
+        let ins_11 = InstructionTableEntry {
             ip: BaseField::from(11),
             ci: InstructionType::JumpIfNotZero.to_base_field(),
             ni: BaseField::from(6),
         };
 
-        let padded_rows = vec![
-            InstructionTableRow {
+        let padded_entries = vec![
+            InstructionTableEntry {
                 ip: BaseField::from(13),
                 ci: BaseField::zero(),
                 ni: BaseField::zero(),
@@ -397,7 +510,7 @@ mod tests {
             10
         ];
 
-        let mut expected_instruction_table = InstructionTable {
+        let mut expected_instruction_intermediate_table = InstructionIntermediateTable {
             table: vec![
                 ins_0.clone(),
                 ins_0,
@@ -424,10 +537,10 @@ mod tests {
             ],
         };
 
-        expected_instruction_table.add_rows(padded_rows);
+        expected_instruction_intermediate_table.add_entries(padded_entries);
 
         // Verify that the instruction table is correct
-        assert_eq!(instruction_table, expected_instruction_table);
+        assert_eq!(instruction_intermediate_table, expected_instruction_intermediate_table);
     }
 
     #[test]
@@ -444,47 +557,49 @@ mod tests {
         // Get the trace of the executed program
         let trace = machine.trace();
 
-        // Convert the trace to an `InstructionTable`
-        let instruction_table: InstructionTable = (trace, machine.program()).into();
+        // Convert the trace to an `InstructionIntermediateTable`
+        let instruction_intermediate_table: InstructionIntermediateTable =
+            (trace, machine.program()).into();
 
-        let ins_0 = InstructionTableRow {
+        let ins_0 = InstructionTableEntry {
             ip: BaseField::zero(),
             ci: InstructionType::JumpIfZero.to_base_field(),
             ni: BaseField::from(4),
         };
 
-        let ins_2 = InstructionTableRow {
+        let ins_2 = InstructionTableEntry {
             ip: BaseField::from(2),
             ci: InstructionType::Minus.to_base_field(),
             ni: InstructionType::JumpIfNotZero.to_base_field(),
         };
 
-        let ins_3 = InstructionTableRow {
+        let ins_3 = InstructionTableEntry {
             ip: BaseField::from(3),
             ci: InstructionType::JumpIfNotZero.to_base_field(),
             ni: BaseField::from(2),
         };
 
-        let padded_rows = vec![
-            InstructionTableRow {
+        let padded_entries = vec![
+            InstructionTableEntry {
                 ip: BaseField::from(5),
                 ci: BaseField::zero(),
                 ni: BaseField::zero(),
             };
             4
         ];
-        let mut expected_instruction_table =
-            InstructionTable { table: vec![ins_0.clone(), ins_0, ins_2, ins_3] };
+        let mut expected_instruction_intermediate_table =
+            InstructionIntermediateTable { table: vec![ins_0.clone(), ins_0, ins_2, ins_3] };
 
-        expected_instruction_table.add_rows(padded_rows);
+        expected_instruction_intermediate_table.add_entries(padded_entries);
 
-        // Verify that the instruction table is correct
-        assert_eq!(instruction_table, expected_instruction_table);
+        // Verify that the instruction intermediate table is correct
+        assert_eq!(instruction_intermediate_table, expected_instruction_intermediate_table);
     }
 
     #[test]
     fn test_trace_evaluation_empty_table() {
-        let instruction_table = InstructionTable::new();
+        let instruction_intermediate_table = InstructionIntermediateTable::new();
+        let instruction_table = InstructionTable::from(instruction_intermediate_table);
         let result = instruction_table.trace_evaluation();
 
         assert!(matches!(result, Err(TraceError::EmptyTrace)));
@@ -493,12 +608,14 @@ mod tests {
     #[test]
     #[allow(clippy::similar_names)]
     fn test_trace_evaluation_single_row() {
-        let mut instruction_table = InstructionTable::new();
-        instruction_table.add_row(InstructionTableRow {
+        let mut instruction_intermediate_table = InstructionIntermediateTable::new();
+        instruction_intermediate_table.add_entry(InstructionTableEntry {
             ip: BaseField::from(1),
             ci: BaseField::from(43),
             ni: BaseField::from(91),
         });
+
+        let instruction_table = InstructionTable::from(instruction_intermediate_table);
 
         let (trace, claim) = instruction_table.trace_evaluation().unwrap();
 
@@ -535,22 +652,24 @@ mod tests {
     #[test]
     #[allow(clippy::similar_names)]
     fn test_instruction_trace_evaluation() {
-        let mut instruction_table = InstructionTable::new();
+        let mut instruction_intermediate_table = InstructionIntermediateTable::new();
 
-        // Add rows to the instruction table.
-        let rows = vec![
-            InstructionTableRow {
+        // Add entries to the instruction table.
+        let entries = vec![
+            InstructionTableEntry {
                 ip: BaseField::zero(),
                 ci: BaseField::from(43),
                 ni: BaseField::from(91),
             },
-            InstructionTableRow {
+            InstructionTableEntry {
                 ip: BaseField::one(),
                 ci: BaseField::from(91),
                 ni: BaseField::from(9),
             },
         ];
-        instruction_table.add_rows(rows);
+        instruction_intermediate_table.add_entries(entries);
+
+        let instruction_table = InstructionTable::from(instruction_intermediate_table);
 
         // Perform the trace evaluation.
         let (trace, claim) = instruction_table.trace_evaluation().unwrap();
@@ -598,19 +717,21 @@ mod tests {
 
     #[test]
     fn test_trace_evaluation_circle_domain() {
-        let mut instruction_table = InstructionTable::new();
-        instruction_table.add_rows(vec![
-            InstructionTableRow {
+        let mut instruction_intermediate_table = InstructionIntermediateTable::new();
+        instruction_intermediate_table.add_entries(vec![
+            InstructionTableEntry {
                 ip: BaseField::from(0),
                 ci: BaseField::from(43),
                 ni: BaseField::from(91),
             },
-            InstructionTableRow {
+            InstructionTableEntry {
                 ip: BaseField::from(1),
                 ci: BaseField::from(91),
                 ni: BaseField::from(9),
             },
         ]);
+
+        let instruction_table = InstructionTable::from(instruction_intermediate_table);
 
         let (trace, claim) = instruction_table.trace_evaluation().unwrap();
 
