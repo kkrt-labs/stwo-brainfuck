@@ -28,6 +28,7 @@ use stwo_prover::core::{
 /// the sorting and the padding is done through the [`ProcessorIntermediateTable`] struct.
 ///
 /// Once done, we can build the Processor table from it, by pairing the consecutive
+/// [`ProcessorTableEntry`] in [`ProcessorTableRow`].
 #[derive(Debug, Default, PartialEq, Eq, Clone)]
 pub struct ProcessorTable {
     /// A vector of [`ProcessorTableRow`] representing the table rows.
@@ -43,12 +44,12 @@ impl ProcessorTable {
         Self::default()
     }
 
-    /// Adds a new row to the Memory Table.
+    /// Adds a new row to the Processor Table.
     ///
     /// # Arguments
     /// * `row` - The [`ProcessorTableRow`] to add to the table.
     ///
-    /// This method pushes a new [`MemoryTableRow`] onto the `table` vector.
+    /// This method pushes a new [`ProcessorTableRow`] onto the `table` vector.
     fn add_row(&mut self, row: ProcessorTableRow) {
         self.table.push(row);
     }
@@ -114,10 +115,10 @@ impl From<Vec<Registers>> for ProcessorTable {
 // It is assumed that [`ProcessorIntermediateTable`] is sorted and padded to the next power of two.
 impl From<ProcessorIntermediateTable> for ProcessorTable {
     fn from(mut intermediate_table: ProcessorIntermediateTable) -> Self {
-        let mut memory_table = Self::new();
+        let mut processor_table = Self::new();
 
         if intermediate_table.table.is_empty() {
-            return memory_table;
+            return processor_table;
         }
 
         let last_entry = intermediate_table.table.last().unwrap();
@@ -130,12 +131,12 @@ impl From<ProcessorIntermediateTable> for ProcessorTable {
             match window {
                 [entry_1, entry_2] => {
                     let row = ProcessorTableRow::new(entry_1, entry_2);
-                    memory_table.add_row(row);
+                    processor_table.add_row(row);
                 }
                 _ => panic!("Empty window"),
             }
         }
-        memory_table
+        processor_table
     }
 }
 
@@ -709,6 +710,7 @@ mod tests {
         let row_14 = ProcessorTableRow::new(&dummy_14, &dummy_15);
         let row_15 = ProcessorTableRow::new(&dummy_15, &dummy_16);
 
+        // TODO: Eventually add a `add_rows` method for test purposes..
         expected_processor_table.add_row(row_0);
         expected_processor_table.add_row(row_1);
         expected_processor_table.add_row(row_2);
