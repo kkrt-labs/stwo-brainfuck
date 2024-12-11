@@ -2,10 +2,13 @@ use crate::components::{InstructionClaim, TraceColumn, TraceError, TraceEval};
 use brainfuck_vm::{machine::ProgramMemory, registers::Registers};
 use num_traits::{One, Zero};
 use stwo_prover::{
-    constraint_framework::{logup::LookupElements, Relation, RelationEFTraitBound},
+    constraint_framework::{
+        logup::{LogupTraceGenerator, LookupElements},
+        Relation, RelationEFTraitBound,
+    },
     core::{
         backend::{
-            simd::{column::BaseColumn, m31::LOG_N_LANES},
+            simd::{column::BaseColumn, m31::LOG_N_LANES, qm31::PackedSecureField},
             Column,
         },
         channel::Channel,
@@ -442,6 +445,134 @@ impl<F: Clone, EF: RelationEFTraitBound<F>> Relation<F, EF> for InstructionEleme
     fn get_size(&self) -> usize {
         INSTRUCTION_LOOKUP_ELEMENTS
     }
+}
+
+/// Creates the interaction trace from the main trace evaluation
+/// and the interaction elements for the Memory component.
+///
+/// The Processor component uses the other components:
+/// The Processor component multiplicities are then positive,
+/// and the Instruction component multiplicities are negative
+/// in the logUp protocol.
+///
+/// Only the 'real' rows are impacting the logUp sum.
+/// Dummy rows are padded rows.
+///
+/// # Returns
+/// - Interaction trace evaluation, to be committed.
+/// - Interaction claim: the total sum from the logUp protocol,
+/// to be mixed into the Fiat-Shamir [`Channel`].
+#[allow(clippy::similar_names)]
+pub fn interaction_trace_evaluation(
+    main_trace_eval: &TraceEval,
+    lookup_elements: &InstructionElements,
+) -> Result<(TraceEval, InteractionClaim), TraceError> {
+    if main_trace_eval.is_empty() {
+        return Err(TraceError::EmptyTrace)
+    }
+
+    let log_size = main_trace_eval[0].domain.log_size();
+
+    let mut logup_gen = LogupTraceGenerator::new(log_size);
+
+    // As the Instruction table is the concatenation of the execution trace
+    // and the compiled program, sorted by `ip`, we can assume that
+    // - Whenever there an `ip` change between the current row and the previous one,
+    // then we are on the first row of the given `ip`, which is then considered a row of the
+    // program.
+    // - Whenever `ip` remains the same between the current one and the previous one,
+    // then the row is considered part of the execution trace.
+
+    // First Column - Instruction & Processor
+    // We want to prove that the subset of rows of the Instruction table
+    // which is from the execution trace is a permutation of the Processor table.
+    let mut col_gen = logup_gen.new_col();
+
+    let ip_col = &main_trace_eval[InstructionColumn::Ip.index()].data;
+    let ci_col = &main_trace_eval[InstructionColumn::Ci.index()].data;
+    let ni_col = &main_trace_eval[InstructionColumn::Ni.index()].data;
+    let next_ip_col = &main_trace_eval[InstructionColumn::NextIp.index()].data;
+    let next_ci_col = &main_trace_eval[InstructionColumn::NextCi.index()].data;
+    let next_ni_col = &main_trace_eval[InstructionColumn::NextNi.index()].data;
+    // The very first row (index 0, entry 0) is always part of the program, thus not the execution
+    // trace.
+    // We work on the second entry of the list (next_...) as the current row,
+    // and use the first entry of the list as the previous one.
+    for vec_row in 0..1 << (log_size - LOG_N_LANES) {
+        let ip = ip_col[vec_row];
+        let next_ip = next_ip_col[vec_row];
+        let next_ci = next_ci_col[vec_row];
+        let next_ni = next_ni_col[vec_row];
+
+        // We check whether `ip` changes.
+        if !(next_ip - ip).is_zero() {
+            continue;
+        }
+
+        // If not, then add it to the permutation argument with logUp.
+
+        // Set the fraction numerator to 0 if a padding row (ci = 0) or ip changes,
+        // otherwise set it to -1.
+        let num = next_ci_col.get(vec_row).map_or_else(
+            || {
+                panic!("Unaccessible vec row.");
+            },
+            |value| {
+                if value.is_zero() || !(next_ip - ip).is_zero() {
+                    PackedSecureField::zero()
+                } else {
+                    -PackedSecureField::one()
+                }
+            },
+        );
+        // Only the common registers with the processor table are part of the extension column.
+        let denom: PackedSecureField = lookup_elements.combine(&[next_ip, next_ci, next_ni]);
+        col_gen.write_frac(vec_row, num, denom);
+    }
+
+    col_gen.finalize_col();
+
+    // Second Column - Instruction & Program
+    // We want to prove that a subset of the rows of the Instruction table (which is disjoint from
+    // the previous subset of rows) is a set equality of the Program.
+    let mut col_gen = logup_gen.new_col();
+
+    // The first entry (row 0, entry 0) is always part of the program
+    col_gen.write_frac(
+        0,
+        -PackedSecureField::one(),
+        lookup_elements.combine(&[ip_col[0], ci_col[0], ni_col[0]]),
+    );
+    for vec_row in 0..1 << (log_size - LOG_N_LANES) {
+        let ip = ip_col[vec_row];
+        let next_ip = next_ip_col[vec_row];
+        let next_ci = next_ci_col[vec_row];
+        let next_ni = next_ni_col[vec_row];
+
+        // Set the fraction numerator to 0 if a padding row (ci = 0) or ip remains the same,
+        // otherwise set it to -1.
+        let num = next_ci_col.get(vec_row).map_or_else(
+            || {
+                panic!("Unaccessible vec row.");
+            },
+            |value| {
+                if value.is_zero() || (next_ip - ip).is_zero() {
+                    PackedSecureField::zero()
+                } else {
+                    -PackedSecureField::one()
+                }
+            },
+        );
+        // Only the common registers with the processor table are part of the extension column.
+        let denom: PackedSecureField = lookup_elements.combine(&[next_ip, next_ci, next_ni]);
+        col_gen.write_frac(vec_row, num, denom);
+    }
+
+    col_gen.finalize_col();
+
+    let (trace, claimed_sum) = logup_gen.finalize_last();
+
+    Ok((trace, InteractionClaim { claimed_sum }))
 }
 
 #[cfg(test)]
