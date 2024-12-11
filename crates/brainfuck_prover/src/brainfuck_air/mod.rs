@@ -1,4 +1,5 @@
 use crate::components::{
+    io::table::IoElements,
     memory::{
         self,
         component::{MemoryComponent, MemoryEval},
@@ -62,6 +63,8 @@ impl BrainfuckClaim {
 /// All the interaction elements (drawn from the channel)
 /// required by the various components during the interaction phase.
 pub struct BrainfuckInteractionElements {
+    pub input_lookup_elements: IoElements,
+    pub output_lookup_elements: IoElements,
     pub memory_lookup_elements: MemoryElements,
 }
 
@@ -69,7 +72,11 @@ impl BrainfuckInteractionElements {
     /// Draw all the interaction elements needed for
     /// all the components of the Brainfuck ZK-VM.
     pub fn draw(channel: &mut impl Channel) -> Self {
-        Self { memory_lookup_elements: MemoryElements::draw(channel) }
+        Self {
+            input_lookup_elements: IoElements::draw(channel),
+            output_lookup_elements: IoElements::draw(channel),
+            memory_lookup_elements: MemoryElements::draw(channel),
+        }
     }
 }
 
