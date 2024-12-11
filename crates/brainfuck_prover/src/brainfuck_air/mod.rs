@@ -1,4 +1,5 @@
 use crate::components::{
+    instruction::table::InstructionElements,
     io::table::IoElements,
     memory::{
         self,
@@ -66,6 +67,7 @@ pub struct BrainfuckInteractionElements {
     pub input_lookup_elements: IoElements,
     pub output_lookup_elements: IoElements,
     pub memory_lookup_elements: MemoryElements,
+    pub instruction_lookup_elements: InstructionElements,
 }
 
 impl BrainfuckInteractionElements {
@@ -76,6 +78,7 @@ impl BrainfuckInteractionElements {
             input_lookup_elements: IoElements::draw(channel),
             output_lookup_elements: IoElements::draw(channel),
             memory_lookup_elements: MemoryElements::draw(channel),
+            instruction_lookup_elements: InstructionElements::draw(channel),
         }
     }
 }
