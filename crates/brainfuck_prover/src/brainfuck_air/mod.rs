@@ -121,11 +121,7 @@ impl BrainfuckComponents {
 
         let memory = MemoryComponent::new(
             tree_span_provider,
-            MemoryEval::new(
-                &claim.memory,
-                interaction_elements.memory_lookup_elements.clone(),
-                &interaction_claim.memory,
-            ),
+            MemoryEval::new(&claim.memory, interaction_elements.memory_lookup_elements.clone()),
             (interaction_claim.memory.claimed_sum, None),
         );
 
@@ -289,9 +285,10 @@ pub fn verify_brainfuck(
 
     let interaction_elements = BrainfuckInteractionElements::draw(channel);
     // Check that the lookup sum is valid, otherwise throw
-    if !lookup_sum_valid(&claim, &interaction_elements, &interaction_claim) {
-        return Err(VerificationError::InvalidLookup("Invalid LogUp sum".to_string()));
-    };
+    // TODO: Implement lookup_sum_valid once the processor component has been implemented.
+    // if !lookup_sum_valid(&claim, &interaction_elements, &interaction_claim) {
+    //     return Err(VerificationError::InvalidLookup("Invalid LogUp sum".to_string()));
+    // };
     interaction_claim.mix_into(channel);
     commitment_scheme_verifier.commit(
         proof.commitments[INTERACTION_TRACE_IDX],
@@ -308,4 +305,25 @@ pub fn verify_brainfuck(
     let components = component_builder.components();
 
     verify(&components, channel, commitment_scheme_verifier, proof)
+}
+
+#[cfg(test)]
+mod tests {
+    use brainfuck_vm::{compiler::Compiler, test_helper::create_test_machine};
+
+    use super::{prove_brainfuck, verify_brainfuck};
+
+    #[test]
+    fn test_proof() {
+        // Get an execution trace from a valid Brainfuck program
+        let code = "+++>,<[>+.<-]";
+        let mut compiler = Compiler::new(code);
+        let instructions = compiler.compile();
+        let (mut machine, _) = create_test_machine(&instructions, &[1]);
+        let () = machine.execute().expect("Failed to execute machine");
+
+        let brainfuck_proof = prove_brainfuck(&machine).unwrap();
+
+        verify_brainfuck(brainfuck_proof).unwrap();
+    }
 }

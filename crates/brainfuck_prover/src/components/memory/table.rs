@@ -42,7 +42,7 @@ use stwo_prover::{
 #[derive(Debug, Default, PartialEq, Eq, Clone)]
 pub struct MemoryTable {
     /// A vector of [`MemoryTableRow`] representing the table rows.
-    table: Vec<MemoryTableRow>,
+    pub(crate) table: Vec<MemoryTableRow>,
 }
 
 impl MemoryTable {
@@ -161,15 +161,15 @@ pub struct MemoryTableRow {
     /// Memory value: value of the cell pointer by `mp` - values in [0..2^31 - 1)
     mv: BaseField,
     /// Dummy: Flag whether the current entry is a dummy one or not
-    d: BaseField,
+    pub(crate) d: BaseField,
     /// Next Clock cycle counter.
     next_clk: BaseField,
     /// Next Memory pointer.
-    next_mp: BaseField,
+    pub(crate) next_mp: BaseField,
     /// Next Memory value.
-    next_mv: BaseField,
+    pub(crate) next_mv: BaseField,
     /// Next Dummy.
-    next_d: BaseField,
+    pub(crate) next_d: BaseField,
 }
 
 impl MemoryTableRow {
