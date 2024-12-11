@@ -310,7 +310,7 @@ impl From<Vec<Registers>> for MemoryIntermediateTable {
     }
 }
 
-/// Represents a single row of the [`MemoryIntermediateTable`].
+/// Represents a single entry of the [`MemoryIntermediateTable`].
 ///
 /// Represents the registers used by the Memory Table of a single step from the execution trace.
 ///

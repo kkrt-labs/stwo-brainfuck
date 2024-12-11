@@ -24,7 +24,8 @@ use stwo_prover::core::{
 /// The preliminary work to extract the fields from the execution trace,
 /// the sorting and the padding is done through the [`InstructionIntermediateTable`] struct.
 ///
-/// Once done, we can build the Instruction table from it, by pairing the consecutive entries.
+/// Once done, we can build the Instruction table from it, by pairing the consecutive
+/// [`InstructionTableEntry`] in [`InstructionTableRow`].
 #[derive(Debug, Default, PartialEq, Eq, Clone)]
 pub struct InstructionTable {
     /// A vector of [`InstructionTableRow`] representing the table rows.
