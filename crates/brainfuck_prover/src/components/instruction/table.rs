@@ -82,7 +82,7 @@ impl InstructionTable {
 
         // Initialize a trace with 3 columns (for `ip`, `ci`, and `ni` registers),
         // each column containing `2^log_size` entries initialized to zero.
-        let mut trace = vec![BaseColumn::zeros(1 << log_size); InstructionColumn::count()];
+        let mut trace = vec![BaseColumn::zeros(1 << log_size); InstructionColumn::count().0];
 
         // Populate the columns with data from the table rows.
         // We iterate over the table rows and, for each row:
@@ -344,8 +344,8 @@ impl InstructionColumn {
 }
 
 impl TraceColumn for InstructionColumn {
-    fn count() -> usize {
-        6
+    fn count() -> (usize, usize) {
+        (6, 2)
     }
 }
 
@@ -623,7 +623,7 @@ mod tests {
         assert_eq!(claim.log_size, LOG_N_LANES, "Log size should include SIMD lanes.");
         assert_eq!(
             trace.len(),
-            InstructionColumn::count(),
+            InstructionColumn::count().0,
             "Trace should contain one column per register."
         );
 

@@ -175,8 +175,8 @@ impl IoColumn {
 }
 
 impl TraceColumn for IoColumn {
-    fn count() -> usize {
-        1
+    fn count() -> (usize, usize) {
+        (1, 1)
     }
 }
 
