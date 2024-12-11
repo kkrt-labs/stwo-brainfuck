@@ -24,7 +24,7 @@ use stwo_prover::core::{
 /// The preliminary work to extract the fields from the execution trace,
 /// the sorting and the padding is done through the [`InstructionIntermediateTable`] struct.
 ///
-/// Once done, we can build the Instruction table from it, by pairing the consecutive
+/// Once done, we can build the Instruction table from it, by pairing the consecutive entries.
 #[derive(Debug, Default, PartialEq, Eq, Clone)]
 pub struct InstructionTable {
     /// A vector of [`InstructionTableRow`] representing the table rows.
@@ -32,20 +32,20 @@ pub struct InstructionTable {
 }
 
 impl InstructionTable {
-    /// Creates a new, empty [`MemoryTable`].
+    /// Creates a new, empty [`InstructionTable`].
     ///
     /// # Returns
-    /// A new instance of [`MemoryTable`] with an empty table.
+    /// A new instance of [`InstructionTable`] with an empty table.
     pub fn new() -> Self {
         Self::default()
     }
 
-    /// Adds a new row to the Memory Table.
+    /// Adds a new row to the Instruction Table.
     ///
     /// # Arguments
-    /// * `row` - The [`MemoryTableRow`] to add to the table.
+    /// * `row` - The [`InstructionTableRow`] to add to the table.
     ///
-    /// This method pushes a new [`MemoryTableRow`] onto the `table` vector.
+    /// This method pushes a new [`InstructionTableRow`] onto the `table` vector.
     fn add_row(&mut self, row: InstructionTableRow) {
         self.table.push(row);
     }
@@ -123,10 +123,10 @@ impl From<(Vec<Registers>, &ProgramMemory)> for InstructionTable {
 // two.
 impl From<InstructionIntermediateTable> for InstructionTable {
     fn from(mut intermediate_table: InstructionIntermediateTable) -> Self {
-        let mut memory_table = Self::new();
+        let mut instruction_table = Self::new();
 
         if intermediate_table.table.is_empty() {
-            return memory_table;
+            return instruction_table;
         }
 
         let last_entry = intermediate_table.table.last().unwrap();
@@ -138,12 +138,12 @@ impl From<InstructionIntermediateTable> for InstructionTable {
             match window {
                 [entry_1, entry_2] => {
                     let row = InstructionTableRow::new(entry_1, entry_2);
-                    memory_table.add_row(row);
+                    instruction_table.add_row(row);
                 }
                 _ => panic!("Empty window"),
             }
         }
-        memory_table
+        instruction_table
     }
 }
 
@@ -171,7 +171,7 @@ pub struct InstructionTableRow {
 }
 
 impl InstructionTableRow {
-    /// Creates a row for the [`MemoryIntermediateTable`] which is considered 'real'.
+    /// Creates a row for the [`InstructionIntermediateTable`] which is considered 'real'.
     ///
     /// A 'real' row, is a row that is part of the execution trace from the Brainfuck program
     /// execution.
