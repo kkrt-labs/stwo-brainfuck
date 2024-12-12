@@ -59,7 +59,6 @@ impl<const N: u32> FrameworkEval for IoEval<N> {
     /// Use `eval.add_to_relation` to define a global constraint for the logUp protocol.
     ///
     /// The logUp must be finalized with `eval.finalize_logup()`.
-    #[allow(clippy::similar_names)]
     fn evaluate<E: EvalAtRow>(&self, _eval: E) -> E {
         todo!()
     }
