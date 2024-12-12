@@ -477,11 +477,15 @@ pub fn interaction_trace_evaluation(
 
     // As the Instruction table is the concatenation of the execution trace
     // and the compiled program, sorted by `ip`, we can assume that
+    // - Whenever `ip` remains the same between the current one and the previous one,
+    // then the row is considered part of the execution trace.
     // - Whenever there an `ip` change between the current row and the previous one,
     // then we are on the first row of the given `ip`, which is then considered a row of the
     // program.
-    // - Whenever `ip` remains the same between the current one and the previous one,
-    // then the row is considered part of the execution trace.
+    //
+    // This way, we have two disjoint subset whose unionis the Instruction table.
+    // The first one can be used to prove the relation with the Processor,
+    // the second one can be used to prove the relation with the Program.
 
     // First Column - Instruction & Processor
     // We want to prove that the subset of rows of the Instruction table
