@@ -69,8 +69,9 @@ impl<const N: u32> FrameworkEval for IoEval<N> {
 ///
 /// The total sum is the computed sum of the logUp extension column,
 /// including the padded rows.
-/// It allows proving that the Memory main trace is a permutation
-/// of the Processor trace (which is the execution trace provided by the `brainfuck_vm`).
+/// It allows proving that the I/O main trace is a sublist
+/// of the Processor trace (which is the execution trace provided by the `brainfuck_vm`):
+/// all input and output values are the same as the one from the execution, in the same order.
 #[derive(Debug, Eq, PartialEq)]
 pub struct InteractionClaim {
     /// The computed sum of the logUp extension column, including padded rows.
