@@ -1,5 +1,5 @@
 use crate::components::{
-    memory::component::InteractionClaim, IoClaim, TraceColumn, TraceError, TraceEval,
+    io::component::InteractionClaim, IoClaim, TraceColumn, TraceError, TraceEval,
 };
 use brainfuck_vm::{instruction::InstructionType, registers::Registers};
 use num_traits::One;
