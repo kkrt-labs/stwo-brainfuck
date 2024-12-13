@@ -575,12 +575,12 @@ mod tests {
         let entry_1 = InstructionTableEntry {
             ip: BaseField::zero(),
             ci: BaseField::from(43),
-            ni: BaseField::from(91),
+            ni: BaseField::from(45),
         };
         let entry_2 = InstructionTableEntry {
             ip: BaseField::one(),
-            ci: BaseField::from(3),
-            ni: BaseField::from(9),
+            ci: BaseField::from(45),
+            ni: BaseField::from(92),
         };
 
         let row = InstructionTableRow::new(&entry_1, &entry_2);
