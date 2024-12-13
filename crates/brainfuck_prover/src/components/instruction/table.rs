@@ -459,6 +459,17 @@ impl<F: Clone, EF: RelationEFTraitBound<F>> Relation<F, EF> for InstructionEleme
 /// Only the 'real' rows are impacting the logUp sum.
 /// Dummy rows are padded rows.
 ///
+/// Here, the logUp has two extension columns:
+/// - One to link the Instruction component with the Processor component.
+/// - one to link the Instruction component with the Program component.
+///
+/// - They use the main Instruction trace as two disjoint subsets:
+/// The subset for the Program is constituted of rows whose `ip` register value
+/// remains the same with the previous `ip` register value. (It includes the first entry).
+///
+/// The subset for the Processor is constituted of rows whose `ip` register value
+/// has changed compared to the previous `ip` value.
+///
 /// # Returns
 /// - Interaction trace evaluation, to be committed.
 /// - Interaction claim: the total sum from the logUp protocol,
@@ -497,24 +508,22 @@ pub fn interaction_trace_evaluation(
     let ci_col = &main_trace_eval[InstructionColumn::Ci.index()].data;
     let ni_col = &main_trace_eval[InstructionColumn::Ni.index()].data;
 
-    // The very first row (index 0, entry 0) is always part of the program, thus not the execution
-    // trace.
-    // We work on the second entry of the list (next_...) as the current row,
-    // and use the first entry of the list as the previous one.
-    // col_gen.write_frac(0, PackedSecureField::zero(), lookup_elements.combine([ip]));
+    // The very first row (index 0) is considered part of the Program subset,
+    // thus not part of the Processor subset.
     col_gen.write_frac(
         0,
         PackedSecureField::zero(),
         lookup_elements.combine(&[ip_col[0], ci_col[0], ni_col[0]]),
     );
 
+    // Populates the first logUp column for the Processor permutation argument.
     let mut prev_ip = ip_col[0];
     for vec_row in 1..1 << (log_size - LOG_N_LANES) {
         let ip = ip_col[vec_row];
         let ci = ci_col[vec_row];
         let ni = ni_col[vec_row];
 
-        // Set the fraction numerator to 0 if a padding row (ci = 0) or ip changes,
+        // Set the multiplicity to 0 if it's a padding row (ci = 0) or if ip has changed,
         // otherwise set it to -1.
         let num = ci_col.get(vec_row).map_or_else(
             || {
@@ -528,7 +537,6 @@ pub fn interaction_trace_evaluation(
                 }
             },
         );
-        // Only the common registers with the processor table are part of the extension column.
         let denom: PackedSecureField = lookup_elements.combine(&[ip, ci, ni]);
         col_gen.write_frac(vec_row, num, denom);
 
@@ -539,10 +547,10 @@ pub fn interaction_trace_evaluation(
 
     // Second Column - Instruction & Program
     // We want to prove that a subset of the rows of the Instruction table (which is disjoint from
-    // the previous subset of rows) is a set equality of the Program.
+    // the previous subset of rows) is an ordered set equality of the Program.
     let mut col_gen = logup_gen.new_col();
 
-    // The first entry (row 0, entry 0) is always part of the program
+    // Populates the second logUp column for the Program evaluation argument.
     col_gen.write_frac(
         0,
         -PackedSecureField::one(),
@@ -555,7 +563,7 @@ pub fn interaction_trace_evaluation(
         let ci = ci_col[vec_row];
         let ni = ni_col[vec_row];
 
-        // Set the fraction numerator to 0 if a padding row (ci = 0) or ip remains the same,
+        // Set the multiplicity to 0 if it's a padding row (ci = 0) or if ip remains the same,
         // otherwise set it to -1.
         let num = ci_col.get(vec_row).map_or_else(
             || {
