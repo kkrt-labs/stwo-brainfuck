@@ -1,3 +1,4 @@
+use super::component::InteractionClaim;
 use crate::components::{InstructionClaim, TraceColumn, TraceError, TraceEval};
 use brainfuck_vm::{machine::ProgramMemory, registers::Registers};
 use num_traits::{One, Zero};
@@ -448,7 +449,7 @@ impl<F: Clone, EF: RelationEFTraitBound<F>> Relation<F, EF> for InstructionEleme
 }
 
 /// Creates the interaction trace from the main trace evaluation
-/// and the interaction elements for the Memory component.
+/// and the interaction elements for the Instruction component.
 ///
 /// The Processor component uses the other components:
 /// The Processor component multiplicities are then positive,
@@ -495,34 +496,32 @@ pub fn interaction_trace_evaluation(
     let ip_col = &main_trace_eval[InstructionColumn::Ip.index()].data;
     let ci_col = &main_trace_eval[InstructionColumn::Ci.index()].data;
     let ni_col = &main_trace_eval[InstructionColumn::Ni.index()].data;
-    let next_ip_col = &main_trace_eval[InstructionColumn::NextIp.index()].data;
-    let next_ci_col = &main_trace_eval[InstructionColumn::NextCi.index()].data;
-    let next_ni_col = &main_trace_eval[InstructionColumn::NextNi.index()].data;
+
     // The very first row (index 0, entry 0) is always part of the program, thus not the execution
     // trace.
     // We work on the second entry of the list (next_...) as the current row,
     // and use the first entry of the list as the previous one.
-    for vec_row in 0..1 << (log_size - LOG_N_LANES) {
+    // col_gen.write_frac(0, PackedSecureField::zero(), lookup_elements.combine([ip]));
+    col_gen.write_frac(
+        0,
+        PackedSecureField::zero(),
+        lookup_elements.combine(&[ip_col[0], ci_col[0], ni_col[0]]),
+    );
+
+    let mut prev_ip = ip_col[0];
+    for vec_row in 1..1 << (log_size - LOG_N_LANES) {
         let ip = ip_col[vec_row];
-        let next_ip = next_ip_col[vec_row];
-        let next_ci = next_ci_col[vec_row];
-        let next_ni = next_ni_col[vec_row];
-
-        // We check whether `ip` changes.
-        if !(next_ip - ip).is_zero() {
-            continue;
-        }
-
-        // If not, then add it to the permutation argument with logUp.
+        let ci = ci_col[vec_row];
+        let ni = ni_col[vec_row];
 
         // Set the fraction numerator to 0 if a padding row (ci = 0) or ip changes,
         // otherwise set it to -1.
-        let num = next_ci_col.get(vec_row).map_or_else(
+        let num = ci_col.get(vec_row).map_or_else(
             || {
                 panic!("Unaccessible vec row.");
             },
             |value| {
-                if value.is_zero() || !(next_ip - ip).is_zero() {
+                if value.is_zero() || !(ip - prev_ip).is_zero() {
                     PackedSecureField::zero()
                 } else {
                     -PackedSecureField::one()
@@ -530,8 +529,10 @@ pub fn interaction_trace_evaluation(
             },
         );
         // Only the common registers with the processor table are part of the extension column.
-        let denom: PackedSecureField = lookup_elements.combine(&[next_ip, next_ci, next_ni]);
+        let denom: PackedSecureField = lookup_elements.combine(&[ip, ci, ni]);
         col_gen.write_frac(vec_row, num, denom);
+
+        prev_ip = ip;
     }
 
     col_gen.finalize_col();
@@ -547,20 +548,21 @@ pub fn interaction_trace_evaluation(
         -PackedSecureField::one(),
         lookup_elements.combine(&[ip_col[0], ci_col[0], ni_col[0]]),
     );
-    for vec_row in 0..1 << (log_size - LOG_N_LANES) {
+
+    let mut prev_ip = ip_col[0];
+    for vec_row in 1..1 << (log_size - LOG_N_LANES) {
         let ip = ip_col[vec_row];
-        let next_ip = next_ip_col[vec_row];
-        let next_ci = next_ci_col[vec_row];
-        let next_ni = next_ni_col[vec_row];
+        let ci = ci_col[vec_row];
+        let ni = ni_col[vec_row];
 
         // Set the fraction numerator to 0 if a padding row (ci = 0) or ip remains the same,
         // otherwise set it to -1.
-        let num = next_ci_col.get(vec_row).map_or_else(
+        let num = ci_col.get(vec_row).map_or_else(
             || {
                 panic!("Unaccessible vec row.");
             },
             |value| {
-                if value.is_zero() || (next_ip - ip).is_zero() {
+                if value.is_zero() || (ip - prev_ip).is_zero() {
                     PackedSecureField::zero()
                 } else {
                     -PackedSecureField::one()
@@ -568,8 +570,10 @@ pub fn interaction_trace_evaluation(
             },
         );
         // Only the common registers with the processor table are part of the extension column.
-        let denom: PackedSecureField = lookup_elements.combine(&[next_ip, next_ci, next_ni]);
+        let denom: PackedSecureField = lookup_elements.combine(&[ip, ci, ni]);
         col_gen.write_frac(vec_row, num, denom);
+
+        prev_ip = ip;
     }
 
     col_gen.finalize_col();
@@ -1046,5 +1050,96 @@ mod tests {
                 "Trace column domain should match expected circle domain."
             );
         }
+    }
+
+    #[test]
+    fn test_empty_interaction_trace_evaluation() {
+        let empty_eval = vec![];
+        let lookup_elements = InstructionElements::dummy();
+        let interaction_trace_eval = interaction_trace_evaluation(&empty_eval, &lookup_elements);
+
+        assert!(matches!(interaction_trace_eval, Err(TraceError::EmptyTrace)));
+    }
+
+    #[allow(clippy::similar_names)]
+    #[test]
+    fn test_interaction_trace_evaluation() {
+        let code = "+->";
+        let mut compiler = Compiler::new(code);
+        let instructions = compiler.compile();
+        let (mut machine, _) = create_test_machine(&instructions, &[1]);
+        let () = machine.execute().expect("Failed to execute machine");
+
+        let trace = machine.trace();
+        let intermediate_table = InstructionIntermediateTable::from((&trace, machine.program()));
+        let instruction_table = InstructionTable::from(intermediate_table);
+
+        let (trace_eval, claim) = instruction_table.trace_evaluation().unwrap();
+
+        let lookup_elements = InstructionElements::dummy();
+        let (interaction_trace_eval, interaction_claim) =
+            interaction_trace_evaluation(&trace_eval, &lookup_elements).unwrap();
+
+        let log_size = trace_eval[0].domain.log_size();
+
+        let mut denoms = [PackedSecureField::zero(); 8];
+        let ip_col = &trace_eval[InstructionColumn::Ip.index()].data;
+        let ci_col = &trace_eval[InstructionColumn::Ci.index()].data;
+        let ni_col = &trace_eval[InstructionColumn::Ni.index()].data;
+
+        // Construct the denominator for each row of the logUp column, from the main trace
+        // evaluation.
+        for vec_row in 0..1 << (log_size - LOG_N_LANES) {
+            let ip = ip_col[vec_row];
+            let ci = ci_col[vec_row];
+            let ni = ni_col[vec_row];
+            let denom: PackedSecureField = lookup_elements.combine(&[ip, ci, ni]);
+            denoms[vec_row] = denom;
+        }
+
+        let mut logup_gen = LogupTraceGenerator::new(log_size);
+
+        // First Column - Instruction & Processor
+        let mut col_gen = logup_gen.new_col();
+
+        col_gen.write_frac(0, PackedSecureField::zero(), denoms[0]);
+        col_gen.write_frac(1, -PackedSecureField::one(), denoms[1]);
+        col_gen.write_frac(2, PackedSecureField::zero(), denoms[2]);
+        col_gen.write_frac(3, -PackedSecureField::one(), denoms[3]);
+        col_gen.write_frac(4, PackedSecureField::zero(), denoms[4]);
+        col_gen.write_frac(5, -PackedSecureField::one(), denoms[5]);
+        col_gen.write_frac(6, PackedSecureField::zero(), denoms[6]);
+        col_gen.write_frac(7, PackedSecureField::zero(), denoms[7]);
+
+        col_gen.finalize_col();
+
+        // Second Column - Instruction & Program
+        let mut col_gen = logup_gen.new_col();
+
+        col_gen.write_frac(0, -PackedSecureField::one(), denoms[0]);
+        col_gen.write_frac(1, PackedSecureField::zero(), denoms[1]);
+        col_gen.write_frac(2, -PackedSecureField::one(), denoms[2]);
+        col_gen.write_frac(3, PackedSecureField::zero(), denoms[3]);
+        col_gen.write_frac(4, -PackedSecureField::one(), denoms[4]);
+        col_gen.write_frac(5, PackedSecureField::zero(), denoms[5]);
+        col_gen.write_frac(6, PackedSecureField::zero(), denoms[6]);
+        col_gen.write_frac(7, PackedSecureField::zero(), denoms[7]);
+
+        col_gen.finalize_col();
+
+        let (expected_interaction_trace_eval, expected_claimed_sum) = logup_gen.finalize_last();
+
+        assert_eq!(claim.log_size, log_size,);
+        for col_index in 0..expected_interaction_trace_eval.len() {
+            assert_eq!(
+                interaction_trace_eval[col_index].domain,
+                expected_interaction_trace_eval[col_index].domain
+            );
+            assert_eq!(
+                interaction_trace_eval[col_index].to_cpu().values,
+                expected_interaction_trace_eval[col_index].to_cpu().values
+            );
+        }
+        assert_eq!(interaction_claim.claimed_sum, expected_claimed_sum);
     }
 }
