@@ -298,6 +298,7 @@ pub fn interaction_trace_evaluation(
 mod tests {
     use super::*;
     use num_traits::{One, Zero};
+    use stwo_prover::core::channel::Blake2sChannel;
 
     type TestIOTable = IOTable<10>;
 
@@ -533,5 +534,70 @@ mod tests {
                 "Trace column domain should match the expected circle domain."
             );
         }
+    }
+
+    #[test]
+    fn test_interaction_trace_evaluation() {
+        let mut io_table = TestIOTable::new();
+        // Trace rows are:
+        // - Real row
+        // - Real row
+        // - Dummy row (padding to the power of 2)
+        // - Dummy row (padding to the power of 2)
+        let rows = vec![
+            IOTableRow::new(BaseField::one()),
+            IOTableRow::new(BaseField::from(2)),
+            IOTableRow::new(BaseField::zero()),
+            IOTableRow::new(BaseField::zero()),
+        ];
+        io_table.add_rows(rows);
+
+        let (trace_eval, claim) = io_table.trace_evaluation();
+
+        let channel = &mut Blake2sChannel::default();
+        let lookup_elements = IoElements::draw(channel);
+
+        let (interaction_trace_eval, interaction_claim) =
+            interaction_trace_evaluation(&trace_eval, &lookup_elements).unwrap();
+
+        let log_size = trace_eval[0].domain.log_size();
+        let mut logup_gen = LogupTraceGenerator::new(log_size);
+        let mut col_gen = logup_gen.new_col();
+
+        let mut denoms = [PackedSecureField::zero(); 4];
+        let mv_col = &trace_eval[IoColumn::Io.index()].data;
+        // Construct the denominator for each row of the logUp column, from the main trace
+        // evaluation.
+        for vec_row in 0..1 << (log_size - LOG_N_LANES) {
+            let mv = mv_col[vec_row];
+            let denom: PackedSecureField = lookup_elements.combine(&[mv]);
+            denoms[vec_row] = denom;
+        }
+
+        let num_0 = -PackedSecureField::one();
+        let num_1 = -PackedSecureField::one();
+        let num_2 = -PackedSecureField::one();
+        let num_3 = -PackedSecureField::one();
+
+        col_gen.write_frac(0, num_0, denoms[0]);
+        col_gen.write_frac(1, num_1, denoms[1]);
+        col_gen.write_frac(2, num_2, denoms[2]);
+        col_gen.write_frac(3, num_3, denoms[3]);
+
+        col_gen.finalize_col();
+        let (expected_interaction_trace_eval, expected_claimed_sum) = logup_gen.finalize_last();
+
+        assert_eq!(claim.log_size, log_size,);
+        for col_index in 0..expected_interaction_trace_eval.len() {
+            assert_eq!(
+                interaction_trace_eval[col_index].domain,
+                expected_interaction_trace_eval[col_index].domain
+            );
+            assert_eq!(
+                interaction_trace_eval[col_index].to_cpu().values,
+                expected_interaction_trace_eval[col_index].to_cpu().values
+            );
+        }
+        assert_eq!(interaction_claim.claimed_sum, expected_claimed_sum);
     }
 }
