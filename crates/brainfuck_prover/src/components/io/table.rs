@@ -414,7 +414,7 @@ mod tests {
 
         // Add rows to the I/O table.
         let rows = vec![
-            IOTableRow::new(BaseField::zero(), BaseField::from(44), BaseField::from(1)),
+            IOTableRow::new(BaseField::zero(), BaseField::from(44), BaseField::one()),
             IOTableRow::new(BaseField::one(), BaseField::from(44), BaseField::from(2)),
         ];
         io_table.add_rows(rows);

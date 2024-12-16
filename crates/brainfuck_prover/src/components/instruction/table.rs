@@ -668,7 +668,7 @@ mod tests {
     fn test_trace_evaluation_single_row() {
         let mut instruction_intermediate_table = InstructionIntermediateTable::new();
         instruction_intermediate_table.add_entry(InstructionTableEntry {
-            ip: BaseField::from(1),
+            ip: BaseField::one(),
             ci: BaseField::from(43),
             ni: BaseField::from(91),
         });
@@ -685,7 +685,7 @@ mod tests {
         );
 
         // Expected values for the single row
-        let expected_ip_column = vec![BaseField::from(1); 1 << LOG_N_LANES];
+        let expected_ip_column = vec![BaseField::one(); 1 << LOG_N_LANES];
         let expected_ci_column = vec![BaseField::from(43); 1 << LOG_N_LANES];
         let expected_ni_column = vec![BaseField::from(91); 1 << LOG_N_LANES];
 
@@ -778,12 +778,12 @@ mod tests {
         let mut instruction_intermediate_table = InstructionIntermediateTable::new();
         instruction_intermediate_table.add_entries(vec![
             InstructionTableEntry {
-                ip: BaseField::from(0),
+                ip: BaseField::zero(),
                 ci: BaseField::from(43),
                 ni: BaseField::from(91),
             },
             InstructionTableEntry {
-                ip: BaseField::from(1),
+                ip: BaseField::one(),
                 ci: BaseField::from(91),
                 ni: BaseField::from(9),
             },
