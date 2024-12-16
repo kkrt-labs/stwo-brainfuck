@@ -185,7 +185,7 @@ mod tests {
         let preprocessed_trace = vec![is_first_col, is_first_col_2];
 
         // Construct the main trace from the execution trace
-        let table = MemoryTable::from(trace_vm);
+        let table = MemoryTable::from(&trace_vm);
         let (main_trace, claim) = table.trace_evaluation().unwrap();
 
         // Draw Interaction elements
@@ -226,7 +226,7 @@ mod tests {
         let preprocessed_trace_eval = vec![is_first_col];
 
         let registers = vec![Registers { clk: BaseField::one(), ..Default::default() }];
-        let memory_table = MemoryTable::from(registers);
+        let memory_table = MemoryTable::from(&registers);
         let (main_trace_eval, claim) = memory_table.trace_evaluation().unwrap();
 
         // Required to use `MemoryElements::draw(channel: &mut impl Channel)`
@@ -266,7 +266,7 @@ mod tests {
         let preprocessed_trace_eval = vec![is_first_col];
 
         let registers = vec![Registers { mp: BaseField::one(), ..Default::default() }];
-        let memory_table = MemoryTable::from(registers);
+        let memory_table = MemoryTable::from(&registers);
         let (main_trace_eval, claim) = memory_table.trace_evaluation().unwrap();
 
         let channel = &mut Blake2sChannel::default();
@@ -303,7 +303,7 @@ mod tests {
         let preprocessed_trace_eval = vec![is_first_col];
 
         let registers = vec![Registers { mv: BaseField::one(), ..Default::default() }];
-        let memory_table = MemoryTable::from(registers);
+        let memory_table = MemoryTable::from(&registers);
         let (main_trace_eval, claim) = memory_table.trace_evaluation().unwrap();
 
         let channel = &mut Blake2sChannel::default();
@@ -340,7 +340,7 @@ mod tests {
         let preprocessed_trace_eval = vec![is_first_col];
 
         let registers = vec![Default::default()];
-        let mut memory_table = MemoryTable::from(registers);
+        let mut memory_table = MemoryTable::from(&registers);
         // We must manually modify the value of d as rows from `Vec<Registers>` are assumed real.
         memory_table.table[0].d = BaseField::one();
         let (main_trace_eval, claim) = memory_table.trace_evaluation().unwrap();
@@ -381,7 +381,7 @@ mod tests {
         // `mp` should increase by 0 or 1, here it increases by 2.
         let registers =
             vec![Default::default(), Registers { mp: BaseField::from(2), ..Default::default() }];
-        let memory_table = MemoryTable::from(registers);
+        let memory_table = MemoryTable::from(&registers);
         let (main_trace_eval, claim) = memory_table.trace_evaluation().unwrap();
 
         let memory_lookup_elements = MemoryElements::dummy();
@@ -418,7 +418,7 @@ mod tests {
 
         // `mp` remains the same, but `clk` is not increased by 1.
         let registers = vec![Default::default(), Default::default()];
-        let memory_table = MemoryTable::from(registers);
+        let memory_table = MemoryTable::from(&registers);
         let (main_trace_eval, claim) = memory_table.trace_evaluation().unwrap();
 
         let channel = &mut Blake2sChannel::default();
@@ -459,7 +459,7 @@ mod tests {
             Default::default(),
             Registers { mp: BaseField::one(), mv: BaseField::one(), ..Default::default() },
         ];
-        let memory_table = MemoryTable::from(registers);
+        let memory_table = MemoryTable::from(&registers);
         let (main_trace_eval, claim) = memory_table.trace_evaluation().unwrap();
 
         let channel = &mut Blake2sChannel::default();
@@ -498,7 +498,7 @@ mod tests {
         // The next dummy register flag `next_d` is set to 2.
         let registers =
             vec![Default::default(), Registers { mp: BaseField::one(), ..Default::default() }];
-        let mut memory_table = MemoryTable::from(registers);
+        let mut memory_table = MemoryTable::from(&registers);
         memory_table.table[0].next_d = BaseField::from(2);
         let (main_trace_eval, claim) = memory_table.trace_evaluation().unwrap();
 
@@ -542,7 +542,7 @@ mod tests {
         // And we modify the second entry of the second row to have `next_mp` different from `mp`
         let registers =
             vec![Default::default(), Registers { mp: BaseField::one(), ..Default::default() }];
-        let mut memory_table = MemoryTable::from(registers);
+        let mut memory_table = MemoryTable::from(&registers);
         memory_table.table[1].d = BaseField::one();
         memory_table.table[1].next_mp = BaseField::from(2);
         let (main_trace_eval, claim) = memory_table.trace_evaluation().unwrap();
@@ -587,7 +587,7 @@ mod tests {
         // And we modify the second entry of the second row to have `next_mv` different from `mv`
         let registers =
             vec![Default::default(), Registers { mp: BaseField::one(), ..Default::default() }];
-        let mut memory_table = MemoryTable::from(registers);
+        let mut memory_table = MemoryTable::from(&registers);
         memory_table.table[1].d = BaseField::one();
         memory_table.table[1].next_mv = BaseField::one();
         let (main_trace_eval, claim) = memory_table.trace_evaluation().unwrap();

@@ -107,8 +107,8 @@ impl MemoryTable {
     }
 }
 
-impl From<Vec<Registers>> for MemoryTable {
-    fn from(registers: Vec<Registers>) -> Self {
+impl From<&Vec<Registers>> for MemoryTable {
+    fn from(registers: &Vec<Registers>) -> Self {
         MemoryIntermediateTable::from(registers).into()
     }
 }
@@ -295,8 +295,8 @@ impl MemoryIntermediateTable {
     }
 }
 
-impl From<Vec<Registers>> for MemoryIntermediateTable {
-    fn from(registers: Vec<Registers>) -> Self {
+impl From<&Vec<Registers>> for MemoryIntermediateTable {
+    fn from(registers: &Vec<Registers>) -> Self {
         let mut intermediate_table = Self::new();
 
         let memory_entries = registers.iter().map(|reg| (reg, false).into()).collect();
@@ -744,13 +744,13 @@ mod tests {
             dummy_entry_2,
         ]);
 
-        assert_eq!(MemoryIntermediateTable::from(registers), expected_memory_table);
+        assert_eq!(MemoryIntermediateTable::from(&registers), expected_memory_table);
     }
 
     #[test]
     fn test_empty_trace_evaluation() {
         let registers = vec![];
-        let trace_eval = MemoryTable::from(registers).trace_evaluation();
+        let trace_eval = MemoryTable::from(&registers).trace_evaluation();
 
         assert!(matches!(trace_eval, Err(TraceError::EmptyTrace)));
     }

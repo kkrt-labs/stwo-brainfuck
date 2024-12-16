@@ -169,11 +169,11 @@ impl<const N: u32> IOTable<N> {
     }
 }
 
-impl<const N: u32> From<Vec<Registers>> for IOTable<N> {
-    fn from(registers: Vec<Registers>) -> Self {
+impl<const N: u32> From<&Vec<Registers>> for IOTable<N> {
+    fn from(registers: &Vec<Registers>) -> Self {
         let mut io_table = Self::new();
         let rows = registers
-            .into_iter()
+            .iter()
             .filter(|register| register.ci == BaseField::from_u32_unchecked(N))
             .map(|x| IOTableRow::new(x.clk, x.ci, x.mv))
             .collect();
@@ -453,7 +453,7 @@ mod tests {
         let mut expected_io_table: InputTable = IOTable::new();
         expected_io_table.add_row(row);
 
-        assert_eq!(IOTable::from(registers), expected_io_table);
+        assert_eq!(IOTable::from(&registers), expected_io_table);
     }
 
     #[test]
@@ -480,7 +480,7 @@ mod tests {
         let mut expected_io_table: OutputTable = IOTable::new();
         expected_io_table.add_row(row);
 
-        assert_eq!(IOTable::from(registers), expected_io_table);
+        assert_eq!(IOTable::from(&registers), expected_io_table);
     }
 
     #[test]

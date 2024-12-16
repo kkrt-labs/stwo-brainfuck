@@ -1,12 +1,16 @@
 use crate::components::{
     instruction::table::InstructionElements,
-    io::table::IoElements,
+    io::{
+        self,
+        component::{InputComponent, InputEval, OutputComponent, OutputEval},
+        table::{InputTable, IoElements, OutputTable},
+    },
     memory::{
         self,
         component::{MemoryComponent, MemoryEval},
-        table::{interaction_trace_evaluation, MemoryElements, MemoryTable},
+        table::{MemoryElements, MemoryTable},
     },
-    MemoryClaim,
+    IoClaim, MemoryClaim,
 };
 use brainfuck_vm::machine::Machine;
 use stwo_prover::{
@@ -42,16 +46,22 @@ pub struct BrainfuckProof<H: MerkleHasher> {
 /// It includes the common claim values such as the initial and final states
 /// and the claim of each component.
 pub struct BrainfuckClaim {
+    pub input: IoClaim,
+    pub output: IoClaim,
     pub memory: MemoryClaim,
 }
 
 impl BrainfuckClaim {
     pub fn mix_into(&self, channel: &mut impl Channel) {
+        self.input.mix_into(channel);
+        self.output.mix_into(channel);
         self.memory.mix_into(channel);
     }
 
     pub fn log_sizes(&self) -> TreeVec<Vec<u32>> {
-        let mut log_sizes = self.memory.log_sizes();
+        let mut log_sizes = TreeVec::concat_cols(
+            [self.input.log_sizes(), self.output.log_sizes(), self.memory.log_sizes()].into_iter(),
+        );
 
         // We overwrite the preprocessed column claim to have all log sizes
         // in the merkle root for the verification.
@@ -87,12 +97,16 @@ impl BrainfuckInteractionElements {
 ///
 /// Mainly the claims on global relations (lookup, permutation, evaluation).
 pub struct BrainfuckInteractionClaim {
+    input: io::component::InteractionClaim,
+    output: io::component::InteractionClaim,
     memory: memory::component::InteractionClaim,
 }
 
 impl BrainfuckInteractionClaim {
     /// Mix the claimed sums of every components in the Fiat-Shamir [`Channel`].
     pub fn mix_into(&self, channel: &mut impl Channel) {
+        self.input.mix_into(channel);
+        self.output.mix_into(channel);
         self.memory.mix_into(channel);
     }
 }
@@ -111,6 +125,8 @@ pub fn lookup_sum_valid(
 /// Components are used by the prover as a `ComponentProver`,
 /// and by the verifier as a `Component`.
 pub struct BrainfuckComponents {
+    input: InputComponent,
+    output: OutputComponent,
     memory: MemoryComponent,
 }
 
@@ -129,18 +145,28 @@ impl BrainfuckComponents {
                 .collect::<Vec<_>>(),
         );
 
+        let input = InputComponent::new(
+            tree_span_provider,
+            InputEval::new(&claim.input, interaction_elements.input_lookup_elements.clone()),
+            (interaction_claim.input.claimed_sum, None),
+        );
+        let output = OutputComponent::new(
+            tree_span_provider,
+            OutputEval::new(&claim.output, interaction_elements.output_lookup_elements.clone()),
+            (interaction_claim.output.claimed_sum, None),
+        );
         let memory = MemoryComponent::new(
             tree_span_provider,
             MemoryEval::new(&claim.memory, interaction_elements.memory_lookup_elements.clone()),
             (interaction_claim.memory.claimed_sum, None),
         );
 
-        Self { memory }
+        Self { input, output, memory }
     }
 
     /// Returns the `ComponentProver` of each components, used by the prover.
     pub fn provers(&self) -> Vec<&dyn ComponentProver<SimdBackend>> {
-        vec![&self.memory]
+        vec![&self.input, &self.output, &self.memory]
     }
 
     /// Returns the `Component` of each components, used by the verifier.
@@ -168,7 +194,7 @@ const LOG_MAX_ROWS: u32 = 20;
 ///
 /// Ideally, we should cover all possible log sizes, between
 /// 1 and `LOG_MAX_ROW`
-const IS_FIRST_LOG_SIZES: [u32; 4] = [10, 9, 8, 5];
+const IS_FIRST_LOG_SIZES: [u32; 8] = [15, 10, 9, 8, 7, 6, 5, 4];
 
 /// Generate a STARK proof of the given Brainfuck program execution.
 ///
@@ -211,11 +237,15 @@ pub fn prove_brainfuck(
     let mut tree_builder = commitment_scheme.tree_builder();
 
     let vm_trace = inputs.trace();
-    let (memory_trace, memory_claim) = MemoryTable::from(vm_trace).trace_evaluation().unwrap();
+    let (input_trace, input_claim) = InputTable::from(&vm_trace).trace_evaluation();
+    let (output_trace, output_claim) = OutputTable::from(&vm_trace).trace_evaluation();
+    let (memory_trace, memory_claim) = MemoryTable::from(&vm_trace).trace_evaluation().unwrap();
 
+    tree_builder.extend_evals(input_trace.clone());
+    tree_builder.extend_evals(output_trace.clone());
     tree_builder.extend_evals(memory_trace.clone());
 
-    let claim = BrainfuckClaim { memory: memory_claim };
+    let claim = BrainfuckClaim { input: input_claim, output: output_claim, memory: memory_claim };
 
     // Mix the claim into the Fiat-Shamir channel.
     claim.mix_into(channel);
@@ -232,13 +262,36 @@ pub fn prove_brainfuck(
     // Generate the interaction trace and the BrainfuckInteractionClaim
     let mut tree_builder = commitment_scheme.tree_builder();
 
-    let (memory_interaction_trace_eval, memory_interaction_claim) =
-        interaction_trace_evaluation(&memory_trace, &interaction_elements.memory_lookup_elements)
-            .unwrap();
+    let (input_interaction_trace_eval, input_interaction_claim) =
+        io::table::interaction_trace_evaluation(
+            &input_trace,
+            &interaction_elements.input_lookup_elements,
+        )
+        .unwrap();
 
+    let (output_interaction_trace_eval, output_interaction_claim) =
+        io::table::interaction_trace_evaluation(
+            &output_trace,
+            &interaction_elements.output_lookup_elements,
+        )
+        .unwrap();
+
+    let (memory_interaction_trace_eval, memory_interaction_claim) =
+        memory::table::interaction_trace_evaluation(
+            &memory_trace,
+            &interaction_elements.memory_lookup_elements,
+        )
+        .unwrap();
+
+    tree_builder.extend_evals(input_interaction_trace_eval);
+    tree_builder.extend_evals(output_interaction_trace_eval);
     tree_builder.extend_evals(memory_interaction_trace_eval);
 
-    let interaction_claim = BrainfuckInteractionClaim { memory: memory_interaction_claim };
+    let interaction_claim = BrainfuckInteractionClaim {
+        input: input_interaction_claim,
+        output: output_interaction_claim,
+        memory: memory_interaction_claim,
+    };
 
     // Mix the interaction claim into the Fiat-Shamir channel.
     interaction_claim.mix_into(channel);
@@ -324,12 +377,54 @@ mod tests {
     use super::{prove_brainfuck, verify_brainfuck};
 
     #[test]
+    fn test_proof_cpu() {
+        // Get an execution trace from a valid Brainfuck program
+        let code = "+>,.";
+        let mut compiler = Compiler::new(code);
+        let instructions = compiler.compile();
+        let (mut machine, _) = create_test_machine(&instructions, &[1]);
+        let () = machine.execute().expect("Failed to execute machine");
+
+        let brainfuck_proof = prove_brainfuck(&machine).unwrap();
+
+        verify_brainfuck(brainfuck_proof).unwrap();
+    }
+
+    #[test]
     fn test_proof() {
         // Get an execution trace from a valid Brainfuck program
         let code = "+++>,<[>+.<-]";
         let mut compiler = Compiler::new(code);
         let instructions = compiler.compile();
         let (mut machine, _) = create_test_machine(&instructions, &[1]);
+        let () = machine.execute().expect("Failed to execute machine");
+
+        let brainfuck_proof = prove_brainfuck(&machine).unwrap();
+
+        verify_brainfuck(brainfuck_proof).unwrap();
+    }
+
+    #[test]
+    fn test_proof_no_input() {
+        // Get an execution trace from a valid Brainfuck program
+        let code = "+++><[>+<-]";
+        let mut compiler = Compiler::new(code);
+        let instructions = compiler.compile();
+        let (mut machine, _) = create_test_machine(&instructions, &[1]);
+        let () = machine.execute().expect("Failed to execute machine");
+
+        let brainfuck_proof = prove_brainfuck(&machine).unwrap();
+
+        verify_brainfuck(brainfuck_proof).unwrap();
+    }
+
+    #[test]
+    fn test_proof_hello_world() {
+        // Get an execution trace from a valid Brainfuck program
+        let code = "++++++++++[>+++++++>++++++++++>+++>+<<<<-]>++.>+.+++++++..+++.>++.<<+++++++++++++++.>.+++.------.--------.>+.>.";
+        let mut compiler = Compiler::new(code);
+        let instructions = compiler.compile();
+        let (mut machine, _) = create_test_machine(&instructions, &[]);
         let () = machine.execute().expect("Failed to execute machine");
 
         let brainfuck_proof = prove_brainfuck(&machine).unwrap();
