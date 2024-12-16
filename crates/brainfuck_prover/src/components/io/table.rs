@@ -16,16 +16,22 @@ use stwo_prover::{
 /// Represents a single row in the I/O Table.
 ///
 /// The I/O Table stores:
+/// - The clock cycle counter (`clk`),
+/// - The current instruction (`ci`),
 /// - The memory value (`mv`),
 #[derive(Debug, Default, PartialEq, Eq, Clone)]
 pub struct IOTableRow {
+    /// Clock cycle counter: the current step.
+    clk: BaseField,
+    /// Current instruction: the opcode at the current instruction pointer.
+    ci: BaseField,
     /// Memory value: value of the cell pointer by `mp` - values in [0..2^31 - 1)
     pub mv: BaseField,
 }
 
 impl IOTableRow {
-    pub const fn new(mv: BaseField) -> Self {
-        Self { mv }
+    pub const fn new(clk: BaseField, ci: BaseField, mv: BaseField) -> Self {
+        Self { clk, ci, mv }
     }
 }
 
@@ -52,8 +58,8 @@ impl<const N: u32> IOTable<N> {
     /// * `mv` - The memory value for the new row.
     ///
     /// This method pushes a new [`IOTableRow`] onto the `table` vector.
-    pub fn add_row_from_register(&mut self, mv: BaseField) {
-        self.table.push(IOTableRow { mv });
+    pub fn add_row_from_register(&mut self, clk: BaseField, ci: BaseField, mv: BaseField) {
+        self.table.push(IOTableRow { clk, ci, mv });
     }
 
     /// Adds a new row to the I/O Table.
@@ -114,13 +120,15 @@ impl<const N: u32> IOTable<N> {
         // Add `LOG_N_LANES` to account for SIMD optimization.
         let log_size = log_n_rows + LOG_N_LANES;
 
-        // Initialize a trace with 1 column (`mv`), each column containing `2^log_size` entries
-        // initialized to zero.
-        let mut trace = vec![BaseColumn::zeros(1 << log_size)];
+        // Initialize a trace with 3 columns (`clk`, `ci`, `mv`), each column containing
+        // `2^log_size` entries initialized to zero.
+        let mut trace = vec![BaseColumn::zeros(1 << log_size); 3];
 
         // Populate the column with data from the table rows.
         for (index, row) in self.table.iter().enumerate().take(1 << log_n_rows) {
-            trace[IoColumn::Io.index()].data[index] = row.mv.into();
+            trace[IoColumn::Clk.index()].data[index] = row.clk.into();
+            trace[IoColumn::Ci.index()].data[index] = row.ci.into();
+            trace[IoColumn::Mv.index()].data[index] = row.mv.into();
         }
 
         // Create a circle domain using a canonical coset.
@@ -140,7 +148,7 @@ impl<const N: u32> From<Vec<Registers>> for IOTable<N> {
         let rows = registers
             .into_iter()
             .filter(|register| register.ci == BaseField::from_u32_unchecked(N))
-            .map(|x| IOTableRow { mv: x.mv })
+            .map(|x| IOTableRow::new(x.clk, x.ci, x.mv))
             .collect();
         io_table.add_rows(rows);
 
@@ -166,26 +174,30 @@ pub type OutputTable = IOTable<{ InstructionType::PutChar.to_u32() }>;
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum IoColumn {
     /// Column representing the input/output operations.
-    Io,
+    Clk,
+    Ci,
+    Mv,
 }
 
 impl IoColumn {
     /// Returns the index of the column in the IO table.
     pub const fn index(self) -> usize {
         match self {
-            Self::Io => 0,
+            Self::Clk => 0,
+            Self::Ci => 1,
+            Self::Mv => 2,
         }
     }
 }
 
 impl TraceColumn for IoColumn {
     fn count() -> (usize, usize) {
-        (1, 1)
+        (3, 1)
     }
 }
 
 /// The number of random elements necessary for the I/O lookup arguments.
-const IO_LOOKUP_ELEMENTS: usize = 1;
+const IO_LOOKUP_ELEMENTS: usize = 3;
 
 /// The interaction elements are drawn for the extension column of the I/O components.
 ///
@@ -239,14 +251,15 @@ impl<F: Clone, EF: RelationEFTraitBound<F>> Relation<F, EF> for IoElements {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use num_traits::One;
+    use num_traits::{One, Zero};
 
     type TestIOTable = IOTable<10>;
 
     #[test]
     fn test_io_row_new() {
-        let row = IOTableRow::new(BaseField::from(91));
-        let expected_row = IOTableRow { mv: BaseField::from(91) };
+        let row = IOTableRow::new(BaseField::zero(), BaseField::from(46), BaseField::from(91));
+        let expected_row =
+            IOTableRow { clk: BaseField::zero(), ci: BaseField::from(46), mv: BaseField::from(91) };
         assert_eq!(row, expected_row);
     }
 
@@ -260,9 +273,9 @@ mod tests {
     fn test_table_add_row_from_register() {
         let mut io_table = TestIOTable::new();
         // Create a row to add to the table
-        let row = IOTableRow::new(BaseField::from(91));
+        let row = IOTableRow::new(BaseField::zero(), BaseField::from(46), BaseField::from(91));
         // Add the row to the table
-        io_table.add_row_from_register(BaseField::from(91));
+        io_table.add_row_from_register(BaseField::zero(), BaseField::from(46), BaseField::from(91));
         // Check that the table contains the added row
         assert_eq!(io_table.table, vec![row], "Added row should match the expected row.");
     }
@@ -271,7 +284,7 @@ mod tests {
     fn test_table_add_row() {
         let mut io_table = TestIOTable::new();
         // Create a row to add to the table
-        let row = IOTableRow::new(BaseField::from(91));
+        let row = IOTableRow::new(BaseField::zero(), BaseField::from(46), BaseField::from(91));
         // Add the row to the table
         io_table.add_row(row.clone());
         // Check that the table contains the added row
@@ -283,9 +296,9 @@ mod tests {
         let mut io_table = TestIOTable::new();
         // Create a vector of rows to add to the table
         let rows = vec![
-            IOTableRow::new(BaseField::from(91)),
-            IOTableRow::new(BaseField::from(9)),
-            IOTableRow::new(BaseField::from(43)),
+            IOTableRow::new(BaseField::zero(), BaseField::from(46), BaseField::from(91)),
+            IOTableRow::new(BaseField::one(), BaseField::from(46), BaseField::from(9)),
+            IOTableRow::new(BaseField::from(4), BaseField::from(46), BaseField::from(43)),
         ];
         // Add the rows to the table
         io_table.add_rows(rows.clone());
@@ -308,7 +321,7 @@ mod tests {
         };
         let registers: Vec<Registers> = vec![reg3, reg1, reg2];
 
-        let row = IOTableRow::new(BaseField::one());
+        let row = IOTableRow::new(BaseField::zero(), BaseField::from(44), BaseField::one());
         // let row = IOTableRow::new(BaseField::from(5));
 
         let mut expected_io_table: InputTable = IOTable::new();
@@ -332,7 +345,7 @@ mod tests {
         };
         let registers: Vec<Registers> = vec![reg3, reg1, reg2];
 
-        let row = IOTableRow::new(BaseField::from(5));
+        let row = IOTableRow::new(BaseField::zero(), BaseField::from(46), BaseField::from(5));
 
         let mut expected_io_table: OutputTable = IOTable::new();
         expected_io_table.add_row(row);
@@ -357,22 +370,41 @@ mod tests {
     #[test]
     fn test_trace_evaluation_single_row() {
         let mut io_table = TestIOTable::new();
-        io_table.add_row(IOTableRow::new(BaseField::from(42)));
+        io_table.add_row(IOTableRow::new(
+            BaseField::one(),
+            BaseField::from(44),
+            BaseField::from(42),
+        ));
 
         let (trace, claim) = io_table.trace_evaluation();
 
-        // Verify the log size includes SIMD lanes.
-        assert!(claim.log_size >= LOG_N_LANES, "Claim log size should include SIMD lanes.");
-
-        // Verify the trace has one column (`mv`).
-        assert_eq!(trace.len(), 1, "Trace should contain one column for 'mv'.");
-
-        // Verify the content of the column.
-        let expected_mv_column = vec![BaseField::from(42); 16];
+        assert_eq!(claim.log_size, LOG_N_LANES, "Log size should include SIMD lanes.");
         assert_eq!(
-            trace[0].to_cpu().values,
+            trace.len(),
+            IoColumn::count().0,
+            "Trace should contain one column per register."
+        );
+
+        // Expected values for the single row
+        let expected_clk_column = vec![BaseField::one(); 1 << LOG_N_LANES];
+        let expected_ci_column = vec![BaseField::from(44); 1 << LOG_N_LANES];
+        let expected_mv_column = vec![BaseField::from(42); 1 << LOG_N_LANES];
+
+        // Check that the entire column matches expected values
+        assert_eq!(
+            trace[IoColumn::Clk.index()].to_cpu().values,
+            expected_clk_column,
+            "Clk column should match expected values."
+        );
+        assert_eq!(
+            trace[IoColumn::Ci.index()].to_cpu().values,
+            expected_ci_column,
+            "Ci column should match expected values."
+        );
+        assert_eq!(
+            trace[IoColumn::Mv.index()].to_cpu().values,
             expected_mv_column,
-            "'mv' column should match expected values."
+            "Mv column should match expected values."
         );
     }
 
@@ -381,7 +413,10 @@ mod tests {
         let mut io_table = TestIOTable::new();
 
         // Add rows to the I/O table.
-        let rows = vec![IOTableRow::new(BaseField::from(1)), IOTableRow::new(BaseField::from(2))];
+        let rows = vec![
+            IOTableRow::new(BaseField::zero(), BaseField::from(44), BaseField::one()),
+            IOTableRow::new(BaseField::one(), BaseField::from(44), BaseField::from(2)),
+        ];
         io_table.add_rows(rows);
 
         // Perform the trace evaluation.
@@ -393,11 +428,19 @@ mod tests {
         let expected_size = 1 << expected_log_size;
 
         // Construct the expected trace column for `mv`.
-        let mut expected_columns = vec![BaseColumn::zeros(expected_size)];
+        let mut expected_columns = vec![BaseColumn::zeros(expected_size); IoColumn::count().0];
+
+        // Populate the `clk` column with row data and padding.
+        expected_columns[IoColumn::Clk.index()].data[0] = BaseField::zero().into();
+        expected_columns[IoColumn::Clk.index()].data[1] = BaseField::one().into();
+
+        // Populate the `ci` column with row data and padding.
+        expected_columns[IoColumn::Ci.index()].data[0] = BaseField::from(44).into();
+        expected_columns[IoColumn::Ci.index()].data[1] = BaseField::from(44).into();
 
         // Populate the `mv` column with row data and padding.
-        expected_columns[0].data[0] = BaseField::from(1).into();
-        expected_columns[0].data[1] = BaseField::from(2).into();
+        expected_columns[IoColumn::Mv.index()].data[0] = BaseField::one().into();
+        expected_columns[IoColumn::Mv.index()].data[1] = BaseField::from(2).into();
 
         // Create the expected domain for evaluation.
         let domain = CanonicCoset::new(expected_log_size).circle_domain();
@@ -430,8 +473,8 @@ mod tests {
     fn test_trace_evaluation_circle_domain() {
         let mut io_table = TestIOTable::new();
         io_table.add_rows(vec![
-            IOTableRow::new(BaseField::from(1)),
-            IOTableRow::new(BaseField::from(2)),
+            IOTableRow::new(BaseField::zero(), BaseField::from(44), BaseField::one()),
+            IOTableRow::new(BaseField::one(), BaseField::from(44), BaseField::from(2)),
         ]);
 
         let (trace, claim) = io_table.trace_evaluation();

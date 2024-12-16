@@ -490,7 +490,7 @@ mod tests {
 
         let entries = vec![
             ProcessorTableEntry {
-                clk: BaseField::from(1),
+                clk: BaseField::one(),
                 ip: BaseField::from(5),
                 ci: BaseField::from(43),
                 ni: BaseField::from(91),
@@ -791,8 +791,8 @@ mod tests {
         // Add entries to the processor table
         let entries = vec![
             ProcessorTableEntry {
-                clk: BaseField::from(0),
-                ip: BaseField::from(1),
+                clk: BaseField::zero(),
+                ip: BaseField::one(),
                 ci: BaseField::from(2),
                 ni: BaseField::from(3),
                 mp: BaseField::from(4),
@@ -800,7 +800,7 @@ mod tests {
                 mvi: BaseField::from(6),
             },
             ProcessorTableEntry {
-                clk: BaseField::from(1),
+                clk: BaseField::one(),
                 ip: BaseField::from(2),
                 ci: BaseField::from(3),
                 ni: BaseField::from(4),
@@ -831,10 +831,10 @@ mod tests {
         let mut mv_column = BaseColumn::zeros(expected_size);
         let mut mvi_column = BaseColumn::zeros(expected_size);
 
-        clk_column.data[0] = BaseField::from(0).into();
-        clk_column.data[1] = BaseField::from(1).into();
+        clk_column.data[0] = BaseField::zero().into();
+        clk_column.data[1] = BaseField::one().into();
 
-        ip_column.data[0] = BaseField::from(1).into();
+        ip_column.data[0] = BaseField::one().into();
         ip_column.data[1] = BaseField::from(2).into();
 
         ci_column.data[0] = BaseField::from(2).into();
