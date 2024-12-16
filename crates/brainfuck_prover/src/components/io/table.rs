@@ -281,8 +281,8 @@ pub fn interaction_trace_evaluation(
     let mv_col = &main_trace_eval[IoColumn::Io.index()].data;
     for (vec_row, mv) in mv_col.iter().enumerate().take(1 << (log_size - LOG_N_LANES)) {
         // We want to prove that the I/O table is a sublist (ordered set inclusion) of the Processor
-        // table. Therefore we set the index of the row into the numerator of the fraction.
-        let num = -PackedSecureField::one() * PackedSecureField::broadcast(vec_row.into());
+        // table.
+        let num = -PackedSecureField::one();
         let denom: PackedSecureField = lookup_elements.combine(&[*mv]);
         col_gen.write_frac(vec_row, num, denom);
     }
