@@ -118,6 +118,14 @@ impl TryFrom<u8> for InstructionType {
     }
 }
 
+impl TryFrom<u32> for InstructionType {
+    type Error = InstructionError;
+
+    fn try_from(value: u32) -> Result<Self, Self::Error> {
+        Self::try_from(value as u8)
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -187,6 +195,32 @@ mod tests {
         assert_eq!(InstructionType::ReadChar.to_u32(), b','.into());
         assert_eq!(InstructionType::JumpIfZero.to_u32(), b'['.into());
         assert_eq!(InstructionType::JumpIfNotZero.to_u32(), b']'.into());
+    }
+
+    // Test from_u32 implementation
+    #[test]
+    fn test_instruction_type_from_u32() {
+        assert_eq!(InstructionType::try_from(u32::from(b'>')).unwrap(), InstructionType::Right);
+        assert_eq!(InstructionType::try_from(u32::from(b'<')).unwrap(), InstructionType::Left);
+        assert_eq!(InstructionType::try_from(u32::from(b'+')).unwrap(), InstructionType::Plus);
+        assert_eq!(InstructionType::try_from(u32::from(b'-')).unwrap(), InstructionType::Minus);
+        assert_eq!(InstructionType::try_from(u32::from(b'.')).unwrap(), InstructionType::PutChar);
+        assert_eq!(InstructionType::try_from(u32::from(b',')).unwrap(), InstructionType::ReadChar);
+        assert_eq!(
+            InstructionType::try_from(u32::from(b'[')).unwrap(),
+            InstructionType::JumpIfZero
+        );
+        assert_eq!(
+            InstructionType::try_from(u32::from(b']')).unwrap(),
+            InstructionType::JumpIfNotZero
+        );
+    }
+
+    // Test to ensure invalid input as u8 returns an error
+    #[test]
+    fn test_instruction_type_from_u32_invalid() {
+        let result = InstructionType::try_from(u32::from(b'x'));
+        assert_eq!(result, Err(InstructionError::Conversion('x')));
     }
 
     #[test]
