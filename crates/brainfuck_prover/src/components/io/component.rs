@@ -16,13 +16,16 @@ use super::table::IoElements;
 /// for the `SimdBackend` from the constraint framework provided by Stwo
 pub type InputComponent = FrameworkComponent<InputEval>;
 
+/// The `FrameworkEval` for the Input component
 pub type InputEval = IoEval<{ InstructionType::ReadChar.to_u32() }>;
 
 /// Implementation of `Component` and `ComponentProver`
 /// for the `SimdBackend` from the constraint framework provided by Stwo
 pub type OutputComponent = FrameworkComponent<OutputEval>;
 
+/// The `FrameworkEval` for the Output component
 pub type OutputEval = IoEval<{ InstructionType::PutChar.to_u32() }>;
+
 /// The AIR for the I/O components.
 ///
 /// Constraints are defined through the `FrameworkEval`
