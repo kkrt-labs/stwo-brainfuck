@@ -156,7 +156,7 @@ mod test {
         let preprocessed_trace = vec![is_first_col];
 
         // Construct the main trace from the execution trace
-        let table = InputTable::from(trace_vm);
+        let table = InputTable::from(&trace_vm);
         let (main_trace, claim) = table.trace_evaluation();
 
         // Draw Interaction elements
@@ -204,7 +204,7 @@ mod test {
         let preprocessed_trace = vec![is_first_col];
 
         // Construct the main trace from the execution trace
-        let table = OutputTable::from(trace_vm);
+        let table = OutputTable::from(&trace_vm);
         let (main_trace, claim) = table.trace_evaluation();
 
         // Draw Interaction elements
