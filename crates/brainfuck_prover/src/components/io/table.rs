@@ -1,11 +1,16 @@
-use crate::components::{IoClaim, TraceColumn, TraceEval};
+use crate::components::{
+    io::component::InteractionClaim, IoClaim, TraceColumn, TraceError, TraceEval,
+};
 use brainfuck_vm::{instruction::InstructionType, registers::Registers};
 use num_traits::{One, Zero};
 use stwo_prover::{
-    constraint_framework::{logup::LookupElements, Relation, RelationEFTraitBound},
+    constraint_framework::{
+        logup::{LogupTraceGenerator, LookupElements},
+        Relation, RelationEFTraitBound,
+    },
     core::{
         backend::{
-            simd::{column::BaseColumn, m31::LOG_N_LANES},
+            simd::{column::BaseColumn, m31::LOG_N_LANES, qm31::PackedSecureField},
             Column,
         },
         channel::Channel,
@@ -273,6 +278,55 @@ impl<F: Clone, EF: RelationEFTraitBound<F>> Relation<F, EF> for IoElements {
     fn get_size(&self) -> usize {
         IO_LOOKUP_ELEMENTS
     }
+}
+
+/// Creates the interaction trace from the main trace evaluation
+/// and the interaction elements for the I/O components.
+///
+/// The Processor component uses the other components:
+/// The Processor component multiplicities are then positive,
+/// and the I/O components' multiplicities are negative
+/// in the logUp protocol.
+///
+/// # Returns
+/// - Interaction trace evaluation, to be committed.
+/// - Interaction claim: the total sum from the logUp protocol,
+/// to be mixed into the Fiat-Shamir [`Channel`].
+#[allow(clippy::similar_names)]
+pub fn interaction_trace_evaluation(
+    main_trace_eval: &TraceEval,
+    lookup_elements: &IoElements,
+) -> Result<(TraceEval, InteractionClaim), TraceError> {
+    // If the main trace of the I/O components is empty, then we claimed that it's log size is zero.
+    let log_size =
+        if main_trace_eval.is_empty() { 0 } else { main_trace_eval[0].domain.log_size() };
+
+    let mut logup_gen = LogupTraceGenerator::new(log_size);
+    let mut col_gen = logup_gen.new_col();
+
+    let clk_col = &main_trace_eval[IoColumn::Clk.index()].data;
+    let ci_col = &main_trace_eval[IoColumn::Ci.index()].data;
+    let mv_col = &main_trace_eval[IoColumn::Mv.index()].data;
+    let d_col = &main_trace_eval[IoColumn::D.index()].data;
+    for vec_row in 0..1 << (log_size - LOG_N_LANES) {
+        let clk = clk_col[vec_row];
+        let ci = ci_col[vec_row];
+        let mv = mv_col[vec_row];
+        let d = d_col[vec_row];
+        // We want to prove that the I/O table is a sublist (ordered set inclusion)
+        // of the Processor table.
+        // To do so we make a permutation argument with a register which contains the order
+        // of the row in the execution (`clk`).
+        let num = PackedSecureField::from(d) - PackedSecureField::one();
+        let denom: PackedSecureField = lookup_elements.combine(&[clk, ci, mv]);
+        col_gen.write_frac(vec_row, num, denom);
+    }
+
+    col_gen.finalize_col();
+
+    let (trace, claimed_sum) = logup_gen.finalize_last();
+
+    Ok((trace, InteractionClaim { claimed_sum }))
 }
 
 #[cfg(test)]
@@ -596,5 +650,85 @@ mod tests {
                 "Trace column domain should match the expected circle domain."
             );
         }
+    }
+
+    #[test]
+    fn test_interaction_trace_evaluation() {
+        let mut io_table = InputTable::new();
+        // Trace rows are:
+        // - Real row
+        // - Real row
+        // - Real row
+        // - Dummy row (padding to the power of 2)
+        let rows = vec![
+            IOTableRow::new(
+                BaseField::zero(),
+                InstructionType::ReadChar.to_base_field(),
+                BaseField::one(),
+            ),
+            IOTableRow::new(
+                BaseField::one(),
+                InstructionType::ReadChar.to_base_field(),
+                BaseField::from(2),
+            ),
+            IOTableRow::new(
+                BaseField::from(3),
+                InstructionType::ReadChar.to_base_field(),
+                BaseField::from(7),
+            ),
+            IOTableRow::new_dummy(BaseField::from(4)),
+        ];
+        io_table.add_rows(rows);
+
+        let (trace_eval, claim) = io_table.trace_evaluation();
+
+        let lookup_elements = IoElements::dummy();
+
+        let (interaction_trace_eval, interaction_claim) =
+            interaction_trace_evaluation(&trace_eval, &lookup_elements).unwrap();
+
+        let log_size = trace_eval[0].domain.log_size();
+        let mut logup_gen = LogupTraceGenerator::new(log_size);
+        let mut col_gen = logup_gen.new_col();
+
+        let mut denoms = [PackedSecureField::zero(); 4];
+        let clk_col = &trace_eval[IoColumn::Clk.index()].data;
+        let ci_col = &trace_eval[IoColumn::Ci.index()].data;
+        let mv_col = &trace_eval[IoColumn::Mv.index()].data;
+        // Construct the denominator for each row of the logUp column, from the main trace
+        // evaluation.
+        for vec_row in 0..1 << (log_size - LOG_N_LANES) {
+            let clk = clk_col[vec_row];
+            let ci = ci_col[vec_row];
+            let mv = mv_col[vec_row];
+            let denom: PackedSecureField = lookup_elements.combine(&[clk, ci, mv]);
+            denoms[vec_row] = denom;
+        }
+
+        let num_0 = -PackedSecureField::one();
+        let num_1 = -PackedSecureField::one();
+        let num_2 = -PackedSecureField::one();
+        let num_3 = PackedSecureField::zero();
+
+        col_gen.write_frac(0, num_0, denoms[0]);
+        col_gen.write_frac(1, num_1, denoms[1]);
+        col_gen.write_frac(2, num_2, denoms[2]);
+        col_gen.write_frac(3, num_3, denoms[3]);
+
+        col_gen.finalize_col();
+        let (expected_interaction_trace_eval, expected_claimed_sum) = logup_gen.finalize_last();
+
+        assert_eq!(claim.log_size, log_size,);
+        for col_index in 0..expected_interaction_trace_eval.len() {
+            assert_eq!(
+                interaction_trace_eval[col_index].domain,
+                expected_interaction_trace_eval[col_index].domain
+            );
+            assert_eq!(
+                interaction_trace_eval[col_index].to_cpu().values,
+                expected_interaction_trace_eval[col_index].to_cpu().values
+            );
+        }
+        assert_eq!(interaction_claim.claimed_sum, expected_claimed_sum);
     }
 }
