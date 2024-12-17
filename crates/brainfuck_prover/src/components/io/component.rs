@@ -1,7 +1,11 @@
 use brainfuck_vm::instruction::InstructionType;
+use num_traits::One;
 use stwo_prover::{
-    constraint_framework::{EvalAtRow, FrameworkComponent, FrameworkEval},
-    core::{channel::Channel, fields::qm31::SecureField},
+    constraint_framework::{EvalAtRow, FrameworkComponent, FrameworkEval, RelationEntry},
+    core::{
+        channel::Channel,
+        fields::{m31::BaseField, qm31::SecureField},
+    },
 };
 
 use crate::components::IoClaim;
@@ -10,24 +14,27 @@ use super::table::IoElements;
 
 /// Implementation of `Component` and `ComponentProver`
 /// for the `SimdBackend` from the constraint framework provided by Stwo
-pub type InputComponent = FrameworkComponent<IoEval<{ InstructionType::ReadChar.to_u32() }>>;
+pub type InputComponent = FrameworkComponent<InputEval>;
+
+pub type InputEval = IoEval<{ InstructionType::ReadChar.to_u32() }>;
 
 /// Implementation of `Component` and `ComponentProver`
 /// for the `SimdBackend` from the constraint framework provided by Stwo
-pub type OutputComponent = FrameworkComponent<IoEval<{ InstructionType::PutChar.to_u32() }>>;
+pub type OutputComponent = FrameworkComponent<OutputEval>;
 
+pub type OutputEval = IoEval<{ InstructionType::PutChar.to_u32() }>;
 /// The AIR for the I/O components.
 ///
 /// Constraints are defined through the `FrameworkEval`
 /// provided by the constraint framework of Stwo.
 pub struct IoEval<const N: u32> {
     log_size: u32,
-    _io_lookup_elements: IoElements,
+    io_lookup_elements: IoElements,
 }
 
 impl<const N: u32> IoEval<N> {
     pub const fn new(claim: &IoClaim, io_lookup_elements: IoElements) -> Self {
-        Self { log_size: claim.log_size, _io_lookup_elements: io_lookup_elements }
+        Self { log_size: claim.log_size, io_lookup_elements }
     }
 }
 
@@ -59,8 +66,33 @@ impl<const N: u32> FrameworkEval for IoEval<N> {
     /// Use `eval.add_to_relation` to define a global constraint for the logUp protocol.
     ///
     /// The logUp must be finalized with `eval.finalize_logup()`.
-    fn evaluate<E: EvalAtRow>(&self, _eval: E) -> E {
-        todo!()
+    fn evaluate<E: EvalAtRow>(&self, mut eval: E) -> E {
+        let clk = eval.next_trace_mask();
+        let ci = eval.next_trace_mask();
+        let mv = eval.next_trace_mask();
+        let d = eval.next_trace_mask();
+
+        // `ci` is either 0 (dummy row), or equal to the I/O instruction
+        let is_io_instruction =
+            ci.clone() - InstructionType::try_from(N).unwrap().to_base_field().into();
+        eval.add_constraint(ci.clone() * is_io_instruction);
+
+        // The dummy is either 0 or 1
+        eval.add_constraint(d.clone() * (d.clone() - BaseField::one().into()));
+
+        // If d is set, then `mv` equals 0
+        eval.add_constraint(d.clone() * mv.clone());
+
+        // If ci is set, then `ci` equals 0
+        eval.add_constraint(d.clone() * ci.clone());
+
+        let num = E::EF::from(d) - E::EF::one();
+
+        eval.add_to_relation(&[RelationEntry::new(&self.io_lookup_elements, num, &[clk, ci, mv])]);
+
+        eval.finalize_logup();
+
+        eval
     }
 }
 
@@ -82,5 +114,120 @@ impl InteractionClaim {
     /// to bound the proof to the trace.
     pub fn mix_into(&self, channel: &mut impl Channel) {
         channel.mix_felts(&[self.claimed_sum]);
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use brainfuck_vm::{compiler::Compiler, test_helper::create_test_machine};
+    use stwo_prover::{
+        constraint_framework::{
+            assert_constraints, preprocessed_columns::gen_is_first, FrameworkEval,
+        },
+        core::{
+            pcs::TreeVec,
+            poly::circle::{CanonicCoset, CircleEvaluation},
+        },
+    };
+
+    use crate::components::io::{
+        component::{InputEval, OutputEval},
+        table::{interaction_trace_evaluation, InputTable, IoElements, OutputTable},
+    };
+
+    #[test]
+    fn test_input_constraints() {
+        const LOG_SIZE: u32 = 4;
+
+        // Get an execution trace from a valid Brainfuck program
+        let code = "+++>,<[>+.<-]";
+        let mut compiler = Compiler::new(code);
+        let instructions = compiler.compile();
+        let (mut machine, _) = create_test_machine(&instructions, &[1]);
+        let () = machine.execute().expect("Failed to execute machine");
+
+        let trace_vm = machine.trace();
+
+        // Construct the IsFirst preprocessed column
+        let is_first_col = gen_is_first(LOG_SIZE);
+        let preprocessed_trace = vec![is_first_col];
+
+        // Construct the main trace from the execution trace
+        let table = InputTable::from(trace_vm);
+        let (main_trace, claim) = table.trace_evaluation();
+
+        // Draw Interaction elements
+        let input_lookup_elements = IoElements::dummy();
+
+        // Generate interaction trace
+        let (interaction_trace, interaction_claim) =
+            interaction_trace_evaluation(&main_trace, &input_lookup_elements).unwrap();
+
+        // Create the trace evaluation TreeVec
+        let trace = TreeVec::new(vec![preprocessed_trace, main_trace, interaction_trace]);
+
+        // Interpolate the trace for the evaluation
+        let trace_polys = trace.map_cols(CircleEvaluation::interpolate);
+
+        // Get the Memory AIR evaluator
+        let input_eval = InputEval::new(&claim, input_lookup_elements);
+
+        // Assert that the constraints are valid for a valid Brainfuck program.
+        assert_constraints(
+            &trace_polys,
+            CanonicCoset::new(LOG_SIZE),
+            |eval| {
+                input_eval.evaluate(eval);
+            },
+            (interaction_claim.claimed_sum, None),
+        );
+    }
+
+    #[test]
+    fn test_output_constraints() {
+        const LOG_SIZE: u32 = 6;
+
+        // Get an execution trace from a valid Brainfuck program
+        let code = "+++>,<[>+.<-]";
+        let mut compiler = Compiler::new(code);
+        let instructions = compiler.compile();
+        let (mut machine, _) = create_test_machine(&instructions, &[1]);
+        let () = machine.execute().expect("Failed to execute machine");
+
+        let trace_vm = machine.trace();
+
+        // Construct the IsFirst preprocessed column
+        let is_first_col = gen_is_first(LOG_SIZE);
+        let preprocessed_trace = vec![is_first_col];
+
+        // Construct the main trace from the execution trace
+        let table = OutputTable::from(trace_vm);
+        let (main_trace, claim) = table.trace_evaluation();
+
+        // Draw Interaction elements
+        let output_lookup_elements = IoElements::dummy();
+
+        // Generate interaction trace
+        let (interaction_trace, interaction_claim) =
+            interaction_trace_evaluation(&main_trace, &output_lookup_elements).unwrap();
+
+        // Create the trace evaluation TreeVec
+        let trace = TreeVec::new(vec![preprocessed_trace, main_trace, interaction_trace]);
+
+        // Interpolate the trace for the evaluation
+        let trace_polys = trace.map_cols(CircleEvaluation::interpolate);
+
+        // Get the Memory AIR evaluator
+        let output_eval = OutputEval::new(&claim, output_lookup_elements);
+
+        // Assert that the constraints are valid for a valid Brainfuck program.
+        assert_constraints(
+            &trace_polys,
+            CanonicCoset::new(LOG_SIZE),
+            |eval| {
+                output_eval.evaluate(eval);
+            },
+            (interaction_claim.claimed_sum, None),
+        );
     }
 }
