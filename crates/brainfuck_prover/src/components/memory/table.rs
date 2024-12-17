@@ -327,7 +327,7 @@ pub struct MemoryTableEntry {
     mp: BaseField,
     /// Memory value: value of the cell pointer by `mp` - values in [0..2^31 - 1)
     mv: BaseField,
-    /// Dummy: Flag whether the row is a dummy one or not
+    /// Dummy: Flag whether the entry is a dummy one or not
     d: BaseField,
 }
 
