@@ -1,4 +1,3 @@
-use super::component::InteractionClaim;
 use crate::components::{InstructionClaim, TraceColumn, TraceError, TraceEval};
 use brainfuck_vm::{machine::ProgramMemory, registers::Registers};
 use num_traits::{One, Zero};
@@ -17,6 +16,8 @@ use stwo_prover::{
         poly::circle::{CanonicCoset, CircleEvaluation},
     },
 };
+
+use super::component::InteractionClaim;
 
 /// Represents the Instruction Table, which holds the required registers
 /// for the Instruction component.
@@ -487,105 +488,34 @@ pub fn interaction_trace_evaluation(
 
     let mut logup_gen = LogupTraceGenerator::new(log_size);
 
-    // As the Instruction table is the concatenation of the execution trace
-    // and the compiled program, sorted by `ip`, we can assume that
-    // - Whenever `ip` remains the same between the current one and the previous one,
-    // then the row is considered part of the execution trace.
-    // - Whenever there an `ip` change between the current row and the previous one,
-    // then we are on the first row of the given `ip`, which is then considered a row of the
-    // program.
+    // The Instruction table is the concatenation of the execution trace
+    // and the compiled program, sorted by `ip`.
     //
-    // This way, we have two disjoint subset whose unionis the Instruction table.
-    // The first one can be used to prove the relation with the Processor,
-    // the second one can be used to prove the relation with the Program.
-
-    // First Column - Instruction & Processor
-    // We want to prove that the subset of rows of the Instruction table
-    // which is from the execution trace is a permutation of the Processor table.
+    // We want to prove that the Instruction table is a permutation of the Processor table
+    // and a sublist of the Program table (as two disjoint subset whose union is the Instruction
+    // table). To do so we make a lookup argument which yields for the Processor and the
+    // Instruction. Here, each fraction have a multiplicity of -1, while the counterpart in the
+    // Processor and Program components will have a multiplicity of 1.
+    // The order is kept by having the `ip` register in the denominator.
     let mut col_gen = logup_gen.new_col();
 
     let ip_col = &main_trace_eval[InstructionColumn::Ip.index()].data;
     let ci_col = &main_trace_eval[InstructionColumn::Ci.index()].data;
     let ni_col = &main_trace_eval[InstructionColumn::Ni.index()].data;
+    let d_col = &main_trace_eval[InstructionColumn::D.index()].data;
 
-    // The very first row (index 0) is considered part of the Program subset,
-    // thus not part of the Processor subset.
-    col_gen.write_frac(
-        0,
-        PackedSecureField::zero(),
-        lookup_elements.combine(&[ip_col[0], ci_col[0], ni_col[0]]),
-    );
-
-    // Populates the first logUp column for the Processor permutation argument.
-    let mut prev_ip = ip_col[0];
-    for vec_row in 1..1 << (log_size - LOG_N_LANES) {
+    for vec_row in 0..1 << (log_size - LOG_N_LANES) {
         let ip = ip_col[vec_row];
         let ci = ci_col[vec_row];
         let ni = ni_col[vec_row];
+        let d = d_col[vec_row];
 
-        // Set the multiplicity to 0 if it's a padding row (ci = 0) or if ip has changed,
-        // otherwise set it to -1.
-        let num = ci_col.get(vec_row).map_or_else(
-            || {
-                panic!("Unaccessible vec row.");
-            },
-            |value| {
-                if value.is_zero() || !(ip - prev_ip).is_zero() {
-                    PackedSecureField::zero()
-                } else {
-                    -PackedSecureField::one()
-                }
-            },
-        );
+        let num = PackedSecureField::from(d) - PackedSecureField::one();
         let denom: PackedSecureField = lookup_elements.combine(&[ip, ci, ni]);
         col_gen.write_frac(vec_row, num, denom);
-
-        prev_ip = ip;
     }
 
     col_gen.finalize_col();
-
-    // Second Column - Instruction & Program
-    // We want to prove that a subset of the rows of the Instruction table (which is disjoint from
-    // the previous subset of rows) is an ordered set equality of the Program.
-    let mut col_gen = logup_gen.new_col();
-
-    // Populates the second logUp column for the Program evaluation argument.
-    col_gen.write_frac(
-        0,
-        -PackedSecureField::one(),
-        lookup_elements.combine(&[ip_col[0], ci_col[0], ni_col[0]]),
-    );
-
-    let mut prev_ip = ip_col[0];
-    for vec_row in 1..1 << (log_size - LOG_N_LANES) {
-        let ip = ip_col[vec_row];
-        let ci = ci_col[vec_row];
-        let ni = ni_col[vec_row];
-
-        // Set the multiplicity to 0 if it's a padding row (ci = 0) or if ip remains the same,
-        // otherwise set it to -1.
-        let num = ci_col.get(vec_row).map_or_else(
-            || {
-                panic!("Unaccessible vec row.");
-            },
-            |value| {
-                if value.is_zero() || (ip - prev_ip).is_zero() {
-                    PackedSecureField::zero()
-                } else {
-                    -PackedSecureField::one()
-                }
-            },
-        );
-        // Only the common registers with the processor table are part of the extension column.
-        let denom: PackedSecureField = lookup_elements.combine(&[ip, ci, ni]);
-        col_gen.write_frac(vec_row, num, denom);
-
-        prev_ip = ip;
-    }
-
-    col_gen.finalize_col();
-
     let (trace, claimed_sum) = logup_gen.finalize_last();
 
     Ok((trace, InteractionClaim { claimed_sum }))
@@ -1072,10 +1002,10 @@ mod tests {
     #[allow(clippy::similar_names)]
     #[test]
     fn test_interaction_trace_evaluation() {
-        let code = "+->";
+        let code = "+->[-]";
         let mut compiler = Compiler::new(code);
         let instructions = compiler.compile();
-        let (mut machine, _) = create_test_machine(&instructions, &[1]);
+        let (mut machine, _) = create_test_machine(&instructions, &[]);
         let () = machine.execute().expect("Failed to execute machine");
 
         let trace = machine.trace();
@@ -1090,7 +1020,7 @@ mod tests {
 
         let log_size = trace_eval[0].domain.log_size();
 
-        let mut denoms = [PackedSecureField::zero(); 8];
+        let mut denoms = [PackedSecureField::zero(); 16];
         let ip_col = &trace_eval[InstructionColumn::Ip.index()].data;
         let ci_col = &trace_eval[InstructionColumn::Ci.index()].data;
         let ni_col = &trace_eval[InstructionColumn::Ni.index()].data;
@@ -1107,31 +1037,24 @@ mod tests {
 
         let mut logup_gen = LogupTraceGenerator::new(log_size);
 
-        // First Column - Instruction & Processor
-        let mut col_gen = logup_gen.new_col();
-
-        col_gen.write_frac(0, PackedSecureField::zero(), denoms[0]);
-        col_gen.write_frac(1, -PackedSecureField::one(), denoms[1]);
-        col_gen.write_frac(2, PackedSecureField::zero(), denoms[2]);
-        col_gen.write_frac(3, -PackedSecureField::one(), denoms[3]);
-        col_gen.write_frac(4, PackedSecureField::zero(), denoms[4]);
-        col_gen.write_frac(5, -PackedSecureField::one(), denoms[5]);
-        col_gen.write_frac(6, PackedSecureField::zero(), denoms[6]);
-        col_gen.write_frac(7, PackedSecureField::zero(), denoms[7]);
-
-        col_gen.finalize_col();
-
-        // Second Column - Instruction & Program
         let mut col_gen = logup_gen.new_col();
 
         col_gen.write_frac(0, -PackedSecureField::one(), denoms[0]);
-        col_gen.write_frac(1, PackedSecureField::zero(), denoms[1]);
+        col_gen.write_frac(1, -PackedSecureField::one(), denoms[1]);
         col_gen.write_frac(2, -PackedSecureField::one(), denoms[2]);
-        col_gen.write_frac(3, PackedSecureField::zero(), denoms[3]);
+        col_gen.write_frac(3, -PackedSecureField::one(), denoms[3]);
         col_gen.write_frac(4, -PackedSecureField::one(), denoms[4]);
-        col_gen.write_frac(5, PackedSecureField::zero(), denoms[5]);
-        col_gen.write_frac(6, PackedSecureField::zero(), denoms[6]);
-        col_gen.write_frac(7, PackedSecureField::zero(), denoms[7]);
+        col_gen.write_frac(5, -PackedSecureField::one(), denoms[5]);
+        col_gen.write_frac(6, -PackedSecureField::one(), denoms[6]);
+        col_gen.write_frac(7, -PackedSecureField::one(), denoms[7]);
+        col_gen.write_frac(8, -PackedSecureField::one(), denoms[8]);
+        col_gen.write_frac(9, -PackedSecureField::one(), denoms[9]);
+        col_gen.write_frac(10, -PackedSecureField::one(), denoms[10]);
+        col_gen.write_frac(11, -PackedSecureField::one(), denoms[11]);
+        col_gen.write_frac(12, -PackedSecureField::one(), denoms[12]);
+        col_gen.write_frac(13, PackedSecureField::zero(), denoms[13]);
+        col_gen.write_frac(14, PackedSecureField::zero(), denoms[14]);
+        col_gen.write_frac(15, PackedSecureField::zero(), denoms[15]);
 
         col_gen.finalize_col();
 
