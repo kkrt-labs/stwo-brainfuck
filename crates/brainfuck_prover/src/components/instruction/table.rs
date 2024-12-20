@@ -2,10 +2,13 @@ use crate::components::{InstructionClaim, TraceColumn, TraceError, TraceEval};
 use brainfuck_vm::{machine::ProgramMemory, registers::Registers};
 use num_traits::{One, Zero};
 use stwo_prover::{
-    constraint_framework::{logup::LookupElements, Relation, RelationEFTraitBound},
+    constraint_framework::{
+        logup::{LogupTraceGenerator, LookupElements},
+        Relation, RelationEFTraitBound,
+    },
     core::{
         backend::{
-            simd::{column::BaseColumn, m31::LOG_N_LANES},
+            simd::{column::BaseColumn, m31::LOG_N_LANES, qm31::PackedSecureField},
             Column,
         },
         channel::Channel,
@@ -13,6 +16,8 @@ use stwo_prover::{
         poly::circle::{CanonicCoset, CircleEvaluation},
     },
 };
+
+use super::component::InteractionClaim;
 
 /// Represents the Instruction Table, which holds the required registers
 /// for the Instruction component.
@@ -442,6 +447,65 @@ impl<F: Clone, EF: RelationEFTraitBound<F>> Relation<F, EF> for InstructionEleme
     fn get_size(&self) -> usize {
         INSTRUCTION_LOOKUP_ELEMENTS
     }
+}
+
+/// Creates the interaction trace from the main trace evaluation
+/// and the interaction elements for the Instruction component.
+///
+/// The Instruction table is the concatenation of the execution trace
+/// and the compiled program, sorted by `ip`.
+///
+/// We want to prove that the Instruction table is a permutation of the Processor table
+/// and a sublist of the Program table (as two disjoint subset whose union is the Instruction
+/// table). To do so we make a lookup argument which yields for the Processor and the
+/// Instruction. Here, each fraction have a multiplicity of -1, while the counterpart in the
+/// Processor and Program components will have a multiplicity of 1.
+/// The order is kept by having the `ip` register in the denominator.
+///
+/// Only the 'real' rows are impacting the logUp sum.
+/// Dummy rows are padding rows.
+///
+/// Here, the logUp has a single extension column, which will be used
+/// by both the Processor and the Program components.
+///
+/// # Returns
+/// - Interaction trace evaluation, to be committed.
+/// - Interaction claim: the total sum from the logUp protocol,
+/// to be mixed into the Fiat-Shamir [`Channel`].
+#[allow(clippy::similar_names)]
+pub fn interaction_trace_evaluation(
+    main_trace_eval: &TraceEval,
+    lookup_elements: &InstructionElements,
+) -> Result<(TraceEval, InteractionClaim), TraceError> {
+    if main_trace_eval.is_empty() {
+        return Err(TraceError::EmptyTrace)
+    }
+
+    let log_size = main_trace_eval[0].domain.log_size();
+
+    let mut logup_gen = LogupTraceGenerator::new(log_size);
+    let mut col_gen = logup_gen.new_col();
+
+    let ip_col = &main_trace_eval[InstructionColumn::Ip.index()].data;
+    let ci_col = &main_trace_eval[InstructionColumn::Ci.index()].data;
+    let ni_col = &main_trace_eval[InstructionColumn::Ni.index()].data;
+    let d_col = &main_trace_eval[InstructionColumn::D.index()].data;
+
+    for vec_row in 0..1 << (log_size - LOG_N_LANES) {
+        let ip = ip_col[vec_row];
+        let ci = ci_col[vec_row];
+        let ni = ni_col[vec_row];
+        let d = d_col[vec_row];
+
+        let num = PackedSecureField::from(d) - PackedSecureField::one();
+        let denom: PackedSecureField = lookup_elements.combine(&[ip, ci, ni]);
+        col_gen.write_frac(vec_row, num, denom);
+    }
+
+    col_gen.finalize_col();
+    let (trace, claimed_sum) = logup_gen.finalize_last();
+
+    Ok((trace, InteractionClaim { claimed_sum }))
 }
 
 #[cfg(test)]
@@ -911,5 +975,89 @@ mod tests {
                 "Trace column domain should match expected circle domain."
             );
         }
+    }
+
+    #[test]
+    fn test_empty_interaction_trace_evaluation() {
+        let empty_eval = vec![];
+        let lookup_elements = InstructionElements::dummy();
+        let interaction_trace_eval = interaction_trace_evaluation(&empty_eval, &lookup_elements);
+
+        assert!(matches!(interaction_trace_eval, Err(TraceError::EmptyTrace)));
+    }
+
+    #[allow(clippy::similar_names)]
+    #[test]
+    fn test_interaction_trace_evaluation() {
+        let code = "+->[-]";
+        let mut compiler = Compiler::new(code);
+        let instructions = compiler.compile();
+        let (mut machine, _) = create_test_machine(&instructions, &[]);
+        let () = machine.execute().expect("Failed to execute machine");
+
+        let trace = machine.trace();
+        let intermediate_table = InstructionIntermediateTable::from((&trace, machine.program()));
+        let instruction_table = InstructionTable::from(intermediate_table);
+
+        let (trace_eval, claim) = instruction_table.trace_evaluation().unwrap();
+
+        let lookup_elements = InstructionElements::dummy();
+        let (interaction_trace_eval, interaction_claim) =
+            interaction_trace_evaluation(&trace_eval, &lookup_elements).unwrap();
+
+        let log_size = trace_eval[0].domain.log_size();
+
+        let mut denoms = [PackedSecureField::zero(); 16];
+        let ip_col = &trace_eval[InstructionColumn::Ip.index()].data;
+        let ci_col = &trace_eval[InstructionColumn::Ci.index()].data;
+        let ni_col = &trace_eval[InstructionColumn::Ni.index()].data;
+
+        // Construct the denominator for each row of the logUp column, from the main trace
+        // evaluation.
+        for vec_row in 0..1 << (log_size - LOG_N_LANES) {
+            let ip = ip_col[vec_row];
+            let ci = ci_col[vec_row];
+            let ni = ni_col[vec_row];
+            let denom: PackedSecureField = lookup_elements.combine(&[ip, ci, ni]);
+            denoms[vec_row] = denom;
+        }
+
+        let mut logup_gen = LogupTraceGenerator::new(log_size);
+
+        let mut col_gen = logup_gen.new_col();
+
+        col_gen.write_frac(0, -PackedSecureField::one(), denoms[0]);
+        col_gen.write_frac(1, -PackedSecureField::one(), denoms[1]);
+        col_gen.write_frac(2, -PackedSecureField::one(), denoms[2]);
+        col_gen.write_frac(3, -PackedSecureField::one(), denoms[3]);
+        col_gen.write_frac(4, -PackedSecureField::one(), denoms[4]);
+        col_gen.write_frac(5, -PackedSecureField::one(), denoms[5]);
+        col_gen.write_frac(6, -PackedSecureField::one(), denoms[6]);
+        col_gen.write_frac(7, -PackedSecureField::one(), denoms[7]);
+        col_gen.write_frac(8, -PackedSecureField::one(), denoms[8]);
+        col_gen.write_frac(9, -PackedSecureField::one(), denoms[9]);
+        col_gen.write_frac(10, -PackedSecureField::one(), denoms[10]);
+        col_gen.write_frac(11, -PackedSecureField::one(), denoms[11]);
+        col_gen.write_frac(12, -PackedSecureField::one(), denoms[12]);
+        col_gen.write_frac(13, PackedSecureField::zero(), denoms[13]);
+        col_gen.write_frac(14, PackedSecureField::zero(), denoms[14]);
+        col_gen.write_frac(15, PackedSecureField::zero(), denoms[15]);
+
+        col_gen.finalize_col();
+
+        let (expected_interaction_trace_eval, expected_claimed_sum) = logup_gen.finalize_last();
+
+        assert_eq!(claim.log_size, log_size,);
+        for col_index in 0..expected_interaction_trace_eval.len() {
+            assert_eq!(
+                interaction_trace_eval[col_index].domain,
+                expected_interaction_trace_eval[col_index].domain
+            );
+            assert_eq!(
+                interaction_trace_eval[col_index].to_cpu().values,
+                expected_interaction_trace_eval[col_index].to_cpu().values
+            );
+        }
+        assert_eq!(interaction_claim.claimed_sum, expected_claimed_sum);
     }
 }
