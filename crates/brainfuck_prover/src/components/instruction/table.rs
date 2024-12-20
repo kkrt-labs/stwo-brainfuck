@@ -452,24 +452,21 @@ impl<F: Clone, EF: RelationEFTraitBound<F>> Relation<F, EF> for InstructionEleme
 /// Creates the interaction trace from the main trace evaluation
 /// and the interaction elements for the Instruction component.
 ///
-/// The Processor component uses the other components:
-/// The Processor component multiplicities are then positive,
-/// and the Instruction component multiplicities are negative
-/// in the logUp protocol.
+/// The Instruction table is the concatenation of the execution trace
+/// and the compiled program, sorted by `ip`.
+///
+/// We want to prove that the Instruction table is a permutation of the Processor table
+/// and a sublist of the Program table (as two disjoint subset whose union is the Instruction
+/// table). To do so we make a lookup argument which yields for the Processor and the
+/// Instruction. Here, each fraction have a multiplicity of -1, while the counterpart in the
+/// Processor and Program components will have a multiplicity of 1.
+/// The order is kept by having the `ip` register in the denominator.
 ///
 /// Only the 'real' rows are impacting the logUp sum.
-/// Dummy rows are padded rows.
+/// Dummy rows are padding rows.
 ///
-/// Here, the logUp has two extension columns:
-/// - One to link the Instruction component with the Processor component.
-/// - one to link the Instruction component with the Program component.
-///
-/// - They use the main Instruction trace as two disjoint subsets:
-/// The subset for the Program is constituted of rows whose `ip` register value
-/// remains the same with the previous `ip` register value. (It includes the first entry).
-///
-/// The subset for the Processor is constituted of rows whose `ip` register value
-/// has changed compared to the previous `ip` value.
+/// Here, the logUp has a single extension column, which will be used
+/// by both the Processor and the Program components.
 ///
 /// # Returns
 /// - Interaction trace evaluation, to be committed.
