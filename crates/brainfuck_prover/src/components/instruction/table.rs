@@ -484,16 +484,6 @@ pub fn interaction_trace_evaluation(
     let log_size = main_trace_eval[0].domain.log_size();
 
     let mut logup_gen = LogupTraceGenerator::new(log_size);
-
-    // The Instruction table is the concatenation of the execution trace
-    // and the compiled program, sorted by `ip`.
-    //
-    // We want to prove that the Instruction table is a permutation of the Processor table
-    // and a sublist of the Program table (as two disjoint subset whose union is the Instruction
-    // table). To do so we make a lookup argument which yields for the Processor and the
-    // Instruction. Here, each fraction have a multiplicity of -1, while the counterpart in the
-    // Processor and Program components will have a multiplicity of 1.
-    // The order is kept by having the `ip` register in the denominator.
     let mut col_gen = logup_gen.new_col();
 
     let ip_col = &main_trace_eval[InstructionColumn::Ip.index()].data;
