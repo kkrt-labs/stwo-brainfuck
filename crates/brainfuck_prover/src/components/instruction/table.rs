@@ -1,6 +1,6 @@
 use crate::components::{InstructionClaim, TraceColumn, TraceError, TraceEval};
 use brainfuck_vm::{machine::ProgramMemory, registers::Registers};
-use num_traits::Zero;
+use num_traits::{One, Zero};
 use stwo_prover::{
     constraint_framework::{logup::LookupElements, Relation, RelationEFTraitBound},
     core::{
@@ -91,16 +91,20 @@ impl InstructionTable {
         // - Map the `ip` value to the first column.
         // - Map the `ci` value to the second column.
         // - Map the `ni` value to the third column.
+        // - Map the `d` value to the fourth column.
         // - Map the `next_ip` value to the fourth column.
         // - Map the `next_ci` value to the fifth column.
         // - Map the `next_ni` value to the sixth column.
+        // - Map the `next_d` value to the seventh column.
         for (index, row) in self.table.iter().enumerate().take(1 << log_n_rows) {
             trace[InstructionColumn::Ip.index()].data[index] = row.ip.into();
             trace[InstructionColumn::Ci.index()].data[index] = row.ci.into();
             trace[InstructionColumn::Ni.index()].data[index] = row.ni.into();
+            trace[InstructionColumn::D.index()].data[index] = row.d.into();
             trace[InstructionColumn::NextIp.index()].data[index] = row.next_ip.into();
             trace[InstructionColumn::NextCi.index()].data[index] = row.next_ci.into();
             trace[InstructionColumn::NextNi.index()].data[index] = row.next_ni.into();
+            trace[InstructionColumn::NextD.index()].data[index] = row.next_d.into();
         }
 
         // Create a circle domain using a canonical coset.
@@ -168,12 +172,16 @@ pub struct InstructionTableRow {
     ci: BaseField,
     /// Next instruction
     ni: BaseField,
+    /// Dummy: Flag whether the current entry is a dummy one or not.
+    d: BaseField,
     /// Next Instruction pointer.
     next_ip: BaseField,
     /// Next Current instruction.
     next_ci: BaseField,
     /// Next Next instruction.
     next_ni: BaseField,
+    /// Next Dummy.
+    next_d: BaseField,
 }
 
 impl InstructionTableRow {
@@ -186,9 +194,11 @@ impl InstructionTableRow {
             ip: entry_1.ip,
             ci: entry_1.ci,
             ni: entry_1.ni,
+            d: entry_1.d,
             next_ip: entry_2.ip,
             next_ci: entry_2.ci,
             next_ni: entry_2.ni,
+            next_d: entry_2.d,
         }
     }
 }
@@ -295,6 +305,7 @@ impl From<(&Vec<Registers>, &ProgramMemory)> for InstructionIntermediateTable {
 /// - The instruction pointer (`ip`),
 /// - The current instruction (`ci`),
 /// - The next instruction (`ni`).
+/// - The dummy flag (`d`).
 #[derive(Debug, Default, PartialEq, Eq, Clone)]
 pub struct InstructionTableEntry {
     /// Instruction pointer: points to the current instruction in the program.
@@ -305,6 +316,8 @@ pub struct InstructionTableEntry {
     /// - The instruction that follows `ci` in the program,
     /// - 0 if out of bounds.
     ni: BaseField,
+    /// Dummy: Flag whether the entry is a dummy one or not.
+    d: BaseField,
 }
 
 impl InstructionTableEntry {
@@ -312,8 +325,8 @@ impl InstructionTableEntry {
     ///
     /// A 'real' entry, is an entry that is part of the execution trace from the Brainfuck program
     /// execution.
-    pub const fn new(ip: BaseField, ci: BaseField, ni: BaseField) -> Self {
-        Self { ip, ci, ni }
+    pub fn new(ip: BaseField, ci: BaseField, ni: BaseField) -> Self {
+        Self { ip, ci, ni, ..Default::default() }
     }
 
     /// Creates an entry for the [`InstructionIntermediateTable`] which is considered 'dummy'.
@@ -322,7 +335,7 @@ impl InstructionTableEntry {
     /// program execution.
     /// They are used to flag padding rows.
     pub fn new_dummy(ip: BaseField) -> Self {
-        Self { ip, ..Default::default() }
+        Self { ip, d: BaseField::one(), ..Default::default() }
     }
 }
 
@@ -345,12 +358,16 @@ pub enum InstructionColumn {
     Ci,
     /// Index of the `ni` register column in the Instruction trace.
     Ni,
+    /// Index of the `d` register column in the Memory trace.
+    D,
     /// Index of the `next_ip` register column in the Instruction trace.
     NextIp,
     /// Index of the `next_ci` register column in the Instruction trace.
     NextCi,
     /// Index of the `next_ni` register column in the Instruction trace.
     NextNi,
+    /// Index of the `next_d` register column in the Memory trace.
+    NextD,
 }
 
 impl InstructionColumn {
@@ -360,16 +377,18 @@ impl InstructionColumn {
             Self::Ip => 0,
             Self::Ci => 1,
             Self::Ni => 2,
-            Self::NextIp => 3,
-            Self::NextCi => 4,
-            Self::NextNi => 5,
+            Self::D => 3,
+            Self::NextIp => 4,
+            Self::NextCi => 5,
+            Self::NextNi => 6,
+            Self::NextD => 7,
         }
     }
 }
 
 impl TraceColumn for InstructionColumn {
     fn count() -> (usize, usize) {
-        (6, 2)
+        (8, 1)
     }
 }
 
@@ -451,6 +470,7 @@ mod tests {
             ip: BaseField::one(),
             ci: BaseField::from(43),
             ni: BaseField::from(45),
+            d: BaseField::zero(),
         };
 
         assert_eq!(entry, expected_entry);
@@ -464,6 +484,7 @@ mod tests {
             ip: BaseField::one(),
             ci: BaseField::zero(),
             ni: BaseField::zero(),
+            d: BaseField::one(),
         };
 
         assert_eq!(entry, expected_entry);
@@ -481,9 +502,11 @@ mod tests {
             ip: BaseField::zero(),
             ci: BaseField::from(43),
             ni: BaseField::from(45),
+            d: BaseField::zero(),
             next_ip: BaseField::one(),
             next_ci: BaseField::zero(),
             next_ni: BaseField::zero(),
+            next_d: BaseField::one(),
         };
         assert_eq!(row, expected_row);
     }
@@ -757,9 +780,11 @@ mod tests {
         let expected_ip_column = vec![BaseField::one(); 1 << LOG_N_LANES];
         let expected_ci_column = vec![BaseField::from(43); 1 << LOG_N_LANES];
         let expected_ni_column = vec![BaseField::from(91); 1 << LOG_N_LANES];
+        let expected_d_column = vec![BaseField::zero(); 1 << LOG_N_LANES];
         let expected_next_ip_column = vec![BaseField::one(); 1 << LOG_N_LANES];
         let expected_next_ci_column = vec![BaseField::zero(); 1 << LOG_N_LANES];
         let expected_next_ni_column = vec![BaseField::zero(); 1 << LOG_N_LANES];
+        let expected_next_d_column = vec![BaseField::one(); 1 << LOG_N_LANES];
 
         // Check that the entire column matches expected values
         assert_eq!(
@@ -777,6 +802,11 @@ mod tests {
             expected_ni_column,
             "NI column should match expected values."
         );
+        assert_eq!(
+            trace[InstructionColumn::D.index()].to_cpu().values,
+            expected_d_column,
+            "D column should match expected values."
+        );
 
         // Check that the entire column matches expected values
         assert_eq!(
@@ -793,6 +823,11 @@ mod tests {
             trace[InstructionColumn::NextNi.index()].to_cpu().values,
             expected_next_ni_column,
             "Next NI column should match expected values."
+        );
+        assert_eq!(
+            trace[InstructionColumn::NextD.index()].to_cpu().values,
+            expected_next_d_column,
+            "Next D column should match expected values."
         );
     }
 
