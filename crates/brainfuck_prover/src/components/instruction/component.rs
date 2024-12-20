@@ -73,20 +73,26 @@ impl FrameworkEval for InstructionEval {
         let next_ip = eval.next_trace_mask();
         let next_ci = eval.next_trace_mask();
         let next_ni = eval.next_trace_mask();
-        // TODO: Looks unnecessary here, might as well remove it.
-        let _next_d = eval.next_trace_mask();
+        let next_d = eval.next_trace_mask();
 
         // Boundary constraints
         eval.add_constraint(is_first * ip.clone());
 
         // Consistency constraints
         eval.add_constraint(d.clone() * (d.clone() - BaseField::one().into()));
+        eval.add_constraint(next_d.clone() * (next_d.clone() - BaseField::one().into()));
 
-        // If d is set, then `ci` equals 0
+        // If `d` is set, then `ci` equals 0
         eval.add_constraint(d.clone() * ci.clone());
 
-        // If ci is set, then `ni` equals 0
+        // If `d` is set, then `ni` equals 0
         eval.add_constraint(d.clone() * ni.clone());
+
+        // If `next_d` is set, then `next_ci` equals 0
+        eval.add_constraint(next_d.clone() * next_ci.clone());
+
+        // If `next_d` is set, then `ni` equals 0
+        eval.add_constraint(next_d * next_ni.clone());
 
         // Transition constraints
 
