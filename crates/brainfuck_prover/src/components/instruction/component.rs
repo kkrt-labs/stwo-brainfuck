@@ -61,7 +61,6 @@ impl FrameworkEval for InstructionEval {
     ///
     /// The logUp must be finalized with `eval.finalize_logup()`.
     #[allow(clippy::similar_names)]
-    #[allow(clippy::redundant_clone)]
     fn evaluate<E: EvalAtRow>(&self, mut eval: E) -> E {
         // Get the preprocessed column to check boundary constraints
         let is_first = eval.get_preprocessed_column(PreprocessedColumn::IsFirst(self.log_size()));
@@ -74,6 +73,7 @@ impl FrameworkEval for InstructionEval {
         let next_ip = eval.next_trace_mask();
         let next_ci = eval.next_trace_mask();
         let next_ni = eval.next_trace_mask();
+        // TODO: Looks unnecessary here, might as well remove it.
         let _next_d = eval.next_trace_mask();
 
         // Boundary constraints
@@ -98,14 +98,12 @@ impl FrameworkEval for InstructionEval {
 
         // If `ip` remains the same, then `ci` remains the same
         eval.add_constraint(
-            (next_ip.clone() - ip.clone() - BaseField::one().into()) *
-                (next_ci.clone() - ci.clone()),
+            (next_ip.clone() - ip.clone() - BaseField::one().into()) * (next_ci - ci.clone()),
         );
 
         // If `ip` remains the same, then `ni` remains the same
         eval.add_constraint(
-            (next_ip.clone() - ip.clone() - BaseField::one().into()) *
-                (next_ni.clone() - ni.clone()),
+            (next_ip - ip.clone() - BaseField::one().into()) * (next_ni - ni.clone()),
         );
 
         // Interaction constraints
@@ -114,7 +112,7 @@ impl FrameworkEval for InstructionEval {
         eval.add_to_relation(&[RelationEntry::new(
             &self.instruction_lookup_elements,
             num.into(),
-            &[ip.clone(), ci.clone(), ni.clone()],
+            &[ip, ci, ni],
         )]);
 
         eval.finalize_logup();
