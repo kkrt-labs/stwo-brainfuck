@@ -91,7 +91,9 @@ impl InstructionTable {
         // - Map the `ip` value to the first column.
         // - Map the `ci` value to the second column.
         // - Map the `ni` value to the third column.
-        // - Map the `d` value to the fourth column.
+        // - Map the `next_ip` value to the fourth column.
+        // - Map the `next_ci` value to the fifth column.
+        // - Map the `next_ni` value to the sixth column.
         for (index, row) in self.table.iter().enumerate().take(1 << log_n_rows) {
             trace[InstructionColumn::Ip.index()].data[index] = row.ip.into();
             trace[InstructionColumn::Ci.index()].data[index] = row.ci.into();
