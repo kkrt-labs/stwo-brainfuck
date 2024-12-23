@@ -1,5 +1,5 @@
-use brainfuck_vm::registers::Registers;
-use num_traits::One;
+use brainfuck_vm::{machine::ProgramMemory, registers::Registers};
+use num_traits::{One, Zero};
 use stwo_prover::{
     constraint_framework::{logup::LookupElements, Relation, RelationEFTraitBound},
     core::{
@@ -156,11 +156,30 @@ impl ProgramTable {
     }
 }
 
-impl From<&Vec<Registers>> for ProgramTable {
-    fn from(registers: &Vec<Registers>) -> Self {
+impl From<&ProgramMemory> for ProgramTable {
+    fn from(program_memory: &ProgramMemory) -> Self {
+        let mut program = Vec::new();
+
+        let code = program_memory.code();
+
+        for (index, ci) in code.iter().enumerate() {
+            // Create a `Registers` object for each instruction from the program memory and its next
+            // instruction.
+            program.push(Registers {
+                ip: BaseField::from(index as u32),
+                ci: *ci,
+                ni: if index == code.len() - 1 {
+                    BaseField::zero()
+                } else {
+                    BaseField::from(code[index + 1])
+                },
+                ..Default::default()
+            });
+        }
+
         let mut program_table = Self::new();
 
-        let rows = registers.iter().map(|x| ProgramTableRow::new(x.ip, x.ci, x.ni)).collect();
+        let rows = program.iter().map(|x| ProgramTableRow::new(x.ip, x.ci, x.ni)).collect();
         program_table.add_rows(rows);
 
         program_table.pad();
@@ -341,28 +360,29 @@ mod tests {
 
     #[test]
     fn test_program_table_from_program_memory() {
-        let code = "+>";
+        let code = "+>-";
         let mut compiler = Compiler::new(code);
         let instructions = compiler.compile();
         // Create a machine and execute the program
         let (mut machine, _) = create_test_machine(&instructions, &[1]);
         let () = machine.execute().expect("Failed to execute machine");
 
-        // Get the trace of the executed program
-        let trace = machine.trace();
+        // Get the program (instructions) of the executed program
+        let program_memory = machine.program();
 
         let ins_0 = InstructionType::Plus.to_base_field();
         let ins_1 = InstructionType::Right.to_base_field();
+        let ins_2 = InstructionType::Minus.to_base_field();
 
         let row_0 = ProgramTableRow::new(BaseField::zero(), ins_0, ins_1);
-        let row_1 = ProgramTableRow::new(BaseField::one(), ins_1, BaseField::zero());
-        let row_2 = ProgramTableRow::new(2.into(), BaseField::zero(), BaseField::zero());
+        let row_1 = ProgramTableRow::new(BaseField::one(), ins_1, ins_2);
+        let row_2 = ProgramTableRow::new(2.into(), ins_2, BaseField::zero());
         let padded_row = ProgramTableRow::new_dummy(2.into());
 
         let mut expected_program_table = ProgramTable::new();
         expected_program_table.add_rows(vec![row_0, row_1, row_2, padded_row]);
 
-        assert_eq!(ProgramTable::from(&trace), expected_program_table);
+        assert_eq!(ProgramTable::from(program_memory), expected_program_table);
     }
 
     #[test]
