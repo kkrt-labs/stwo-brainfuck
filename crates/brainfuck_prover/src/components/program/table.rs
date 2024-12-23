@@ -1,12 +1,16 @@
 use brainfuck_vm::registers::Registers;
 use num_traits::One;
-use stwo_prover::core::{
-    backend::{
-        simd::{column::BaseColumn, m31::LOG_N_LANES},
-        Column,
+use stwo_prover::{
+    constraint_framework::{logup::LookupElements, Relation, RelationEFTraitBound},
+    core::{
+        backend::{
+            simd::{column::BaseColumn, m31::LOG_N_LANES},
+            Column,
+        },
+        channel::Channel,
+        fields::m31::BaseField,
+        poly::circle::{CanonicCoset, CircleEvaluation},
     },
-    fields::m31::BaseField,
-    poly::circle::{CanonicCoset, CircleEvaluation},
 };
 
 use crate::components::{ProgramClaim, TraceColumn, TraceError, TraceEval};
@@ -193,6 +197,58 @@ impl ProgramColumn {
 impl TraceColumn for ProgramColumn {
     fn count() -> (usize, usize) {
         (4, 1)
+    }
+}
+
+/// The number of random elements necessary for the Program lookup arguments.
+const PROGRAM_LOOKUP_ELEMENTS: usize = 3;
+
+/// The interaction elements are drawn for the extension column of the Program components.
+///
+/// The logUp protocol uses these elements to combine the values of the different
+/// registers of the main trace to create a random linear combination
+/// of them, and use it in the denominator of the fractions in the logUp protocol.
+///
+/// There are three lookup elements in the Program components: `ip`, `ci` and `ni`.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct ProgramElements(LookupElements<PROGRAM_LOOKUP_ELEMENTS>);
+
+impl ProgramElements {
+    /// Provides dummy lookup elements.
+    pub fn dummy() -> Self {
+        Self(LookupElements::dummy())
+    }
+
+    /// Draw random elements from the Fiat-Shamir [`Channel`].
+    ///
+    /// These elements are randomly secured, and will be use
+    /// to generate the interaction trace with the logUp protocol.
+    pub fn draw(channel: &mut impl Channel) -> Self {
+        Self(LookupElements::draw(channel))
+    }
+}
+
+impl<F: Clone, EF: RelationEFTraitBound<F>> Relation<F, EF> for ProgramElements {
+    /// Combine multiple values from a basefield (e.g. [`BaseField`])
+    /// and combine them to a value from an extension field (e.g. [`PackedSecureField`])
+    ///
+    /// This is used when computing the interaction values from the main trace values.
+    fn combine(&self, values: &[F]) -> EF {
+        values
+            .iter()
+            .zip(self.0.alpha_powers)
+            .fold(EF::zero(), |acc, (value, power)| acc + EF::from(power) * value.clone()) -
+            self.0.z.into()
+    }
+
+    /// Returns the name of the struct.
+    fn get_name(&self) -> &str {
+        stringify!(IoElements)
+    }
+
+    /// Returns the number interaction elements.
+    fn get_size(&self) -> usize {
+        PROGRAM_LOOKUP_ELEMENTS
     }
 }
 
