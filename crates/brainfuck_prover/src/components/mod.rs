@@ -2,6 +2,7 @@ use instruction::table::InstructionColumn;
 use io::table::IoColumn;
 use memory::table::MemoryColumn;
 use processor::table::ProcessorColumn;
+use program::table::ProgramColumn;
 use stwo_prover::core::{
     backend::simd::SimdBackend,
     channel::Channel,
@@ -16,6 +17,7 @@ pub mod instruction;
 pub mod io;
 pub mod memory;
 pub mod processor;
+pub mod program;
 
 /// Type for trace evaluation to be used in Stwo.
 pub type TraceEval = ColumnVec<CircleEvaluation<SimdBackend, BaseField, BitReversedOrder>>;
@@ -31,6 +33,9 @@ pub type IoClaim = Claim<IoColumn>;
 
 /// Processor claim for the Trace.
 pub type ProcessorClaim = Claim<ProcessorColumn>;
+
+/// Program claim for the Trace.
+pub type ProgramClaim = Claim<ProgramColumn>;
 
 /// Custom error type for the Trace.
 #[derive(Debug, Error, Eq, PartialEq)]
