@@ -1,6 +1,6 @@
 use crate::components::{ProcessorClaim, TraceColumn, TraceError, TraceEval};
 use brainfuck_vm::registers::Registers;
-use num_traits::One;
+use num_traits::{One, Zero};
 use stwo_prover::core::{
     backend::{
         simd::{column::BaseColumn, m31::LOG_N_LANES},
@@ -164,6 +164,8 @@ pub struct ProcessorTableRow {
     /// Memory value inverse: the modular inverse of `mv` on the cell values' range (over
     /// [`BaseField`])
     mvi: BaseField,
+    /// Dummy: Flag whether the current entry is a dummy one or not.
+    d: BaseField,
     /// Next Clock cycle counter
     next_clk: BaseField,
     /// Next Instruction pointer
@@ -178,6 +180,8 @@ pub struct ProcessorTableRow {
     next_mv: BaseField,
     /// Next Memory value inverse
     next_mvi: BaseField,
+    /// Next Dummy.
+    next_d: BaseField,
 }
 
 impl ProcessorTableRow {
@@ -194,6 +198,7 @@ impl ProcessorTableRow {
             mp: entry_1.mp,
             mv: entry_1.mv,
             mvi: entry_1.mvi,
+            d: entry_1.d,
             next_clk: entry_2.clk,
             next_ip: entry_2.ip,
             next_ci: entry_2.ci,
@@ -201,6 +206,7 @@ impl ProcessorTableRow {
             next_mp: entry_2.mp,
             next_mv: entry_2.mv,
             next_mvi: entry_2.mvi,
+            next_d: entry_2.d,
         }
     }
 }
@@ -256,10 +262,10 @@ impl ProcessorIntermediateTable {
             let trace_len = self.table.len();
             let padding_offset = (trace_len.next_power_of_two() - trace_len) as u32;
             for i in 1..=padding_offset {
-                self.add_entry(ProcessorTableEntry {
-                    clk: last_entry.clk + BaseField::from(i),
-                    ..last_entry.clone()
-                });
+                self.add_entry(ProcessorTableEntry::new_dummy(
+                    last_entry.clk + BaseField::from(i),
+                    last_entry.ip,
+                ));
             }
         }
     }
@@ -308,19 +314,48 @@ pub struct ProcessorTableEntry {
     /// Memory value inverse: the modular inverse of `mv` on the cell values' range (over
     /// [`BaseField`])
     mvi: BaseField,
+    /// Dummy: Flag whether the current entry is a dummy one or not.
+    d: BaseField,
+}
+
+impl ProcessorTableEntry {
+    /// Creates an entry for the [`ProcessorIntermediateTable`] which is considered 'real'.
+    ///
+    /// A 'real' entry, is an entry that is part of the execution trace from the Brainfuck program
+    /// execution.
+    pub fn new(
+        clk: BaseField,
+        ip: BaseField,
+        ci: BaseField,
+        ni: BaseField,
+        mp: BaseField,
+        mv: BaseField,
+        mvi: BaseField,
+    ) -> Self {
+        Self { clk, ip, ci, ni, mp, mv, mvi, d: BaseField::zero() }
+    }
+
+    /// Creates an entry for the [`InstructionIntermediateTable`] which is considered 'dummy'.
+    ///
+    /// A 'dummy' entry, is an entry that is not part of the execution trace from the Brainfuck
+    /// program execution.
+    /// They are used to flag padding rows.
+    pub fn new_dummy(clk: BaseField, ip: BaseField) -> Self {
+        Self { clk, ip, d: BaseField::one(), ..Default::default() }
+    }
 }
 
 impl From<&Registers> for ProcessorTableEntry {
     fn from(registers: &Registers) -> Self {
-        Self {
-            clk: registers.clk,
-            ip: registers.ip,
-            ci: registers.ci,
-            ni: registers.ni,
-            mp: registers.mp,
-            mv: registers.mv,
-            mvi: registers.mvi,
-        }
+        Self::new(
+            registers.clk,
+            registers.ip,
+            registers.ci,
+            registers.ni,
+            registers.mp,
+            registers.mv,
+            registers.mvi,
+        )
     }
 }
 
@@ -334,6 +369,7 @@ pub enum ProcessorColumn {
     Mp,
     Mv,
     Mvi,
+    D,
     NextClk,
     NextIp,
     NextCi,
@@ -341,6 +377,7 @@ pub enum ProcessorColumn {
     NextMp,
     NextMv,
     NextMvi,
+    NextD,
 }
 
 impl ProcessorColumn {
@@ -354,20 +391,22 @@ impl ProcessorColumn {
             Self::Mp => 4,
             Self::Mv => 5,
             Self::Mvi => 6,
-            Self::NextClk => 7,
-            Self::NextIp => 8,
-            Self::NextCi => 9,
-            Self::NextNi => 10,
-            Self::NextMp => 11,
-            Self::NextMv => 12,
-            Self::NextMvi => 13,
+            Self::D => 7,
+            Self::NextClk => 8,
+            Self::NextIp => 9,
+            Self::NextCi => 10,
+            Self::NextNi => 11,
+            Self::NextMp => 12,
+            Self::NextMv => 13,
+            Self::NextMvi => 14,
+            Self::NextD => 15,
         }
     }
 }
 
 impl TraceColumn for ProcessorColumn {
     fn count() -> (usize, usize) {
-        (14, 4)
+        (16, 4)
     }
 }
 
@@ -394,40 +433,32 @@ mod tests {
 
         let entry = ProcessorTableEntry::from(&registers);
 
-        let expected_entry = ProcessorTableEntry {
-            clk: BaseField::one(),
-            ip: BaseField::from(5),
-            ci: BaseField::from(43),
-            ni: BaseField::from(91),
-            mp: BaseField::from(2),
-            mv: BaseField::from(7),
-            mvi: BaseField::zero(),
-        };
+        let expected_entry = ProcessorTableEntry::new(
+            BaseField::one(),
+            BaseField::from(5),
+            BaseField::from(43),
+            BaseField::from(91),
+            BaseField::from(2),
+            BaseField::from(7),
+            BaseField::zero(),
+        );
 
         assert_eq!(entry, expected_entry);
     }
 
     #[test]
     fn test_processor_table_row() {
-        let entry_1 = ProcessorTableEntry {
-            clk: BaseField::one(),
-            ip: BaseField::from(5),
-            ci: BaseField::from(43),
-            ni: BaseField::from(91),
-            mp: BaseField::from(2),
-            mv: BaseField::from(7),
-            mvi: BaseField::zero(),
-        };
+        let entry_1 = ProcessorTableEntry::new(
+            BaseField::one(),
+            BaseField::from(5),
+            BaseField::from(43),
+            BaseField::from(91),
+            BaseField::from(2),
+            BaseField::from(7),
+            BaseField::zero(),
+        );
 
-        let entry_2 = ProcessorTableEntry {
-            clk: BaseField::one(),
-            ip: BaseField::from(5),
-            ci: BaseField::from(63),
-            ni: BaseField::from(42),
-            mp: BaseField::from(2),
-            mv: BaseField::one(),
-            mvi: BaseField::zero(),
-        };
+        let entry_2 = ProcessorTableEntry::new_dummy(BaseField::one(), BaseField::from(5));
 
         let row = ProcessorTableRow::new(&entry_1, &entry_2);
 
@@ -439,13 +470,11 @@ mod tests {
             mp: BaseField::from(2),
             mv: BaseField::from(7),
             mvi: BaseField::zero(),
+            d: BaseField::zero(),
             next_clk: BaseField::one(),
             next_ip: BaseField::from(5),
-            next_ci: BaseField::from(63),
-            next_ni: BaseField::from(42),
-            next_mp: BaseField::from(2),
-            next_mv: BaseField::one(),
-            next_mvi: BaseField::zero(),
+            next_d: BaseField::one(),
+            ..Default::default()
         };
 
         assert_eq!(row, expected_row);
@@ -469,15 +498,15 @@ mod tests {
     fn test_add_entry() {
         let mut processor_table = ProcessorIntermediateTable::new();
 
-        let entry = ProcessorTableEntry {
-            clk: BaseField::from(10),
-            ip: BaseField::from(15),
-            ci: BaseField::from(43),
-            ni: BaseField::from(91),
-            mp: BaseField::from(20),
-            mv: BaseField::from(25),
-            mvi: BaseField::one(),
-        };
+        let entry = ProcessorTableEntry::new(
+            BaseField::from(10),
+            BaseField::from(15),
+            BaseField::from(43),
+            BaseField::from(91),
+            BaseField::from(20),
+            BaseField::from(25),
+            BaseField::one(),
+        );
 
         processor_table.add_entry(entry.clone());
 
@@ -489,33 +518,33 @@ mod tests {
         let mut processor_table = ProcessorIntermediateTable::new();
 
         let entries = vec![
-            ProcessorTableEntry {
-                clk: BaseField::one(),
-                ip: BaseField::from(5),
-                ci: BaseField::from(43),
-                ni: BaseField::from(91),
-                mp: BaseField::from(10),
-                mv: BaseField::from(15),
-                mvi: BaseField::zero(),
-            },
-            ProcessorTableEntry {
-                clk: BaseField::from(2),
-                ip: BaseField::from(6),
-                ci: BaseField::from(44),
-                ni: BaseField::from(92),
-                mp: BaseField::from(11),
-                mv: BaseField::from(16),
-                mvi: BaseField::one(),
-            },
-            ProcessorTableEntry {
-                clk: BaseField::from(3),
-                ip: BaseField::from(7),
-                ci: BaseField::from(45),
-                ni: BaseField::from(93),
-                mp: BaseField::from(12),
-                mv: BaseField::from(17),
-                mvi: BaseField::zero(),
-            },
+            ProcessorTableEntry::new(
+                BaseField::one(),
+                BaseField::from(5),
+                BaseField::from(43),
+                BaseField::from(91),
+                BaseField::from(10),
+                BaseField::from(15),
+                BaseField::zero(),
+            ),
+            ProcessorTableEntry::new(
+                BaseField::from(2),
+                BaseField::from(6),
+                BaseField::from(44),
+                BaseField::from(92),
+                BaseField::from(11),
+                BaseField::from(16),
+                BaseField::one(),
+            ),
+            ProcessorTableEntry::new(
+                BaseField::from(3),
+                BaseField::from(7),
+                BaseField::from(45),
+                BaseField::from(93),
+                BaseField::from(12),
+                BaseField::from(17),
+                BaseField::zero(),
+            ),
         ];
 
         for entry in &entries {
@@ -546,131 +575,136 @@ mod tests {
         let processor_table = ProcessorTable::from(processor_intermediate_table.clone());
 
         // Create the expected `ProcessorIntermediateTable`
-        let process_0 = ProcessorTableEntry {
-            clk: BaseField::zero(),
-            ip: BaseField::zero(),
-            ci: BaseField::from(43),
-            ni: BaseField::from(62),
-            mp: BaseField::zero(),
-            mv: BaseField::zero(),
-            mvi: BaseField::zero(),
-        };
+        let process_0 = ProcessorTableEntry::new(
+            BaseField::zero(),
+            BaseField::zero(),
+            BaseField::from(43),
+            BaseField::from(62),
+            BaseField::zero(),
+            BaseField::zero(),
+            BaseField::zero(),
+        );
 
-        let process_1 = ProcessorTableEntry {
-            clk: BaseField::one(),
-            ip: BaseField::one(),
-            ci: BaseField::from(62),
-            ni: BaseField::from(44),
-            mp: BaseField::zero(),
-            mv: BaseField::one(),
-            mvi: BaseField::one(),
-        };
+        let process_1 = ProcessorTableEntry::new(
+            BaseField::one(),
+            BaseField::one(),
+            BaseField::from(62),
+            BaseField::from(44),
+            BaseField::zero(),
+            BaseField::one(),
+            BaseField::one(),
+        );
 
-        let process_2 = ProcessorTableEntry {
-            clk: BaseField::from(2),
-            ip: BaseField::from(2),
-            ci: BaseField::from(44),
-            ni: BaseField::from(60),
-            mp: BaseField::one(),
-            mv: BaseField::zero(),
-            mvi: BaseField::zero(),
-        };
+        let process_2 = ProcessorTableEntry::new(
+            BaseField::from(2),
+            BaseField::from(2),
+            BaseField::from(44),
+            BaseField::from(60),
+            BaseField::one(),
+            BaseField::zero(),
+            BaseField::zero(),
+        );
 
-        let process_3 = ProcessorTableEntry {
-            clk: BaseField::from(3),
-            ip: BaseField::from(3),
-            ci: BaseField::from(60),
-            ni: BaseField::from(91),
-            mp: BaseField::one(),
-            mv: BaseField::one(),
-            mvi: BaseField::one(),
-        };
+        let process_3 = ProcessorTableEntry::new(
+            BaseField::from(3),
+            BaseField::from(3),
+            BaseField::from(60),
+            BaseField::from(91),
+            BaseField::one(),
+            BaseField::one(),
+            BaseField::one(),
+        );
 
-        let process_4 = ProcessorTableEntry {
-            clk: BaseField::from(4),
-            ip: BaseField::from(4),
-            ci: BaseField::from(91),
-            ni: BaseField::from(12),
-            mp: BaseField::zero(),
-            mv: BaseField::one(),
-            mvi: BaseField::one(),
-        };
+        let process_4 = ProcessorTableEntry::new(
+            BaseField::from(4),
+            BaseField::from(4),
+            BaseField::from(91),
+            BaseField::from(12),
+            BaseField::zero(),
+            BaseField::one(),
+            BaseField::one(),
+        );
 
-        let process_5 = ProcessorTableEntry {
-            clk: BaseField::from(5),
-            ip: BaseField::from(6),
-            ci: BaseField::from(62),
-            ni: BaseField::from(43),
-            mp: BaseField::zero(),
-            mv: BaseField::one(),
-            mvi: BaseField::one(),
-        };
+        let process_5 = ProcessorTableEntry::new(
+            BaseField::from(5),
+            BaseField::from(6),
+            BaseField::from(62),
+            BaseField::from(43),
+            BaseField::zero(),
+            BaseField::one(),
+            BaseField::one(),
+        );
 
-        let process_6 = ProcessorTableEntry {
-            clk: BaseField::from(6),
-            ip: BaseField::from(7),
-            ci: BaseField::from(43),
-            ni: BaseField::from(46),
-            mp: BaseField::one(),
-            mv: BaseField::one(),
-            mvi: BaseField::one(),
-        };
+        let process_6 = ProcessorTableEntry::new(
+            BaseField::from(6),
+            BaseField::from(7),
+            BaseField::from(43),
+            BaseField::from(46),
+            BaseField::one(),
+            BaseField::one(),
+            BaseField::one(),
+        );
 
-        let process_7 = ProcessorTableEntry {
-            clk: BaseField::from(7),
-            ip: BaseField::from(8),
-            ci: BaseField::from(46),
-            ni: BaseField::from(60),
-            mp: BaseField::one(),
-            mv: BaseField::from(2),
-            mvi: BaseField::from(2).inverse(),
-        };
+        let process_7 = ProcessorTableEntry::new(
+            BaseField::from(7),
+            BaseField::from(8),
+            BaseField::from(46),
+            BaseField::from(60),
+            BaseField::one(),
+            BaseField::from(2),
+            BaseField::from(2).inverse(),
+        );
 
-        let process_8 = ProcessorTableEntry {
-            clk: BaseField::from(8),
-            ip: BaseField::from(9),
-            ci: BaseField::from(60),
-            ni: BaseField::from(45),
-            mp: BaseField::one(),
-            mv: BaseField::from(2),
-            mvi: BaseField::from(2).inverse(),
-        };
+        let process_8 = ProcessorTableEntry::new(
+            BaseField::from(8),
+            BaseField::from(9),
+            BaseField::from(60),
+            BaseField::from(45),
+            BaseField::one(),
+            BaseField::from(2),
+            BaseField::from(2).inverse(),
+        );
 
-        let process_9 = ProcessorTableEntry {
-            clk: BaseField::from(9),
-            ip: BaseField::from(10),
-            ci: BaseField::from(45),
-            ni: BaseField::from(93),
-            mp: BaseField::zero(),
-            mv: BaseField::one(),
-            mvi: BaseField::one(),
-        };
+        let process_9 = ProcessorTableEntry::new(
+            BaseField::from(9),
+            BaseField::from(10),
+            BaseField::from(45),
+            BaseField::from(93),
+            BaseField::zero(),
+            BaseField::one(),
+            BaseField::one(),
+        );
 
-        let process_10 = ProcessorTableEntry {
-            clk: BaseField::from(10),
-            ip: BaseField::from(11),
-            ci: BaseField::from(93),
-            ni: BaseField::from(6),
-            mp: BaseField::zero(),
-            mv: BaseField::zero(),
-            mvi: BaseField::zero(),
-        };
+        let process_10 = ProcessorTableEntry::new(
+            BaseField::from(10),
+            BaseField::from(11),
+            BaseField::from(93),
+            BaseField::from(6),
+            BaseField::zero(),
+            BaseField::zero(),
+            BaseField::zero(),
+        );
 
-        let process_11 = ProcessorTableEntry {
-            clk: BaseField::from(11),
-            ip: BaseField::from(13),
-            ci: BaseField::zero(),
-            ni: BaseField::zero(),
-            mp: BaseField::zero(),
-            mv: BaseField::zero(),
-            mvi: BaseField::zero(),
-        };
+        let process_11 = ProcessorTableEntry::new(
+            BaseField::from(11),
+            BaseField::from(13),
+            BaseField::zero(),
+            BaseField::zero(),
+            BaseField::zero(),
+            BaseField::zero(),
+            BaseField::zero(),
+        );
 
-        let dummy_12 = ProcessorTableEntry { clk: process_11.clk + BaseField::one(), ..process_11 };
-        let dummy_13 = ProcessorTableEntry { clk: dummy_12.clk + BaseField::one(), ..process_11 };
-        let dummy_14 = ProcessorTableEntry { clk: dummy_13.clk + BaseField::one(), ..process_11 };
-        let dummy_15 = ProcessorTableEntry { clk: dummy_14.clk + BaseField::one(), ..process_11 };
-        let dummy_16 = ProcessorTableEntry { clk: dummy_15.clk + BaseField::one(), ..process_11 };
+        let dummy_12 =
+            ProcessorTableEntry::new_dummy(process_11.clk + BaseField::one(), process_11.ip);
+        let dummy_13 =
+            ProcessorTableEntry::new_dummy(dummy_12.clk + BaseField::one(), process_11.ip);
+        let dummy_14 =
+            ProcessorTableEntry::new_dummy(dummy_13.clk + BaseField::one(), process_11.ip);
+        let dummy_15 =
+            ProcessorTableEntry::new_dummy(dummy_14.clk + BaseField::one(), process_11.ip);
+        let dummy_16 =
+            ProcessorTableEntry::new_dummy(dummy_15.clk + BaseField::one(), process_11.ip);
 
         let mut expected_processor_intermediate_table = ProcessorIntermediateTable {
             table: vec![
@@ -745,15 +779,15 @@ mod tests {
     #[allow(clippy::similar_names)]
     fn test_trace_evaluation_single_row_processor_table() {
         let mut processor_intermediate_table = ProcessorIntermediateTable::new();
-        processor_intermediate_table.add_entry(ProcessorTableEntry {
-            clk: BaseField::one(),
-            ip: BaseField::from(2),
-            ci: BaseField::from(3),
-            ni: BaseField::from(4),
-            mp: BaseField::from(5),
-            mv: BaseField::from(6),
-            mvi: BaseField::from(7),
-        });
+        processor_intermediate_table.add_entry(ProcessorTableEntry::new(
+            BaseField::one(),
+            BaseField::from(2),
+            BaseField::from(3),
+            BaseField::from(4),
+            BaseField::from(5),
+            BaseField::from(6),
+            BaseField::from(7),
+        ));
 
         let processor_table = ProcessorTable::from(processor_intermediate_table);
 
@@ -790,24 +824,24 @@ mod tests {
 
         // Add entries to the processor table
         let entries = vec![
-            ProcessorTableEntry {
-                clk: BaseField::zero(),
-                ip: BaseField::one(),
-                ci: BaseField::from(2),
-                ni: BaseField::from(3),
-                mp: BaseField::from(4),
-                mv: BaseField::from(5),
-                mvi: BaseField::from(6),
-            },
-            ProcessorTableEntry {
-                clk: BaseField::one(),
-                ip: BaseField::from(2),
-                ci: BaseField::from(3),
-                ni: BaseField::from(4),
-                mp: BaseField::from(5),
-                mv: BaseField::from(6),
-                mvi: BaseField::from(7),
-            },
+            ProcessorTableEntry::new(
+                BaseField::zero(),
+                BaseField::one(),
+                BaseField::from(2),
+                BaseField::from(3),
+                BaseField::from(4),
+                BaseField::from(5),
+                BaseField::from(6),
+            ),
+            ProcessorTableEntry::new(
+                BaseField::one(),
+                BaseField::from(2),
+                BaseField::from(3),
+                BaseField::from(4),
+                BaseField::from(5),
+                BaseField::from(6),
+                BaseField::from(7),
+            ),
         ];
 
         processor_intermediate_table.add_entries(entries);
