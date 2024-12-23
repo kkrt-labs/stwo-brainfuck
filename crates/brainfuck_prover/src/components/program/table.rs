@@ -110,7 +110,7 @@ impl From<&Vec<Registers>> for ProgramTable {
     }
 }
 
-/// Enum representing the column indices in the IO trace.
+/// Enum representing the column indices in the Program trace.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ProgramColumn {
     /// Index of the `ip` register column in the Program trace.
