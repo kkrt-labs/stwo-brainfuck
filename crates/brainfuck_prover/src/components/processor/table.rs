@@ -1,3 +1,4 @@
+use super::component::InteractionClaim;
 use crate::components::{
     instruction::table::InstructionElements, io::table::IoElements, memory::table::MemoryElements,
     ProcessorClaim, TraceColumn, TraceError, TraceEval,
@@ -15,8 +16,6 @@ use stwo_prover::{
         poly::circle::{CanonicCoset, CircleEvaluation},
     },
 };
-
-use super::component::InteractionClaim;
 
 /// Represents the Processor Table, which holds the required registers
 /// for the Processor component.
