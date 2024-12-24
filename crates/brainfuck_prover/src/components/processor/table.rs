@@ -1,14 +1,22 @@
-use crate::components::{ProcessorClaim, TraceColumn, TraceError, TraceEval};
+use crate::components::{
+    instruction::table::InstructionElements, io::table::IoElements, memory::table::MemoryElements,
+    ProcessorClaim, TraceColumn, TraceError, TraceEval,
+};
 use brainfuck_vm::registers::Registers;
 use num_traits::{One, Zero};
-use stwo_prover::core::{
-    backend::{
-        simd::{column::BaseColumn, m31::LOG_N_LANES},
-        Column,
+use stwo_prover::{
+    constraint_framework::{logup::LogupTraceGenerator, Relation},
+    core::{
+        backend::{
+            simd::{column::BaseColumn, m31::LOG_N_LANES, qm31::PackedSecureField},
+            Column,
+        },
+        fields::m31::BaseField,
+        poly::circle::{CanonicCoset, CircleEvaluation},
     },
-    fields::m31::BaseField,
-    poly::circle::{CanonicCoset, CircleEvaluation},
 };
+
+use super::component::InteractionClaim;
 
 /// Represents the Processor Table, which holds the required registers
 /// for the Processor component.
@@ -87,6 +95,7 @@ impl ProcessorTable {
             trace[ProcessorColumn::Mp.index()].data[index] = row.mp.into();
             trace[ProcessorColumn::Mv.index()].data[index] = row.mv.into();
             trace[ProcessorColumn::Mvi.index()].data[index] = row.mvi.into();
+            trace[ProcessorColumn::D.index()].data[index] = row.d.into();
             trace[ProcessorColumn::NextClk.index()].data[index] = row.next_clk.into();
             trace[ProcessorColumn::NextIp.index()].data[index] = row.next_ip.into();
             trace[ProcessorColumn::NextCi.index()].data[index] = row.next_ci.into();
@@ -94,6 +103,7 @@ impl ProcessorTable {
             trace[ProcessorColumn::NextMp.index()].data[index] = row.next_mp.into();
             trace[ProcessorColumn::NextMv.index()].data[index] = row.next_mv.into();
             trace[ProcessorColumn::NextMvi.index()].data[index] = row.next_mvi.into();
+            trace[ProcessorColumn::NextD.index()].data[index] = row.next_d.into();
         }
 
         // Evaluate columns on the circle domain
@@ -123,7 +133,7 @@ impl From<ProcessorIntermediateTable> for ProcessorTable {
 
         let last_entry = intermediate_table.table.last().unwrap();
         let next_dummy_entry =
-            ProcessorTableEntry { clk: last_entry.clk + BaseField::one(), ..last_entry.clone() };
+            ProcessorTableEntry::new_dummy(last_entry.clk + BaseField::one(), last_entry.ip);
 
         intermediate_table.add_entry(next_dummy_entry);
 
@@ -410,6 +420,131 @@ impl TraceColumn for ProcessorColumn {
     }
 }
 
+/// Creates the interaction trace from the main trace evaluation
+/// and the interaction elements for the Processor component.
+///
+/// The Processor table represents the execution trace.
+///
+/// The Processor table is the central component of the system,
+/// it uses the other components (Input, Output, Instruction and Memory)
+/// to verify other properties on the execution trace, through lookup arguments (logUp).
+///
+/// Only the 'real' rows are impacting the logUp sum.
+/// Dummy rows are padding rows.
+///
+/// Here, the logUp has four extension columns, which uses
+/// the Input, Output, Instruction and Memory components.
+///
+/// # Returns
+/// - Interaction trace evaluation, to be committed.
+/// - Interaction claim: the total sum from the logUp protocol,
+/// to be mixed into the Fiat-Shamir [`Channel`].
+#[allow(clippy::similar_names)]
+pub fn interaction_trace_evaluation(
+    main_trace_eval: &TraceEval,
+    input_lookup_elements: &IoElements,
+    output_lookup_elements: &IoElements,
+    instruction_lookup_elements: &InstructionElements,
+    memory_lookup_elements: &MemoryElements,
+) -> Result<(TraceEval, InteractionClaim), TraceError> {
+    if main_trace_eval.is_empty() {
+        return Err(TraceError::EmptyTrace)
+    }
+
+    let log_size = main_trace_eval[0].domain.log_size();
+
+    let clk_col = &main_trace_eval[ProcessorColumn::Clk.index()].data;
+    let ip_col = &main_trace_eval[ProcessorColumn::Ip.index()].data;
+    let ci_col = &main_trace_eval[ProcessorColumn::Ci.index()].data;
+    let ni_col = &main_trace_eval[ProcessorColumn::Ni.index()].data;
+    let mp_col = &main_trace_eval[ProcessorColumn::Mp.index()].data;
+    let mv_col = &main_trace_eval[ProcessorColumn::Mv.index()].data;
+    let d_col = &main_trace_eval[ProcessorColumn::D.index()].data;
+    let next_clk_col = &main_trace_eval[ProcessorColumn::NextClk.index()].data;
+    let next_mp_col = &main_trace_eval[ProcessorColumn::NextMp.index()].data;
+    let next_mv_col = &main_trace_eval[ProcessorColumn::NextMv.index()].data;
+    let next_d_col = &main_trace_eval[ProcessorColumn::NextD.index()].data;
+
+    let mut logup_gen = LogupTraceGenerator::new(log_size);
+
+    // Processor & Input
+    let mut col_gen = logup_gen.new_col();
+    for vec_row in 0..1 << (log_size - LOG_N_LANES) {
+        let clk = clk_col[vec_row];
+        let ci = ci_col[vec_row];
+        let mv = mv_col[vec_row];
+        let d = d_col[vec_row];
+
+        let num = PackedSecureField::one() - PackedSecureField::from(d);
+
+        let input_denom: PackedSecureField = input_lookup_elements.combine(&[clk, ci, mv]);
+        col_gen.write_frac(vec_row, num, input_denom);
+    }
+    col_gen.finalize_col();
+
+    // Processor & Output
+    let mut col_gen = logup_gen.new_col();
+    for vec_row in 0..1 << (log_size - LOG_N_LANES) {
+        let clk = clk_col[vec_row];
+        let ci = ci_col[vec_row];
+        let mv = mv_col[vec_row];
+        let d = d_col[vec_row];
+
+        let num = PackedSecureField::one() - PackedSecureField::from(d);
+
+        let output_denom: PackedSecureField = output_lookup_elements.combine(&[clk, ci, mv]);
+        col_gen.write_frac(vec_row, num, output_denom);
+    }
+    col_gen.finalize_col();
+
+    // Processor & Instruction
+    let mut col_gen = logup_gen.new_col();
+    for vec_row in 0..1 << (log_size - LOG_N_LANES) {
+        let ip = ip_col[vec_row];
+        let ci = ci_col[vec_row];
+        let ni = ni_col[vec_row];
+        let d = d_col[vec_row];
+
+        let num = PackedSecureField::one() - PackedSecureField::from(d);
+
+        let instruction_denom: PackedSecureField =
+            instruction_lookup_elements.combine(&[ip, ci, ni]);
+        col_gen.write_frac(vec_row, num, instruction_denom);
+    }
+    col_gen.finalize_col();
+
+    // Processor & Memory
+    let mut col_gen = logup_gen.new_col();
+
+    for vec_row in 0..1 << (log_size - LOG_N_LANES) {
+        let clk = clk_col[vec_row];
+        let mp = mp_col[vec_row];
+        let mv = mv_col[vec_row];
+        let d = d_col[vec_row];
+        let next_clk = next_clk_col[vec_row];
+        let next_mp = next_mp_col[vec_row];
+        let next_mv = next_mv_col[vec_row];
+        let next_d = next_d_col[vec_row];
+
+        let num = PackedSecureField::one() - PackedSecureField::from(d);
+        let next_num = PackedSecureField::one() - PackedSecureField::from(next_d);
+
+        let memory_denom: PackedSecureField = memory_lookup_elements.combine(&[clk, mp, mv]);
+        let next_memory_denom: PackedSecureField =
+            memory_lookup_elements.combine(&[next_clk, next_mp, next_mv]);
+        col_gen.write_frac(
+            vec_row,
+            num * next_memory_denom + next_num * memory_denom,
+            memory_denom * next_memory_denom,
+        );
+    }
+    col_gen.finalize_col();
+
+    let (trace, claimed_sum) = logup_gen.finalize_last();
+
+    Ok((trace, InteractionClaim { claimed_sum }))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -458,7 +593,7 @@ mod tests {
             BaseField::zero(),
         );
 
-        let entry_2 = ProcessorTableEntry::new_dummy(BaseField::one(), BaseField::from(5));
+        let entry_2 = ProcessorTableEntry::new_dummy(BaseField::one(), entry_1.ip);
 
         let row = ProcessorTableRow::new(&entry_1, &entry_2);
 
@@ -914,5 +1049,159 @@ mod tests {
                 "Values of trace columns should match."
             );
         }
+    }
+
+    #[test]
+    fn test_empty_interaction_trace_evaluation() {
+        let empty_eval = vec![];
+        let input_lookup_elements = IoElements::dummy();
+        let output_lookup_elements = IoElements::dummy();
+        let instruction_lookup_elements = InstructionElements::dummy();
+        let memory_lookup_elements = MemoryElements::dummy();
+        let interaction_trace_eval = interaction_trace_evaluation(
+            &empty_eval,
+            &input_lookup_elements,
+            &output_lookup_elements,
+            &instruction_lookup_elements,
+            &memory_lookup_elements,
+        );
+
+        assert!(matches!(interaction_trace_eval, Err(TraceError::EmptyTrace)));
+    }
+
+    #[allow(clippy::similar_names)]
+    #[allow(clippy::too_many_lines)]
+    #[test]
+    fn test_interaction_trace_evaluation() {
+        // Get an execution trace from a valid Brainfuck program
+        let code = "+,.";
+        let mut compiler = Compiler::new(code);
+        let instructions = compiler.compile();
+        let (mut machine, _) = create_test_machine(&instructions, &[1]);
+        let () = machine.execute().expect("Failed to execute machine");
+
+        let processor_table = ProcessorTable::from(machine.trace());
+
+        let (trace_eval, claim) = processor_table.trace_evaluation().unwrap();
+
+        let input_lookup_elements = IoElements::dummy();
+        let output_lookup_elements = IoElements::dummy();
+        let instruction_lookup_elements = InstructionElements::dummy();
+        let memory_lookup_elements = MemoryElements::dummy();
+
+        let (interaction_trace_eval, interaction_claim) = interaction_trace_evaluation(
+            &trace_eval,
+            &input_lookup_elements,
+            &output_lookup_elements,
+            &instruction_lookup_elements,
+            &memory_lookup_elements,
+        )
+        .unwrap();
+
+        let log_size = trace_eval[0].domain.log_size();
+
+        let mut input_denoms = [PackedSecureField::zero(); 4];
+        let mut output_denoms = [PackedSecureField::zero(); 4];
+        let mut instruction_denoms = [PackedSecureField::zero(); 4];
+        let mut memory_denoms = [PackedSecureField::zero(); 4];
+
+        let clk_col = &trace_eval[ProcessorColumn::Clk.index()].data;
+        let ip_col = &trace_eval[ProcessorColumn::Ip.index()].data;
+        let ci_col = &trace_eval[ProcessorColumn::Ci.index()].data;
+        let ni_col = &trace_eval[ProcessorColumn::Ni.index()].data;
+        let mp_col = &trace_eval[ProcessorColumn::Mp.index()].data;
+        let mv_col = &trace_eval[ProcessorColumn::Mv.index()].data;
+
+        // Construct the denominator for each row of the logUp column, from the main trace
+        // evaluation.
+        for vec_row in 0..1 << (log_size - LOG_N_LANES) {
+            let clk = clk_col[vec_row];
+            let ip = ip_col[vec_row];
+            let ci = ci_col[vec_row];
+            let ni = ni_col[vec_row];
+            let mp = mp_col[vec_row];
+            let mv = mv_col[vec_row];
+
+            // Input lookup argument
+            let input_denom: PackedSecureField = input_lookup_elements.combine(&[clk, ci, mv]);
+            // Output lookup argument
+            let output_denom: PackedSecureField = output_lookup_elements.combine(&[clk, ci, mv]);
+            // Instruction lookup argument
+            let instruction_denom: PackedSecureField =
+                instruction_lookup_elements.combine(&[ip, ci, ni]);
+            // Memory lookup argument
+            let memory_denom: PackedSecureField = memory_lookup_elements.combine(&[clk, mp, mv]);
+
+            input_denoms[vec_row] = input_denom;
+            output_denoms[vec_row] = output_denom;
+            instruction_denoms[vec_row] = instruction_denom;
+            memory_denoms[vec_row] = memory_denom;
+        }
+
+        let num_0 = PackedSecureField::one();
+        let num_1 = PackedSecureField::one();
+        let num_2 = PackedSecureField::one();
+        let num_3 = PackedSecureField::one();
+
+        let mut logup_gen = LogupTraceGenerator::new(log_size);
+
+        // Input Lookup
+        let mut col_gen = logup_gen.new_col();
+        col_gen.write_frac(0, num_0, input_denoms[0]);
+        col_gen.write_frac(1, num_1, input_denoms[1]);
+        col_gen.write_frac(2, num_2, input_denoms[2]);
+        col_gen.write_frac(3, num_3, input_denoms[3]);
+        col_gen.finalize_col();
+
+        // Output Lookup
+        let mut col_gen = logup_gen.new_col();
+        col_gen.write_frac(0, num_0, output_denoms[0]);
+        col_gen.write_frac(1, num_1, output_denoms[1]);
+        col_gen.write_frac(2, num_2, output_denoms[2]);
+        col_gen.write_frac(3, num_3, output_denoms[3]);
+        col_gen.finalize_col();
+
+        // Instruction Lookup
+        let mut col_gen = logup_gen.new_col();
+        col_gen.write_frac(0, num_0, instruction_denoms[0]);
+        col_gen.write_frac(1, num_1, instruction_denoms[1]);
+        col_gen.write_frac(2, num_2, instruction_denoms[2]);
+        col_gen.write_frac(3, num_3, instruction_denoms[3]);
+        col_gen.finalize_col();
+
+        // Memory Lookup
+        let mut col_gen = logup_gen.new_col();
+        col_gen.write_frac(
+            0,
+            num_0 * memory_denoms[1] + num_1 * memory_denoms[0],
+            memory_denoms[0] * memory_denoms[1],
+        );
+        col_gen.write_frac(
+            1,
+            num_1 * memory_denoms[2] + num_2 * memory_denoms[1],
+            memory_denoms[1] * memory_denoms[2],
+        );
+        col_gen.write_frac(
+            2,
+            num_2 * memory_denoms[3] + num_3 * memory_denoms[2],
+            memory_denoms[2] * memory_denoms[3],
+        );
+        col_gen.write_frac(3, num_3, memory_denoms[3]);
+        col_gen.finalize_col();
+
+        let (expected_interaction_trace_eval, expected_claimed_sum) = logup_gen.finalize_last();
+
+        assert_eq!(claim.log_size, log_size,);
+        for col_index in 0..expected_interaction_trace_eval.len() {
+            assert_eq!(
+                interaction_trace_eval[col_index].domain,
+                expected_interaction_trace_eval[col_index].domain
+            );
+            assert_eq!(
+                interaction_trace_eval[col_index].to_cpu().values,
+                expected_interaction_trace_eval[col_index].to_cpu().values
+            );
+        }
+        assert_eq!(interaction_claim.claimed_sum, expected_claimed_sum);
     }
 }
