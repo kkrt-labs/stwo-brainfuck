@@ -494,7 +494,7 @@ pub fn interaction_trace_evaluation(
     let d_col = &main_trace_eval[MemoryColumn::D.index()].data;
     let next_clk_col = &main_trace_eval[MemoryColumn::NextClk.index()].data;
     let next_mp_col = &main_trace_eval[MemoryColumn::NextMp.index()].data;
-    let next_mv_column = &main_trace_eval[MemoryColumn::NextMv.index()].data;
+    let next_mv_col = &main_trace_eval[MemoryColumn::NextMv.index()].data;
     let next_d_col = &main_trace_eval[MemoryColumn::NextD.index()].data;
     for vec_row in 0..1 << (log_size - LOG_N_LANES) {
         let clk = clk_col[vec_row];
@@ -502,7 +502,7 @@ pub fn interaction_trace_evaluation(
         let mv = mv_column[vec_row];
         let next_clk = next_clk_col[vec_row];
         let next_mp = next_mp_col[vec_row];
-        let next_mv = next_mv_column[vec_row];
+        let next_mv = next_mv_col[vec_row];
         // Set the fraction numerator to 0 if it is a dummy row (d = 1), otherwise set it to -1.
         let num_1 = PackedSecureField::from(d_col[vec_row]) - PackedSecureField::one();
         let num_2 = PackedSecureField::from(next_d_col[vec_row]) - PackedSecureField::one();
