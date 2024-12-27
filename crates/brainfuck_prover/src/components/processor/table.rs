@@ -443,8 +443,8 @@ pub fn interaction_trace_evaluation(
     main_trace_eval: &TraceEval,
     input_lookup_elements: &IoElements,
     output_lookup_elements: &IoElements,
-    instruction_lookup_elements: &InstructionElements,
     memory_lookup_elements: &MemoryElements,
+    instruction_lookup_elements: &InstructionElements,
 ) -> Result<(TraceEval, InteractionClaim), TraceError> {
     if main_trace_eval.is_empty() {
         return Err(TraceError::EmptyTrace)
@@ -1061,8 +1061,8 @@ mod tests {
             &empty_eval,
             &input_lookup_elements,
             &output_lookup_elements,
-            &instruction_lookup_elements,
             &memory_lookup_elements,
+            &instruction_lookup_elements,
         );
 
         assert!(matches!(interaction_trace_eval, Err(TraceError::EmptyTrace)));
@@ -1092,8 +1092,8 @@ mod tests {
             &trace_eval,
             &input_lookup_elements,
             &output_lookup_elements,
-            &instruction_lookup_elements,
             &memory_lookup_elements,
+            &instruction_lookup_elements,
         )
         .unwrap();
 
