@@ -14,7 +14,12 @@ use crate::components::{
         component::{MemoryComponent, MemoryEval},
         table::{MemoryElements, MemoryTable},
     },
-    InstructionClaim, IoClaim, MemoryClaim,
+    processor::{
+        self,
+        component::{ProcessorComponent, ProcessorEval},
+        table::ProcessorTable,
+    },
+    InstructionClaim, IoClaim, MemoryClaim, ProcessorClaim,
 };
 use brainfuck_vm::machine::Machine;
 use stwo_prover::{
@@ -54,6 +59,7 @@ pub struct BrainfuckClaim {
     pub output: IoClaim,
     pub memory: MemoryClaim,
     pub instruction: InstructionClaim,
+    pub processor: ProcessorClaim,
 }
 
 impl BrainfuckClaim {
@@ -62,6 +68,7 @@ impl BrainfuckClaim {
         self.output.mix_into(channel);
         self.memory.mix_into(channel);
         self.instruction.mix_into(channel);
+        self.processor.mix_into(channel);
     }
 
     pub fn log_sizes(&self) -> TreeVec<Vec<u32>> {
@@ -71,6 +78,7 @@ impl BrainfuckClaim {
                 self.output.log_sizes(),
                 self.memory.log_sizes(),
                 self.instruction.log_sizes(),
+                self.processor.log_sizes(),
             ]
             .into_iter(),
         );
@@ -113,6 +121,7 @@ pub struct BrainfuckInteractionClaim {
     output: io::component::InteractionClaim,
     memory: memory::component::InteractionClaim,
     instruction: instruction::component::InteractionClaim,
+    processor: processor::component::InteractionClaim,
 }
 
 impl BrainfuckInteractionClaim {
@@ -122,6 +131,7 @@ impl BrainfuckInteractionClaim {
         self.output.mix_into(channel);
         self.memory.mix_into(channel);
         self.instruction.mix_into(channel);
+        self.processor.mix_into(channel);
     }
 }
 
@@ -143,6 +153,7 @@ pub struct BrainfuckComponents {
     output: OutputComponent,
     memory: MemoryComponent,
     instruction: InstructionComponent,
+    processor: ProcessorComponent,
 }
 
 impl BrainfuckComponents {
@@ -183,13 +194,24 @@ impl BrainfuckComponents {
             ),
             (interaction_claim.instruction.claimed_sum, None),
         );
+        let processor = ProcessorComponent::new(
+            tree_span_provider,
+            ProcessorEval::new(
+                &claim.processor,
+                interaction_elements.input_lookup_elements.clone(),
+                interaction_elements.output_lookup_elements.clone(),
+                interaction_elements.memory_lookup_elements.clone(),
+                interaction_elements.instruction_lookup_elements.clone(),
+            ),
+            (interaction_claim.processor.claimed_sum, None),
+        );
 
-        Self { input, output, memory, instruction }
+        Self { input, output, memory, instruction, processor }
     }
 
     /// Returns the `ComponentProver` of each components, used by the prover.
     pub fn provers(&self) -> Vec<&dyn ComponentProver<SimdBackend>> {
-        vec![&self.input, &self.output, &self.memory, &self.instruction]
+        vec![&self.input, &self.output, &self.memory, &self.instruction, &self.processor]
     }
 
     /// Returns the `Component` of each components, used by the verifier.
@@ -265,17 +287,21 @@ pub fn prove_brainfuck(
     let (memory_trace, memory_claim) = MemoryTable::from(&vm_trace).trace_evaluation().unwrap();
     let (instruction_trace, instruction_claim) =
         InstructionTable::from((&vm_trace, inputs.program())).trace_evaluation().unwrap();
+    let (processor_trace, processor_claim) =
+        ProcessorTable::from(vm_trace).trace_evaluation().unwrap();
 
     tree_builder.extend_evals(input_trace.clone());
     tree_builder.extend_evals(output_trace.clone());
     tree_builder.extend_evals(memory_trace.clone());
     tree_builder.extend_evals(instruction_trace.clone());
+    tree_builder.extend_evals(processor_trace.clone());
 
     let claim = BrainfuckClaim {
         input: input_claim,
         output: output_claim,
         memory: memory_claim,
         instruction: instruction_claim,
+        processor: processor_claim,
     };
 
     // Mix the claim into the Fiat-Shamir channel.
@@ -321,16 +347,28 @@ pub fn prove_brainfuck(
         )
         .unwrap();
 
+    let (processor_interaction_trace_eval, processor_interaction_claim) =
+        processor::table::interaction_trace_evaluation(
+            &processor_trace,
+            &interaction_elements.input_lookup_elements,
+            &interaction_elements.output_lookup_elements,
+            &interaction_elements.instruction_lookup_elements,
+            &interaction_elements.memory_lookup_elements,
+        )
+        .unwrap();
+
     tree_builder.extend_evals(input_interaction_trace_eval);
     tree_builder.extend_evals(output_interaction_trace_eval);
     tree_builder.extend_evals(memory_interaction_trace_eval);
     tree_builder.extend_evals(instruction_interaction_trace_eval);
+    tree_builder.extend_evals(processor_interaction_trace_eval);
 
     let interaction_claim = BrainfuckInteractionClaim {
         input: input_interaction_claim,
         output: output_interaction_claim,
         memory: memory_interaction_claim,
         instruction: instruction_interaction_claim,
+        processor: processor_interaction_claim,
     };
 
     // Mix the interaction claim into the Fiat-Shamir channel.
