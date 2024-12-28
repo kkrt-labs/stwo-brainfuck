@@ -154,7 +154,7 @@ impl From<ProcessorIntermediateTable> for ProcessorTable {
 /// Two consecutive entries [`ProcessorTableEntry`] flattened.
 ///
 /// To avoid bit-reversals when evaluating transition constraints,
-/// the two consecutives rows on which transition constraints are evaluated
+/// the two consecutive rows on which transition constraints are evaluated
 /// are flattened into a single row.
 #[derive(Debug, Default, PartialEq, Eq, Clone)]
 pub struct ProcessorTableRow {

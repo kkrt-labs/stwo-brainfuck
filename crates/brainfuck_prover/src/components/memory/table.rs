@@ -64,7 +64,7 @@ impl MemoryTable {
         self.table.push(row);
     }
 
-    /// Transforms the [`MemoryTable`] into [`super::super::TraceEval`], to be commited
+    /// Transforms the [`MemoryTable`] into [`super::super::TraceEval`], to be committed
     /// when generating a STARK proof.
     ///
     /// The [`MemoryTable`] is transformed from an array of consecutive rows (one
@@ -150,7 +150,7 @@ impl From<MemoryIntermediateTable> for MemoryTable {
 /// Two consecutive [`MemoryTableEntry`] flattened.
 ///
 /// To avoid bit-reversals when evaluating transition constraints,
-/// the two consecutives rows on which transition constraints are evaluated
+/// the two consecutive rows on which transition constraints are evaluated
 /// are flattened into a single row.
 #[derive(Debug, Default, PartialEq, Eq, Clone)]
 pub struct MemoryTableRow {
@@ -434,7 +434,7 @@ impl MemoryElements {
 }
 
 impl<F: Clone, EF: RelationEFTraitBound<F>> Relation<F, EF> for MemoryElements {
-    /// Combine multiple values from a basefield (e.g. [`BaseField`])
+    /// Combine multiple values from a base field (e.g. [`BaseField`])
     /// and combine them to a value from an extension field (e.g. [`PackedSecureField`])
     ///
     /// This is used when computing the interaction values from the main trace values.

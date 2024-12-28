@@ -167,7 +167,7 @@ impl From<InstructionIntermediateTable> for InstructionTable {
 /// Two consecutive [`InstructionTableEntry`] flattened.
 ///
 /// To avoid bit-reversals when evaluating transition constraints,
-/// the two consecutives rows on which transition constraints are evaluated
+/// the two consecutive rows on which transition constraints are evaluated
 /// are flattened into a single row.
 #[derive(Debug, Default, PartialEq, Eq, Clone)]
 pub struct InstructionTableRow {
@@ -426,7 +426,7 @@ impl InstructionElements {
 }
 
 impl<F: Clone, EF: RelationEFTraitBound<F>> Relation<F, EF> for InstructionElements {
-    /// Combine multiple values from a basefield (e.g. [`BaseField`])
+    /// Combine multiple values from a base field (e.g. [`BaseField`])
     /// and combine them to a value from an extension field (e.g. [`PackedSecureField`])
     ///
     /// This is used when computing the interaction values from the main trace values.
@@ -456,7 +456,7 @@ impl<F: Clone, EF: RelationEFTraitBound<F>> Relation<F, EF> for InstructionEleme
 /// and the compiled program, sorted by `ip`.
 ///
 /// We want to prove that the Instruction table is a permutation of the Processor table
-/// and a sublist of the Program table (as two disjoint subset whose union is the Instruction
+/// and a sub list of the Program table (as two disjoint subset whose union is the Instruction
 /// table). To do so we make a lookup argument which yields for the Processor and the
 /// Instruction. Here, each fraction have a multiplicity of -1, while the counterpart in the
 /// Processor and Program components will have a multiplicity of 1.
