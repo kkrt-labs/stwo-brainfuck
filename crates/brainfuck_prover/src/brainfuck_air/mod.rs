@@ -38,7 +38,10 @@ use stwo_prover::{
 
 /// The STARK proof of the execution of a given Brainfuck program.
 ///
-/// It includes the proof as well as the claims during the various phases of the proof generation.
+/// # Fields
+/// * `claim` - Initial claims from phase 0 containing states and component claims
+/// * `interaction_claim` - Claims from phase 2 containing global relations
+/// * `proof` - The actual STARK proof data
 pub struct BrainfuckProof<H: MerkleHasher> {
     pub claim: BrainfuckClaim,
     pub interaction_claim: BrainfuckInteractionClaim,
@@ -125,13 +128,23 @@ impl BrainfuckInteractionClaim {
     }
 }
 
-/// Verify that the claims (i.e. Statement) are valid.
+/// Verifies that all lookup claims are valid by checking their sums.
+/// 
+/// # Security
+/// IMPORTANT: Currently unimplemented. This is a critical security check that needs to be
+/// implemented before using in production. Without this check, the proof system may accept
+/// invalid proofs.
+/// 
+/// # Arguments
+/// * `claim` - The initial claims from phase 0
+/// * `interaction_elements` - Elements drawn from the channel during interaction
+/// * `interaction_claim` - Claims from phase 2
 pub fn lookup_sum_valid(
     _claim: &BrainfuckClaim,
     _interaction_elements: &BrainfuckInteractionElements,
     _interaction_claim: &BrainfuckInteractionClaim,
 ) -> bool {
-    todo!();
+    todo!("Implement lookup sum validation");
 }
 
 /// All the components that constitute the Brainfuck ZK-VM.
@@ -198,9 +211,16 @@ impl BrainfuckComponents {
     }
 }
 
-/// `LOG_MAX_ROWS = ilog2(MAX_ROWS)`
-///
-/// Means that the ZK-VM does not accept programs with more than 2^20 steps (1M steps).
+/// Maximum number of steps allowed in a program execution, expressed as log2(MAX_ROWS).
+/// 
+/// Current value is 20, meaning:
+/// - Maximum steps = 2^20 = 1,048,576 steps
+/// - Programs requiring more steps will be rejected
+/// 
+/// This limit exists to:
+/// 1. Bound proof generation time and memory usage
+/// 2. Ensure reasonable verification costs
+/// 3. Prevent potential overflow issues
 const LOG_MAX_ROWS: u32 = 20;
 
 /// Log sizes of the preprocessed columns
@@ -350,6 +370,10 @@ pub fn prove_brainfuck(
 }
 
 /// Verify a given STARK proof of a Brainfuck program execution with corresponding claim.
+/// 
+/// # Warning
+/// Current implementation skips lookup sum validation. This makes the verification
+/// potentially unsafe until lookup_sum_valid() is implemented.
 pub fn verify_brainfuck(
     BrainfuckProof { claim, interaction_claim, proof }: BrainfuckProof<Blake2sMerkleHasher>,
 ) -> Result<(), VerificationError> {
@@ -387,8 +411,7 @@ pub fn verify_brainfuck(
     // └───────────────────────────────────────────────┘
 
     let interaction_elements = BrainfuckInteractionElements::draw(channel);
-    // Check that the lookup sum is valid, otherwise throw
-    // TODO: Implement lookup_sum_valid once the processor component has been implemented.
+    // SECURITY: This check is currently disabled but needs to be implemented
     // if !lookup_sum_valid(&claim, &interaction_elements, &interaction_claim) {
     //     return Err(VerificationError::InvalidLookup("Invalid LogUp sum".to_string()));
     // };
@@ -460,7 +483,11 @@ mod tests {
 
     #[test]
     fn test_proof_hello_world() {
-        // Get an execution trace from a valid Brainfuck program
+        // Tests proof generation and verification for the classic "Hello World!" program
+        // This is a comprehensive test that exercises:
+        // - Complex loop structures
+        // - Multiple memory cell manipulations
+        // - Character output operations
         let code = "++++++++++[>+++++++>++++++++++>+++>+<<<<-]>++.>+.+++++++..+++.>++.<<+++++++++++++++.>.+++.------.--------.>+.>.";
         let mut compiler = Compiler::new(code);
         let instructions = compiler.compile();
