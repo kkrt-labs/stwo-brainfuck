@@ -1,7 +1,7 @@
 use instruction::table::InstructionColumn;
 use io::table::IoColumn;
 use memory::table::MemoryColumn;
-use processor::table::ProcessorColumn;
+use processor::{instructions::table::ProcessorInstructionColumn, table::ProcessorColumn};
 use program::table::ProgramColumn;
 use stwo_prover::core::{
     backend::simd::SimdBackend,
@@ -19,24 +19,6 @@ pub mod memory;
 pub mod processor;
 pub mod program;
 
-/// Type for trace evaluation to be used in Stwo.
-pub type TraceEval = ColumnVec<CircleEvaluation<SimdBackend, BaseField, BitReversedOrder>>;
-
-/// Memory claim for the Trace.
-pub type MemoryClaim = Claim<MemoryColumn>;
-
-/// Instruction claim for the Trace.
-pub type InstructionClaim = Claim<InstructionColumn>;
-
-/// IO claim for the Trace.
-pub type IoClaim = Claim<IoColumn>;
-
-/// Processor claim for the Trace.
-pub type ProcessorClaim = Claim<ProcessorColumn>;
-
-/// Program claim for the Trace.
-pub type ProgramClaim = Claim<ProgramColumn>;
-
 /// Custom error type for the Trace.
 #[derive(Debug, Error, Eq, PartialEq)]
 pub enum TraceError {
@@ -44,6 +26,27 @@ pub enum TraceError {
     #[error("The trace is empty.")]
     EmptyTrace,
 }
+
+/// Type for trace evaluation to be used in Stwo.
+pub type TraceEval = ColumnVec<CircleEvaluation<SimdBackend, BaseField, BitReversedOrder>>;
+
+/// Claim for the Memory trace.
+pub type MemoryClaim = Claim<MemoryColumn>;
+
+/// Claim for the Instruction trace.
+pub type InstructionClaim = Claim<InstructionColumn>;
+
+/// IO claim for the Trace.
+pub type IoClaim = Claim<IoColumn>;
+
+/// Claim for the Processor trace.
+pub type ProcessorClaim = Claim<ProcessorColumn>;
+
+/// Claim for the Program trace.
+pub type ProgramClaim = Claim<ProgramColumn>;
+
+/// Claim for all the instructions traces (all except jumps and end of execution).
+pub type ProcessorInstructionClaim = Claim<ProcessorInstructionColumn>;
 
 /// The claim of the interaction phase 2 (with the logUp protocol).
 ///
