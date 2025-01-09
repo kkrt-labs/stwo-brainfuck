@@ -17,8 +17,8 @@ use stwo_prover::{
     },
 };
 
-/// Represents the Memory Table, which holds the required registers
-/// for the Memory component.
+/// Represents the trace for the Memory component, containing the required registers for its
+/// constraints.
 ///
 /// The Memory Table is constructed by extracting the required fields
 /// from the execution trace provided by the Brainfuck Virtual Machine,
@@ -63,7 +63,7 @@ impl MemoryTable {
         self.table.push(row);
     }
 
-    /// Transforms the [`MemoryTable`] into [`super::super::TraceEval`], to be committed
+    /// Transforms the [`MemoryTable`] into [`TraceEval`], to be commited
     /// when generating a STARK proof.
     ///
     /// The [`MemoryTable`] is transformed from an array of consecutive rows (one
@@ -84,6 +84,7 @@ impl MemoryTable {
         if n_rows == 0 {
             return Err(TraceError::EmptyTrace);
         }
+
         let log_n_rows = n_rows.ilog2();
         let log_size = log_n_rows + LOG_N_LANES;
         let mut trace = vec![BaseColumn::zeros(1 << log_size); MemoryColumn::count().0];
@@ -112,7 +113,7 @@ impl From<&Vec<Registers>> for MemoryTable {
     }
 }
 
-// Separated from `Vec<Registers> for MemoryTable` to facilitate tests.
+// Separated from `From<&Vec<Registers>> for MemoryTable` to facilitate tests.
 // It is assumed that [`MemoryIntermediateTable`] is sorted and padded to the next power of two.
 impl From<MemoryIntermediateTable> for MemoryTable {
     fn from(mut intermediate_table: MemoryIntermediateTable) -> Self {
@@ -122,6 +123,8 @@ impl From<MemoryIntermediateTable> for MemoryTable {
             return memory_table;
         }
 
+        // As we are pairing each entry from the `MemoryIntermediateTable`, the last entry does
+        // not have any "next entry", hence the creation of a dummy one.
         let last_entry = intermediate_table.table.last().unwrap();
         let next_dummy_entry = MemoryTableEntry::new_dummy(
             last_entry.clk + BaseField::one(),
@@ -146,10 +149,10 @@ impl From<MemoryIntermediateTable> for MemoryTable {
 
 /// Represents a single row of the [`MemoryTable`]
 ///
-/// Two consecutive [`MemoryTableEntry`] flattened.
+/// A row is two consecutive [`MemoryTableEntry`].
 ///
 /// To avoid bit-reversals when evaluating transition constraints,
-/// the two consecutive rows on which transition constraints are evaluated
+/// the two consecutives rows on which transition constraints are evaluated
 /// are flattened into a single row.
 #[derive(Debug, Default, PartialEq, Eq, Clone)]
 pub struct MemoryTableRow {
@@ -190,7 +193,7 @@ impl MemoryTableRow {
     }
 }
 
-/// An intermediate representation of the trace, between the execution trace and the trace for the
+/// An intermediate representation of the trace between the execution trace and the trace for the
 /// Memory component.
 ///
 /// It allows extracting the required fields from the execution trace provided by the Brainfuck
@@ -215,7 +218,7 @@ impl MemoryIntermediateTable {
         Self::default()
     }
 
-    /// Adds a new entry to the Memory Table.
+    /// Adds a new entry to the [`MemoryIntermediateTable`].
     ///
     /// # Arguments
     /// * `entry` - The [`MemoryTableEntry`] to add to the table.
@@ -225,7 +228,7 @@ impl MemoryIntermediateTable {
         self.table.push(entry);
     }
 
-    /// Adds multiple entries to the Memory Table.
+    /// Adds multiple entries to the [`MemoryIntermediateTable`].
     ///
     /// # Arguments
     /// * `entries` - A vector of [`MemoryTableEntry`] to add to the table.
@@ -235,8 +238,8 @@ impl MemoryIntermediateTable {
         self.table.extend(entries);
     }
 
-    /// Sorts in-place the existing [`MemoryTableEntry`] rows in the Memory Table by `mp`, then
-    /// `clk`.
+    /// Sorts in-place the existing [`MemoryTableEntry`] rows in the [`MemoryIntermediateTable`] by
+    /// `mp`, then `clk`.
     ///
     /// Having the entries sorted is required to ensure a correct proof generation (such that the
     /// constraints can be verified).
@@ -252,6 +255,7 @@ impl MemoryIntermediateTable {
     /// Does nothing if the table is empty.
     fn complete_with_dummy_entries(&mut self) {
         let mut new_table = Vec::with_capacity(self.table.len());
+
         if let Some(mut prev_entry) = self.table.first() {
             for entry in &self.table {
                 let next_clk = prev_entry.clk + BaseField::one();
@@ -269,6 +273,7 @@ impl MemoryIntermediateTable {
                 new_table.push(entry.clone());
                 prev_entry = entry;
             }
+
             new_table.shrink_to_fit();
             self.table = new_table;
         }
@@ -276,7 +281,8 @@ impl MemoryIntermediateTable {
 
     /// Pads the memory table with dummy entries up to the next power of two length.
     ///
-    /// Each dummy entry preserves the last memory pointer and value, while incrementing the clock.
+    /// Each dummy entry preserves the last memory pointer `mp` and value `mv`, while incrementing
+    /// the clock `clk`.
     ///
     /// Does nothing if the table is empty.
     fn pad(&mut self) {
@@ -309,11 +315,10 @@ impl From<&Vec<Registers>> for MemoryIntermediateTable {
     }
 }
 
-/// Represents a single entry of the [`MemoryIntermediateTable`].
+/// Represents the registers of a single step from the execution trace used by the
+/// [`MemoryIntermediateTable`].
 ///
-/// Represents the registers used by the Memory Table of a single step from the execution trace.
-///
-/// The Memory Table Intermediate stores:
+/// The [`MemoryIntermediateTable`] stores:
 /// - The clock cycle counter (`clk`),
 /// - The memory pointer (`mp`),
 /// - The memory value (`mv`),
@@ -324,9 +329,9 @@ pub struct MemoryTableEntry {
     clk: BaseField,
     /// Memory pointer: points to a memory cell.
     mp: BaseField,
-    /// Memory value: value of the cell pointer by `mp` - values in [0..2^31 - 1)
+    /// Memory value: value of the cell pointer by `mp` - values in [0..2^31 - 1).
     mv: BaseField,
-    /// Dummy: Flag whether the entry is a dummy one or not
+    /// Dummy: Flag whether the entry is a dummy one or not.
     d: BaseField,
 }
 
@@ -360,7 +365,7 @@ impl From<(&Registers, bool)> for MemoryTableEntry {
     }
 }
 
-/// Enum representing the column indices in the Memory trace
+/// Enum representing the column indices in the Memory trace.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum MemoryColumn {
     /// Index of the `clk` register column in the Memory trace.
@@ -382,7 +387,7 @@ pub enum MemoryColumn {
 }
 
 impl MemoryColumn {
-    /// Returns the index of the column in the Memory table
+    /// Returns the index of the column in the Memory trace.
     pub const fn index(self) -> usize {
         match self {
             Self::Clk => 0,
@@ -433,7 +438,7 @@ impl MemoryElements {
 }
 
 impl<F: Clone, EF: RelationEFTraitBound<F>> Relation<F, EF> for MemoryElements {
-    /// Combine multiple values from a base field (e.g. [`BaseField`])
+    /// Combine multiple values from a basefield (e.g. [`BaseField`])
     /// and combine them to a value from an extension field (e.g. [`PackedSecureField`])
     ///
     /// This is used when computing the interaction values from the main trace values.
@@ -460,12 +465,12 @@ impl<F: Clone, EF: RelationEFTraitBound<F>> Relation<F, EF> for MemoryElements {
 /// and the interaction elements for the Memory component.
 ///
 /// The Processor component uses the other components:
-/// The Processor component multiplicities are then positive,
-/// and the Memory component multiplicities are negative
+/// The Processor component's multiplicities are then positive,
+/// and the Memory component's multiplicities are negative
 /// in the logUp protocol.
 ///
 /// Only the 'real' rows are impacting the logUp sum.
-/// Dummy rows are padded rows and rows filling the `clk` gaps
+/// Dummy rows are padding rows and rows filling the `clk` gaps,
 /// which does not appear in the Processor main trace.
 ///
 ///
@@ -491,24 +496,15 @@ pub fn interaction_trace_evaluation(
     let mp_col = &main_trace_eval[MemoryColumn::Mp.index()].data;
     let mv_column = &main_trace_eval[MemoryColumn::Mv.index()].data;
     let d_col = &main_trace_eval[MemoryColumn::D.index()].data;
-    let next_clk_col = &main_trace_eval[MemoryColumn::NextClk.index()].data;
-    let next_mp_col = &main_trace_eval[MemoryColumn::NextMp.index()].data;
-    let next_mv_col = &main_trace_eval[MemoryColumn::NextMv.index()].data;
-    let next_d_col = &main_trace_eval[MemoryColumn::NextD.index()].data;
     for vec_row in 0..1 << (log_size - LOG_N_LANES) {
         let clk = clk_col[vec_row];
         let mp = mp_col[vec_row];
         let mv = mv_column[vec_row];
-        let next_clk = next_clk_col[vec_row];
-        let next_mp = next_mp_col[vec_row];
-        let next_mv = next_mv_col[vec_row];
         // Set the fraction numerator to 0 if it is a dummy row (d = 1), otherwise set it to -1.
-        let num_1 = PackedSecureField::from(d_col[vec_row]) - PackedSecureField::one();
-        let num_2 = PackedSecureField::from(next_d_col[vec_row]) - PackedSecureField::one();
+        let num = PackedSecureField::from(d_col[vec_row]) - PackedSecureField::one();
         // Only the common registers with the processor table are part of the extension column.
-        let denom_1: PackedSecureField = lookup_elements.combine(&[clk, mp, mv]);
-        let denom_2: PackedSecureField = lookup_elements.combine(&[next_clk, next_mp, next_mv]);
-        col_gen.write_frac(vec_row, num_1 * denom_2 + num_2 * denom_1, denom_1 * denom_2);
+        let denom: PackedSecureField = lookup_elements.combine(&[clk, mp, mv]);
+        col_gen.write_frac(vec_row, num, denom);
     }
 
     col_gen.finalize_col();
@@ -856,9 +852,9 @@ mod tests {
         let num_2 = -PackedSecureField::one();
         let num_3 = PackedSecureField::zero();
 
-        col_gen.write_frac(0, num_0 * denoms[1] + num_1 * denoms[0], denoms[0] * denoms[1]);
-        col_gen.write_frac(1, num_1 * denoms[2] + num_2 * denoms[1], denoms[1] * denoms[2]);
-        col_gen.write_frac(2, num_2 * denoms[3] + num_3 * denoms[2], denoms[2] * denoms[3]);
+        col_gen.write_frac(0, num_0, denoms[0]);
+        col_gen.write_frac(1, num_1, denoms[1]);
+        col_gen.write_frac(2, num_2, denoms[2]);
         col_gen.write_frac(3, num_3, denoms[3]);
 
         col_gen.finalize_col();
