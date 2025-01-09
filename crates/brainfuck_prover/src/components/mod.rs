@@ -45,6 +45,9 @@ pub type ProcessorClaim = Claim<ProcessorColumn>;
 /// Claim for the Program trace.
 pub type ProgramClaim = Claim<ProgramColumn>;
 
+/// Claim for all the instructions traces (all except jumps and end of execution).
+pub type ProcessorInstructionClaim = Claim<ProcessorInstructionColumn>;
+
 /// The claim of the interaction phase 2 (with the logUp protocol).
 ///
 /// The claimed sum is the total sum, which is the computed sum of the logUp extension column,
