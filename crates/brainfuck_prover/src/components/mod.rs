@@ -1,7 +1,10 @@
 use instruction::table::InstructionColumn;
 use memory::table::MemoryColumn;
 use processor::{
-    instructions::{jump::table::JumpColumn, table::ProcessorInstructionColumn},
+    instructions::{
+        end_of_execution::table::EndOfExecutionColumn, jump::table::JumpColumn,
+        table::ProcessorInstructionColumn,
+    },
     table::ProcessorColumn,
 };
 use program::table::ProgramColumn;
@@ -26,6 +29,9 @@ pub enum TraceError {
     /// The component trace is empty.
     #[error("The trace is empty.")]
     EmptyTrace,
+    /// The trace of the End of Execution component is not equal to one.
+    #[error("The end of execution trace is not equal to one.")]
+    InvalidEndOfExecution,
 }
 
 /// Type for trace evaluation to be used in Stwo.
@@ -48,6 +54,9 @@ pub type ProcessorInstructionClaim = Claim<ProcessorInstructionColumn>;
 
 /// Claims for the `JumpIfNotZero` and `JumpIfZero` traces.
 pub type JumpClaim = Claim<JumpColumn>;
+
+/// Claim for the `EndOfExecution` trace.
+pub type EndOfExecutionClaim = Claim<EndOfExecutionColumn>;
 
 /// The claim of the interaction phase 2 (with the logUp protocol).
 ///
