@@ -6,7 +6,7 @@ use program::table::ProgramColumn;
 use stwo_prover::core::{
     backend::simd::SimdBackend,
     channel::Channel,
-    fields::{m31::BaseField, secure_column::SECURE_EXTENSION_DEGREE},
+    fields::{m31::BaseField, qm31::SecureField, secure_column::SECURE_EXTENSION_DEGREE},
     pcs::TreeVec,
     poly::{circle::CircleEvaluation, BitReversedOrder},
     ColumnVec,
@@ -43,6 +43,27 @@ pub enum TraceError {
     /// The component trace is empty.
     #[error("The trace is empty.")]
     EmptyTrace,
+}
+
+/// The claim of the interaction phase 2 (with the logUp protocol).
+///
+/// The claimed sum is the total sum, which is the computed sum of the logUp extension column,
+/// including the padding rows.
+/// It allows proving that the main trace of a component is either a permutation, or a sublist of
+/// another.
+#[derive(Debug, Eq, PartialEq)]
+pub struct InteractionClaim {
+    /// The computed sum of the logUp extension column, including padding rows (which are actually
+    /// set to a multiplicity of 0).
+    pub claimed_sum: SecureField,
+}
+
+impl InteractionClaim {
+    /// Mix the sum from the logUp protocol into the Fiat-Shamir [`Channel`],
+    /// to bound the proof to the trace.
+    pub fn mix_into(&self, channel: &mut impl Channel) {
+        channel.mix_felts(&[self.claimed_sum]);
+    }
 }
 
 /// Represents a claim associated with a specific trace in the Brainfuck STARK proving system.
