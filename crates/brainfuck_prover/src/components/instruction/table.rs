@@ -1,4 +1,4 @@
-use crate::components::{InstructionClaim, TraceColumn, TraceError, TraceEval};
+use crate::components::{InstructionClaim, InteractionClaim, TraceColumn, TraceError, TraceEval};
 use brainfuck_vm::{machine::ProgramMemory, registers::Registers};
 use num_traits::{One, Zero};
 use stwo_prover::{
@@ -16,8 +16,6 @@ use stwo_prover::{
         poly::circle::{CanonicCoset, CircleEvaluation},
     },
 };
-
-use super::component::InteractionClaim;
 
 /// Represents the Instruction Table, which holds the required registers
 /// for the Instruction component.

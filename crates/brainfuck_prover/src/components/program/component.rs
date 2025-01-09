@@ -1,9 +1,6 @@
 use super::table::ProgramElements;
 use crate::components::ProgramClaim;
-use stwo_prover::{
-    constraint_framework::{EvalAtRow, FrameworkComponent, FrameworkEval},
-    core::{channel::Channel, fields::qm31::SecureField},
-};
+use stwo_prover::constraint_framework::{EvalAtRow, FrameworkComponent, FrameworkEval};
 
 /// Implementation of `Component` and `ComponentProver`
 /// for the `SimdBackend` from the constraint framework provided by Stwo
@@ -52,23 +49,5 @@ impl FrameworkEval for ProgramEval {
     /// The logUp must be finalized with `eval.finalize_logup()`.
     fn evaluate<E: EvalAtRow>(&self, _eval: E) -> E {
         todo!()
-    }
-}
-
-/// The claim of the interaction phase 2 (with the logUp protocol).
-///
-/// The total sum is the computed sum of the logUp extension column,
-/// including the padded rows.
-#[derive(Debug, Eq, PartialEq)]
-pub struct InteractionClaim {
-    /// The computed sum of the logUp extension column, including padded rows.
-    pub claimed_sum: SecureField,
-}
-
-impl InteractionClaim {
-    /// Mix the sums from the logUp protocol into the Fiat-Shamir [`Channel`],
-    /// to bound the proof to the trace.
-    pub fn mix_into(&self, channel: &mut impl Channel) {
-        channel.mix_felts(&[self.claimed_sum]);
     }
 }

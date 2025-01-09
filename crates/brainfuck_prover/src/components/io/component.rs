@@ -2,10 +2,7 @@ use brainfuck_vm::instruction::InstructionType;
 use num_traits::One;
 use stwo_prover::{
     constraint_framework::{EvalAtRow, FrameworkComponent, FrameworkEval, RelationEntry},
-    core::{
-        channel::Channel,
-        fields::{m31::BaseField, qm31::SecureField},
-    },
+    core::fields::m31::BaseField,
 };
 
 use crate::components::IoClaim;
@@ -96,27 +93,6 @@ impl<const N: u32> FrameworkEval for IoEval<N> {
         eval.finalize_logup();
 
         eval
-    }
-}
-
-/// The claim of the interaction phase 2 (with the logUp protocol).
-///
-/// The total sum is the computed sum of the logUp extension column,
-/// including the padded rows.
-/// It allows proving that the I/O main trace is a sublist
-/// of the Processor trace (which is the execution trace provided by the `brainfuck_vm`):
-/// all input and output values are the same as the one from the execution, in the same order.
-#[derive(Debug, Eq, PartialEq)]
-pub struct InteractionClaim {
-    /// The computed sum of the logUp extension column, including padded rows.
-    pub claimed_sum: SecureField,
-}
-
-impl InteractionClaim {
-    /// Mix the sums from the logUp protocol into the Fiat-Shamir [`Channel`],
-    /// to bound the proof to the trace.
-    pub fn mix_into(&self, channel: &mut impl Channel) {
-        channel.mix_felts(&[self.claimed_sum]);
     }
 }
 

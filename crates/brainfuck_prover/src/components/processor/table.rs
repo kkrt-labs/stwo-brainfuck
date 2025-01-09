@@ -1,7 +1,6 @@
-use super::component::InteractionClaim;
 use crate::components::{
     instruction::table::InstructionElements, io::table::IoElements, memory::table::MemoryElements,
-    ProcessorClaim, TraceColumn, TraceError, TraceEval,
+    InteractionClaim, ProcessorClaim, TraceColumn, TraceError, TraceEval,
 };
 use brainfuck_vm::registers::Registers;
 use num_traits::{One, Zero};

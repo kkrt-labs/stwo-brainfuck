@@ -14,7 +14,7 @@ use crate::components::{
         component::{MemoryComponent, MemoryEval},
         table::{MemoryElements, MemoryTable},
     },
-    InstructionClaim, IoClaim, MemoryClaim,
+    InstructionClaim, InteractionClaim, IoClaim, MemoryClaim,
 };
 use brainfuck_vm::machine::Machine;
 use stwo_prover::{
@@ -109,10 +109,10 @@ impl BrainfuckInteractionElements {
 ///
 /// Mainly the claims on global relations (lookup, permutation, evaluation).
 pub struct BrainfuckInteractionClaim {
-    input: io::component::InteractionClaim,
-    output: io::component::InteractionClaim,
-    memory: memory::component::InteractionClaim,
-    instruction: instruction::component::InteractionClaim,
+    input: InteractionClaim,
+    output: InteractionClaim,
+    memory: InteractionClaim,
+    instruction: InteractionClaim,
 }
 
 impl BrainfuckInteractionClaim {

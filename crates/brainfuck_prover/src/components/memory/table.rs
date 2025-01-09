@@ -1,5 +1,4 @@
-use super::component::InteractionClaim;
-use crate::components::{MemoryClaim, TraceColumn, TraceError, TraceEval};
+use crate::components::{InteractionClaim, MemoryClaim, TraceColumn, TraceError, TraceEval};
 use brainfuck_vm::registers::Registers;
 use num_traits::One;
 use stwo_prover::{

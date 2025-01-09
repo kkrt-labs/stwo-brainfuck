@@ -6,10 +6,7 @@ use stwo_prover::{
         preprocessed_columns::PreprocessedColumn, EvalAtRow, FrameworkComponent, FrameworkEval,
         RelationEntry,
     },
-    core::{
-        channel::Channel,
-        fields::{m31::BaseField, qm31::SecureField},
-    },
+    core::fields::m31::BaseField,
 };
 
 /// Implementation of `Component` and `ComponentProver`
@@ -124,30 +121,6 @@ impl FrameworkEval for InstructionEval {
         eval.finalize_logup();
 
         eval
-    }
-}
-
-// TODO: Eventually refactor all InteractionClaim into a common struct at the components mod root.
-/// The claim of the interaction phase 2 (with the logUp protocol).
-///
-/// The total sum is the computed sum of the logUp extension column,
-/// including the padded rows.
-/// It allows proving two things on two disjoint subset of the Instruction main trace (whose union
-/// constitutes the Instruction):
-/// - One is the permutation of the Processor trace
-/// - The other is a subset of the Program trace (order preserved).
-/// of the Processor trace (which is the execution trace provided by the `brainfuck_vm`).
-#[derive(Debug, Eq, PartialEq)]
-pub struct InteractionClaim {
-    /// The computed sum of the logUp extension column, including padded rows.
-    pub claimed_sum: SecureField,
-}
-
-impl InteractionClaim {
-    /// Mix the sums from the logUp protocol into the Fiat-Shamir [`Channel`],
-    /// to bound the proof to the trace.
-    pub fn mix_into(&self, channel: &mut impl Channel) {
-        channel.mix_felts(&[self.claimed_sum]);
     }
 }
 
