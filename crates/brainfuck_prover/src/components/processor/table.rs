@@ -1,27 +1,30 @@
 use crate::components::{
-    instruction::table::InstructionElements, io::table::IoElements, memory::table::MemoryElements,
-    InteractionClaim, ProcessorClaim, TraceColumn, TraceError, TraceEval,
+    instruction::table::InstructionElements, memory::table::MemoryElements, InteractionClaim,
+    ProcessorClaim, TraceColumn, TraceError, TraceEval,
 };
 use brainfuck_vm::registers::Registers;
 use num_traits::{One, Zero};
 use stwo_prover::{
-    constraint_framework::{logup::LogupTraceGenerator, Relation},
+    constraint_framework::{
+        logup::{LogupTraceGenerator, LookupElements},
+        Relation, RelationEFTraitBound,
+    },
     core::{
         backend::{
             simd::{column::BaseColumn, m31::LOG_N_LANES, qm31::PackedSecureField},
             Column,
         },
+        channel::Channel,
         fields::m31::BaseField,
         poly::circle::{CanonicCoset, CircleEvaluation},
     },
 };
 
-/// Represents the Processor Table, which holds the required registers
-/// for the Processor component.
+/// Represents the Processor table for the Processor component, containing the required registers
+/// for its constraints.
 ///
-/// The Processor Table ensures consistency for the part of the execution that
-/// relates to the registers of the Brainfuck virtual machine. It records all
-/// register values for each cycle that the program ran.
+/// The Processor Table ensures the correctness of the state transition when executing an
+/// instruction.
 ///
 ///
 /// To ease constraints evaluation, each row of the Processor component
@@ -113,14 +116,14 @@ impl ProcessorTable {
     }
 }
 
-impl From<Vec<Registers>> for ProcessorTable {
-    fn from(registers: Vec<Registers>) -> Self {
+impl From<&Vec<Registers>> for ProcessorTable {
+    fn from(registers: &Vec<Registers>) -> Self {
         ProcessorIntermediateTable::from(registers).into()
     }
 }
 
-// Separated from `Vec<Registers> for ProcessorTable` to facilitate tests.
-// It is assumed that [`ProcessorIntermediateTable`] is sorted and padded to the next power of two.
+// Separated from `From<Vec<Registers>> for ProcessorTable` to facilitate tests.
+// It is assumed that `ProcessorIntermediateTable` is sorted and padded to the next power of two.
 impl From<ProcessorIntermediateTable> for ProcessorTable {
     fn from(mut intermediate_table: ProcessorIntermediateTable) -> Self {
         let mut processor_table = Self::new();
@@ -153,7 +156,7 @@ impl From<ProcessorIntermediateTable> for ProcessorTable {
 /// Two consecutive entries [`ProcessorTableEntry`] flattened.
 ///
 /// To avoid bit-reversals when evaluating transition constraints,
-/// the two consecutive rows on which transition constraints are evaluated
+/// the two consecutives rows on which transition constraints are evaluated
 /// are flattened into a single row.
 #[derive(Debug, Default, PartialEq, Eq, Clone)]
 pub struct ProcessorTableRow {
@@ -219,7 +222,7 @@ impl ProcessorTableRow {
     }
 }
 
-/// Represents the Processor Table, which records the register values for
+/// Represents the [`ProcessorTable`], which records the register values for
 /// each cycle that the program ran.
 ///
 /// The Processor Table is used to verify the consistency of the execution,
@@ -240,7 +243,7 @@ impl ProcessorIntermediateTable {
         Self { table: Vec::new() }
     }
 
-    /// Adds a new entry to the Processor Table.
+    /// Adds a new entry to the [`ProcessorIntermediateTable`].
     ///
     /// # Arguments
     /// * `entry` - The [`ProcessorTableEntry`] to add to the table.
@@ -250,7 +253,7 @@ impl ProcessorIntermediateTable {
         self.table.push(entry);
     }
 
-    /// Adds multiple entries to the Processor Table.
+    /// Adds multiple entries to the [`ProcessorIntermediateTable`].
     ///
     /// # Arguments
     /// * `entries` - A vector of [`ProcessorTableEntry`] to add to the table.
@@ -260,7 +263,8 @@ impl ProcessorIntermediateTable {
         self.table.extend(entries);
     }
 
-    /// Pads the Processor table with dummy entries up to the next power of two length.
+    /// Pads the [`ProcessorIntermediateTable`] with dummy entries up to the next power of two
+    /// length.
     ///
     /// Each dummy entry increase clk, copy the others from the last step
     ///
@@ -279,8 +283,8 @@ impl ProcessorIntermediateTable {
     }
 }
 
-impl From<Vec<Registers>> for ProcessorIntermediateTable {
-    fn from(registers: Vec<Registers>) -> Self {
+impl From<&Vec<Registers>> for ProcessorIntermediateTable {
+    fn from(registers: &Vec<Registers>) -> Self {
         let mut processor_table = Self::new();
 
         let entries = registers.iter().map(Into::into).collect();
@@ -291,7 +295,7 @@ impl From<Vec<Registers>> for ProcessorIntermediateTable {
     }
 }
 
-/// Represents a single entry in the Processor Table.
+/// Represents a single entry in the [`ProcessorIntermediateTable`].
 ///
 /// The Processor Table ensures consistency for the part of the execution that
 /// relates to the registers of the Brainfuck virtual machine. It records all
@@ -343,7 +347,7 @@ impl ProcessorTableEntry {
         Self { clk, ip, ci, ni, mp, mv, mvi, d: BaseField::zero() }
     }
 
-    /// Creates an entry for the [`InstructionIntermediateTable`] which is considered 'dummy'.
+    /// Creates an entry for the [`ProcessorIntermediateTable`] which is considered 'dummy'.
     ///
     /// A 'dummy' entry, is an entry that is not part of the execution trace from the Brainfuck
     /// program execution.
@@ -414,24 +418,80 @@ impl ProcessorColumn {
 
 impl TraceColumn for ProcessorColumn {
     fn count() -> (usize, usize) {
-        (16, 4)
+        (16, 3)
+    }
+}
+
+/// The number of random elements necessary for the Processor lookup argument.
+const PROCESSOR_LOOKUP_ELEMENTS: usize = 7;
+
+/// The interaction elements are drawn for the extension column of the Processor component
+/// and its sub components.
+///
+/// The logUp protocol uses these elements to combine the values of the different
+/// registers of the main trace to create a random linear combination
+/// of them, and use it in the denominator of the fractions in the logUp protocol.
+///
+/// There are 7 lookup elements in the Processor component: `clk`, `ip`, `ci`, `ni`, `mp`,
+/// `mv`, and `mvi`.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct ProcessorElements(LookupElements<PROCESSOR_LOOKUP_ELEMENTS>);
+
+impl ProcessorElements {
+    /// Provides dummy lookup elements.
+    pub fn dummy() -> Self {
+        Self(LookupElements::dummy())
+    }
+
+    /// Draw random elements from the Fiat-Shamir [`Channel`].
+    ///
+    /// These elements are randomly secured, and will be use
+    /// to generate the interaction trace with the logUp protocol.
+    pub fn draw(channel: &mut impl Channel) -> Self {
+        Self(LookupElements::draw(channel))
+    }
+}
+
+impl<F: Clone, EF: RelationEFTraitBound<F>> Relation<F, EF> for ProcessorElements {
+    /// Combine multiple values from a basefield (e.g. [`BaseField`])
+    /// and combine them to a value from an extension field (e.g. [`PackedSecureField`])
+    ///
+    /// This is used when computing the interaction values from the main trace values.
+    fn combine(&self, values: &[F]) -> EF {
+        values
+            .iter()
+            .zip(self.0.alpha_powers)
+            .fold(EF::zero(), |acc, (value, power)| acc + EF::from(power) * value.clone()) -
+            self.0.z.into()
+    }
+
+    /// Returns the name of the struct.
+    fn get_name(&self) -> &str {
+        stringify!(ProcessorElements)
+    }
+
+    /// Returns the number interaction elements.
+    fn get_size(&self) -> usize {
+        PROCESSOR_LOOKUP_ELEMENTS
     }
 }
 
 /// Creates the interaction trace from the main trace evaluation
 /// and the interaction elements for the Processor component.
 ///
-/// The Processor table represents the execution trace.
+/// The [`ProcessorTable`] represents the execution trace.
 ///
-/// The Processor table is the central component of the system,
-/// it uses the other components (Input, Output, Instruction and Memory)
+/// The [`ProcessorTable`] is the central component of the system,
+/// it uses the other components (Instruction, Memory and its instruction sub-components)
 /// to verify other properties on the execution trace, through lookup arguments (logUp).
 ///
 /// Only the 'real' rows are impacting the logUp sum.
 /// Dummy rows are padding rows.
 ///
-/// Here, the logUp has four extension columns, which uses
-/// the Input, Output, Instruction and Memory components.
+/// Here, the logUp has three extension columns, which uses
+/// the various components: one linked to the Instruction component,
+/// another one linked to the Memory component and a last one linked to the instruction
+/// sub-components.
 ///
 /// # Returns
 /// - Interaction trace evaluation, to be committed.
@@ -440,10 +500,9 @@ impl TraceColumn for ProcessorColumn {
 #[allow(clippy::similar_names)]
 pub fn interaction_trace_evaluation(
     main_trace_eval: &TraceEval,
-    input_lookup_elements: &IoElements,
-    output_lookup_elements: &IoElements,
     instruction_lookup_elements: &InstructionElements,
     memory_lookup_elements: &MemoryElements,
+    processor_lookup_elements: &ProcessorElements,
 ) -> Result<(TraceEval, InteractionClaim), TraceError> {
     if main_trace_eval.is_empty() {
         return Err(TraceError::EmptyTrace)
@@ -457,41 +516,28 @@ pub fn interaction_trace_evaluation(
     let ni_col = &main_trace_eval[ProcessorColumn::Ni.index()].data;
     let mp_col = &main_trace_eval[ProcessorColumn::Mp.index()].data;
     let mv_col = &main_trace_eval[ProcessorColumn::Mv.index()].data;
+    let mvi_col = &main_trace_eval[ProcessorColumn::Mvi.index()].data;
     let d_col = &main_trace_eval[ProcessorColumn::D.index()].data;
-    let next_clk_col = &main_trace_eval[ProcessorColumn::NextClk.index()].data;
-    let next_mp_col = &main_trace_eval[ProcessorColumn::NextMp.index()].data;
-    let next_mv_col = &main_trace_eval[ProcessorColumn::NextMv.index()].data;
-    let next_d_col = &main_trace_eval[ProcessorColumn::NextD.index()].data;
 
     let mut logup_gen = LogupTraceGenerator::new(log_size);
 
-    // Processor & Input
+    // Processor & instruction Sub-components
     let mut col_gen = logup_gen.new_col();
     for vec_row in 0..1 << (log_size - LOG_N_LANES) {
         let clk = clk_col[vec_row];
+        let ip = ip_col[vec_row];
         let ci = ci_col[vec_row];
+        let ni = ni_col[vec_row];
+        let mp = mp_col[vec_row];
         let mv = mv_col[vec_row];
+        let mvi = mvi_col[vec_row];
         let d = d_col[vec_row];
 
         let num = PackedSecureField::one() - PackedSecureField::from(d);
 
-        let input_denom: PackedSecureField = input_lookup_elements.combine(&[clk, ci, mv]);
+        let input_denom: PackedSecureField =
+            processor_lookup_elements.combine(&[clk, ip, ci, ni, mp, mv, mvi]);
         col_gen.write_frac(vec_row, num, input_denom);
-    }
-    col_gen.finalize_col();
-
-    // Processor & Output
-    let mut col_gen = logup_gen.new_col();
-    for vec_row in 0..1 << (log_size - LOG_N_LANES) {
-        let clk = clk_col[vec_row];
-        let ci = ci_col[vec_row];
-        let mv = mv_col[vec_row];
-        let d = d_col[vec_row];
-
-        let num = PackedSecureField::one() - PackedSecureField::from(d);
-
-        let output_denom: PackedSecureField = output_lookup_elements.combine(&[clk, ci, mv]);
-        col_gen.write_frac(vec_row, num, output_denom);
     }
     col_gen.finalize_col();
 
@@ -513,28 +559,16 @@ pub fn interaction_trace_evaluation(
 
     // Processor & Memory
     let mut col_gen = logup_gen.new_col();
-
     for vec_row in 0..1 << (log_size - LOG_N_LANES) {
         let clk = clk_col[vec_row];
         let mp = mp_col[vec_row];
         let mv = mv_col[vec_row];
         let d = d_col[vec_row];
-        let next_clk = next_clk_col[vec_row];
-        let next_mp = next_mp_col[vec_row];
-        let next_mv = next_mv_col[vec_row];
-        let next_d = next_d_col[vec_row];
 
         let num = PackedSecureField::one() - PackedSecureField::from(d);
-        let next_num = PackedSecureField::one() - PackedSecureField::from(next_d);
 
         let memory_denom: PackedSecureField = memory_lookup_elements.combine(&[clk, mp, mv]);
-        let next_memory_denom: PackedSecureField =
-            memory_lookup_elements.combine(&[next_clk, next_mp, next_mv]);
-        col_gen.write_frac(
-            vec_row,
-            num * next_memory_denom + next_num * memory_denom,
-            memory_denom * next_memory_denom,
-        );
+        col_gen.write_frac(vec_row, num, memory_denom);
     }
     col_gen.finalize_col();
 
@@ -700,7 +734,7 @@ mod tests {
         let () = machine.execute().expect("Failed to execute machine");
 
         // Get the trace of the executed program
-        let trace = machine.trace();
+        let trace = &machine.trace();
 
         // Convert the trace to an `ProcessorIntermediateTable`
         let processor_intermediate_table: ProcessorIntermediateTable = trace.into();
@@ -1052,16 +1086,14 @@ mod tests {
     #[test]
     fn test_empty_interaction_trace_evaluation() {
         let empty_eval = vec![];
-        let input_lookup_elements = IoElements::dummy();
-        let output_lookup_elements = IoElements::dummy();
         let instruction_lookup_elements = InstructionElements::dummy();
         let memory_lookup_elements = MemoryElements::dummy();
+        let processor_lookup_elements = ProcessorElements::dummy();
         let interaction_trace_eval = interaction_trace_evaluation(
             &empty_eval,
-            &input_lookup_elements,
-            &output_lookup_elements,
             &instruction_lookup_elements,
             &memory_lookup_elements,
+            &processor_lookup_elements,
         );
 
         assert!(matches!(interaction_trace_eval, Err(TraceError::EmptyTrace)));
@@ -1078,28 +1110,25 @@ mod tests {
         let (mut machine, _) = create_test_machine(&instructions, &[1]);
         let () = machine.execute().expect("Failed to execute machine");
 
-        let processor_table = ProcessorTable::from(machine.trace());
+        let processor_table = ProcessorTable::from(&machine.trace());
 
         let (trace_eval, claim) = processor_table.trace_evaluation().unwrap();
 
-        let input_lookup_elements = IoElements::dummy();
-        let output_lookup_elements = IoElements::dummy();
         let instruction_lookup_elements = InstructionElements::dummy();
         let memory_lookup_elements = MemoryElements::dummy();
+        let processor_lookup_elements = ProcessorElements::dummy();
 
         let (interaction_trace_eval, interaction_claim) = interaction_trace_evaluation(
             &trace_eval,
-            &input_lookup_elements,
-            &output_lookup_elements,
             &instruction_lookup_elements,
             &memory_lookup_elements,
+            &processor_lookup_elements,
         )
         .unwrap();
 
         let log_size = trace_eval[0].domain.log_size();
 
-        let mut input_denoms = [PackedSecureField::zero(); 4];
-        let mut output_denoms = [PackedSecureField::zero(); 4];
+        let mut sub_component_denoms = [PackedSecureField::zero(); 4];
         let mut instruction_denoms = [PackedSecureField::zero(); 4];
         let mut memory_denoms = [PackedSecureField::zero(); 4];
 
@@ -1109,6 +1138,7 @@ mod tests {
         let ni_col = &trace_eval[ProcessorColumn::Ni.index()].data;
         let mp_col = &trace_eval[ProcessorColumn::Mp.index()].data;
         let mv_col = &trace_eval[ProcessorColumn::Mv.index()].data;
+        let mvi_col = &trace_eval[ProcessorColumn::Mvi.index()].data;
 
         // Construct the denominator for each row of the logUp column, from the main trace
         // evaluation.
@@ -1119,19 +1149,18 @@ mod tests {
             let ni = ni_col[vec_row];
             let mp = mp_col[vec_row];
             let mv = mv_col[vec_row];
+            let mvi = mvi_col[vec_row];
 
-            // Input lookup argument
-            let input_denom: PackedSecureField = input_lookup_elements.combine(&[clk, ci, mv]);
-            // Output lookup argument
-            let output_denom: PackedSecureField = output_lookup_elements.combine(&[clk, ci, mv]);
+            // Sub-component lookup argument
+            let sub_component_denom: PackedSecureField =
+                processor_lookup_elements.combine(&[clk, ip, ci, ni, mp, mv, mvi]);
             // Instruction lookup argument
             let instruction_denom: PackedSecureField =
                 instruction_lookup_elements.combine(&[ip, ci, ni]);
             // Memory lookup argument
             let memory_denom: PackedSecureField = memory_lookup_elements.combine(&[clk, mp, mv]);
 
-            input_denoms[vec_row] = input_denom;
-            output_denoms[vec_row] = output_denom;
+            sub_component_denoms[vec_row] = sub_component_denom;
             instruction_denoms[vec_row] = instruction_denom;
             memory_denoms[vec_row] = memory_denom;
         }
@@ -1143,20 +1172,12 @@ mod tests {
 
         let mut logup_gen = LogupTraceGenerator::new(log_size);
 
-        // Input Lookup
+        // Sub Component Lookup
         let mut col_gen = logup_gen.new_col();
-        col_gen.write_frac(0, num_0, input_denoms[0]);
-        col_gen.write_frac(1, num_1, input_denoms[1]);
-        col_gen.write_frac(2, num_2, input_denoms[2]);
-        col_gen.write_frac(3, num_3, input_denoms[3]);
-        col_gen.finalize_col();
-
-        // Output Lookup
-        let mut col_gen = logup_gen.new_col();
-        col_gen.write_frac(0, num_0, output_denoms[0]);
-        col_gen.write_frac(1, num_1, output_denoms[1]);
-        col_gen.write_frac(2, num_2, output_denoms[2]);
-        col_gen.write_frac(3, num_3, output_denoms[3]);
+        col_gen.write_frac(0, num_0, sub_component_denoms[0]);
+        col_gen.write_frac(1, num_1, sub_component_denoms[1]);
+        col_gen.write_frac(2, num_2, sub_component_denoms[2]);
+        col_gen.write_frac(3, num_3, sub_component_denoms[3]);
         col_gen.finalize_col();
 
         // Instruction Lookup
@@ -1169,21 +1190,9 @@ mod tests {
 
         // Memory Lookup
         let mut col_gen = logup_gen.new_col();
-        col_gen.write_frac(
-            0,
-            num_0 * memory_denoms[1] + num_1 * memory_denoms[0],
-            memory_denoms[0] * memory_denoms[1],
-        );
-        col_gen.write_frac(
-            1,
-            num_1 * memory_denoms[2] + num_2 * memory_denoms[1],
-            memory_denoms[1] * memory_denoms[2],
-        );
-        col_gen.write_frac(
-            2,
-            num_2 * memory_denoms[3] + num_3 * memory_denoms[2],
-            memory_denoms[2] * memory_denoms[3],
-        );
+        col_gen.write_frac(0, num_0, memory_denoms[0]);
+        col_gen.write_frac(1, num_1, memory_denoms[1]);
+        col_gen.write_frac(2, num_2, memory_denoms[2]);
         col_gen.write_frac(3, num_3, memory_denoms[3]);
         col_gen.finalize_col();
 
