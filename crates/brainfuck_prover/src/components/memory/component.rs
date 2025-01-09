@@ -9,16 +9,20 @@ use stwo_prover::{
     core::fields::m31::BaseField,
 };
 
-/// Implementation of `Component` and `ComponentProver`
-/// for the `SimdBackend` from the constraint framework provided by Stwo
+/// Implementation of `Component` and `ComponentProver` for the Memory component.
+/// It targets the `SimdBackend` from the Stwo constraint framework, with a fallback
+/// on `CpuBakend` for small traces.
 pub type MemoryComponent = FrameworkComponent<MemoryEval>;
 
-/// The AIR for the Memory component.
+/// The AIR for the [`MemoryComponent`].
 ///
-/// Constraints are defined through the `FrameworkEval`
+/// Constraints are defined through the [`FrameworkEval`]
 /// provided by the constraint framework of Stwo.
 pub struct MemoryEval {
+    /// The log size of the component's main trace height.
     log_size: u32,
+    /// The random elements used for the lookup protocol linking the memory component and the
+    /// processor component.
     memory_lookup_elements: MemoryElements,
 }
 
@@ -43,7 +47,7 @@ impl FrameworkEval for MemoryEval {
 
     /// Defines the AIR for the Memory component
     ///
-    /// Registers values from the current row are obtained through masks.
+    /// Registers' values from the current row are obtained through masks.
     /// When you apply a mask, you target the current column and then pass to the next
     /// one: the register order matters to correctly fetch them.
     ///
@@ -69,13 +73,31 @@ impl FrameworkEval for MemoryEval {
         let next_mv = eval.next_trace_mask();
         let next_d = eval.next_trace_mask();
 
-        // Boundary constraints
+        // ┌──────────────────────────┐
+        // │   Boundary Constraints   │
+        // └──────────────────────────┘
+
+        // The first registers' values are equal to 0.
         eval.add_constraint(is_first.clone() * clk.clone());
         eval.add_constraint(is_first.clone() * mp.clone());
         eval.add_constraint(is_first.clone() * mv.clone());
         eval.add_constraint(is_first * d.clone());
 
-        // `mp` increases by 0 or 1
+        // ┌─────────────────────────────┐
+        // │   Consistency Constraints   │
+        // └─────────────────────────────┘
+
+        // `d` is either 0 or 1.
+        eval.add_constraint(d.clone() * (d.clone() - BaseField::one().into()));
+
+        // `next_d` is either 0 or 1.
+        eval.add_constraint(next_d.clone() * (next_d - BaseField::one().into()));
+
+        // ┌────────────────────────────┐
+        // │   Transition Constraints   │
+        // └────────────────────────────┘
+
+        // `mp` increases by 0 or 1.
         eval.add_constraint(
             (next_mp.clone() - mp.clone()) *
                 (next_mp.clone() - mp.clone() - BaseField::one().into()),
@@ -84,37 +106,31 @@ impl FrameworkEval for MemoryEval {
         // If `mp` remains the same, `clk` increases by 1
         // Note: `mp` increases by 0 or 1, if `mp` increases, then the
         // constraints on `clk` increasing should be void, hence the
-        // (`next_mp` - `mp` - 1)
+        // (`next_mp` - `mp` - 1).
         eval.add_constraint(
             (next_mp.clone() - mp.clone() - BaseField::one().into()) *
-                (next_clk.clone() - clk.clone() - BaseField::one().into()),
+                (next_clk - clk.clone() - BaseField::one().into()),
         );
 
-        // If `mp` increases by 1, then `next_mv` must be 0
+        // If `mp` increases by 1, then `next_mv` must be 0.
         eval.add_constraint((next_mp.clone() - mp.clone()) * next_mv.clone());
 
-        // The next dummy is either 0 or 1
-        eval.add_constraint(next_d.clone() * (next_d.clone() - BaseField::one().into()));
+        // If `d` is set, then `mp` remains the same.
+        eval.add_constraint(d.clone() * (next_mp - mp.clone()));
 
-        // If `d` is set, then `mp` remains the same
-        eval.add_constraint(d.clone() * (next_mp.clone() - mp.clone()));
+        // If `d` is set, then `mv` remains the same.
+        eval.add_constraint(d.clone() * (next_mv - mv.clone()));
 
-        // If `d` is set, then `mv` remains the same
-        eval.add_constraint(d.clone() * (next_mv.clone() - mv.clone()));
+        // ┌─────────────────────────────┐
+        // │   Interaction Constraints   │
+        // └─────────────────────────────┘
 
-        // LogUp of `clk`, `mp` and `mv`
-        let multiplicity_row = E::EF::from(d) - E::EF::one();
-        // LogUp of `next_clk`, `next_mp` and `next_mv`
-        let multiplicity_next_row = E::EF::from(next_d) - E::EF::one();
-        eval.add_to_relation(&[
-            RelationEntry::new(&self.memory_lookup_elements, multiplicity_row, &[clk, mp, mv]),
-            RelationEntry::new(
-                &self.memory_lookup_elements,
-                multiplicity_next_row,
-                &[next_clk, next_mp, next_mv],
-            ),
-        ]);
-
+        let num = d - E::F::one();
+        eval.add_to_relation(&[RelationEntry::new(
+            &self.memory_lookup_elements,
+            num.into(),
+            &[clk, mp, mv],
+        )]);
         eval.finalize_logup();
 
         eval

@@ -17,8 +17,13 @@ use stwo_prover::{
     },
 };
 
-/// Represents the Instruction Table, which holds the required registers
-/// for the Instruction component.
+/// Represents the trace for the Instruction component, containing the required registers for its
+/// constraints.
+///
+/// The Instruction table is constructed by concatenating the program's list of
+/// instructions with the execution trace provided by the Brainfuck Virtual Machine,
+/// and then sorting by instruction pointer `ip` and cycle `clk`.
+/// It is used to verify that the program being executed matches the correct instruction sequence.
 ///
 /// To ease constraints evaluation, each row of the Instruction component
 /// contains the current row and the next row in natural order.
@@ -46,7 +51,7 @@ impl InstructionTable {
         Self::default()
     }
 
-    /// Adds a new row to the Instruction Table.
+    /// Adds a new row to the [`InstructionTable`].
     ///
     /// # Arguments
     /// * `row` - The [`InstructionTableRow`] to add to the table.
@@ -56,10 +61,10 @@ impl InstructionTable {
         self.table.push(row);
     }
 
-    /// Transforms the [`InstructionIntermediateTable`] into a [`TraceEval`], to be committed when
+    /// Transforms the [`InstructionTable`] into a [`TraceEval`], to be committed when
     /// generating a STARK proof.
     ///
-    /// The [`InstructionIntermediateTable`] is transformed from an array of rows (one element = one
+    /// The [`InstructionTable`] is transformed from an array of rows (one element = one
     /// step of all registers) to an array of columns (one element = all steps of one register).
     /// It is then evaluated on the circle domain.
     ///
@@ -85,7 +90,7 @@ impl InstructionTable {
         // the domain size is aligned for parallel processing.
         let log_size = log_n_rows + LOG_N_LANES;
 
-        // Initialize a trace with 3 columns (for `ip`, `ci`, and `ni` registers),
+        // Initialize a trace with 8 columns (8 registers),
         // each column containing `2^log_size` entries initialized to zero.
         let mut trace = vec![BaseColumn::zeros(1 << log_size); InstructionColumn::count().0];
 
@@ -120,7 +125,8 @@ impl InstructionTable {
         // constraint verification in STARK proofs.
         let trace = trace.into_iter().map(|col| CircleEvaluation::new(domain, col)).collect();
 
-        // Return the evaluated trace and a claim containing the log size of the domain.
+        // Return the evaluated trace and a claim containing the log size of the domain, which is
+        // the log height of the component's trace.
         Ok((trace, InstructionClaim::new(log_size)))
     }
 }
@@ -131,7 +137,7 @@ impl From<(&Vec<Registers>, &ProgramMemory)> for InstructionTable {
     }
 }
 
-// Separated from `Vec<Registers> for InstructionTable` to facilitate tests.
+// Separated from `From<&Vec<Registers>> for InstructionTable` to facilitate tests.
 // It is assumed that [`InstructionIntermediateTable`] is sorted and padded to the next power of
 // two.
 impl From<InstructionIntermediateTable> for InstructionTable {
@@ -142,6 +148,8 @@ impl From<InstructionIntermediateTable> for InstructionTable {
             return instruction_table;
         }
 
+        // As we are pairing each entry from the `InstructionIntermediateTable`, the last entry does
+        // not have any "next entry", hence the creation of a dummy one.
         let last_entry = intermediate_table.table.last().unwrap();
         let next_dummy_entry = InstructionTableEntry::new_dummy(last_entry.ip);
 
@@ -156,16 +164,17 @@ impl From<InstructionIntermediateTable> for InstructionTable {
                 _ => panic!("Empty window"),
             }
         }
+
         instruction_table
     }
 }
 
 /// Represents a single row of the [`InstructionTable`]
 ///
-/// Two consecutive [`InstructionTableEntry`] flattened.
+/// A row is two consecutive [`InstructionTableEntry`].
 ///
 /// To avoid bit-reversals when evaluating transition constraints,
-/// the two consecutive rows on which transition constraints are evaluated
+/// the two consecutives trace rows on which transition constraints are evaluated
 /// are flattened into a single row.
 #[derive(Debug, Default, PartialEq, Eq, Clone)]
 pub struct InstructionTableRow {
@@ -175,7 +184,7 @@ pub struct InstructionTableRow {
     ci: BaseField,
     /// Next instruction
     ni: BaseField,
-    /// Dummy: Flag whether the current entry is a dummy one or not.
+    /// Dummy: Flag whether the current entry is a dummy (padding) entry or not.
     d: BaseField,
     /// Next Instruction pointer.
     next_ip: BaseField,
@@ -206,10 +215,10 @@ impl InstructionTableRow {
     }
 }
 
-/// Represents the Instruction Table, which holds the instruction sequence
-/// for the Brainfuck virtual machine.
+/// Represents the Instruction intermediate table between the execution trace and the trace for the
+/// Instruction component.
 ///
-/// The Instruction Table is constructed by concatenating the program's list of
+/// The Instruction intermediate table is constructed by concatenating the program's list of
 /// instructions with the execution trace, and then sorting by instruction
 /// pointer and cycle. It is used to verify that the program being executed
 /// matches the correct instruction sequence.
@@ -228,7 +237,7 @@ impl InstructionIntermediateTable {
         Self { table: Vec::new() }
     }
 
-    /// Adds a new entry to the Instruction Table.
+    /// Adds a new entry to the [`InstructionIntermediateTable`].
     ///
     /// # Arguments
     /// * `entry` - The [`InstructionTableEntry`] to add to the table.
@@ -238,7 +247,7 @@ impl InstructionIntermediateTable {
         self.table.push(entry);
     }
 
-    /// Adds multiple entries to the Instruction Table.
+    /// Adds multiple entries to the [`InstructionIntermediateTable`].
     ///
     /// # Arguments
     /// * `entries` - A vector of [`InstructionTableEntry`] to add to the table.
@@ -250,8 +259,8 @@ impl InstructionIntermediateTable {
 
     /// Pads the instruction table with dummy entries up to the next power of two length.
     ///
-    /// Each dummy entry preserves the last instruction pointer
-    /// with current and next instructions `ci` and `ni` set to zero.
+    /// Each dummy entry preserves the last instruction pointer `ip`,
+    /// with the current and next instructions, `ci` and `ni`, set to zero.
     ///
     /// Does nothing if the table is empty.
     fn pad(&mut self) {
@@ -301,10 +310,10 @@ impl From<(&Vec<Registers>, &ProgramMemory)> for InstructionIntermediateTable {
 
 /// Represents a single entry of the [`InstructionIntermediateTable`].
 ///
-/// Represents the registers used by the Instruction Table of a single step from the execution
-/// trace.
+/// Represents the registers of a single step from the execution trace used by the
+/// [`InstructionIntermediateTable`]. trace.
 ///
-/// The Instruction Table stores:
+/// The [`InstructionIntermediateTable`] stores:
 /// - The instruction pointer (`ip`),
 /// - The current instruction (`ci`),
 /// - The next instruction (`ni`).
@@ -352,7 +361,7 @@ impl From<(&Registers, bool)> for InstructionTableEntry {
     }
 }
 
-/// Enum representing the column indices in the Instruction trace
+/// Enum representing the column indices in the Instruction trace.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum InstructionColumn {
     /// Index of the `ip` register column in the Instruction trace.
@@ -374,7 +383,7 @@ pub enum InstructionColumn {
 }
 
 impl InstructionColumn {
-    /// Returns the index of the column in the Instruction trace
+    /// Returns the index of the column in the Instruction trace.
     pub const fn index(self) -> usize {
         match self {
             Self::Ip => 0,
@@ -402,7 +411,7 @@ const INSTRUCTION_LOOKUP_ELEMENTS: usize = 3;
 ///
 /// The logUp protocol uses these elements to combine the values of the different
 /// registers of the main trace to create a random linear combination
-/// of them, and use it in the denominator of the fractions in the logUp protocol.
+/// of them. This combination is used as the denominator of the fractions in the logUp protocol.
 ///
 /// There are 3 lookup elements in the Instruction component: `ip`, `ci` and `ni`.
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -424,7 +433,7 @@ impl InstructionElements {
 }
 
 impl<F: Clone, EF: RelationEFTraitBound<F>> Relation<F, EF> for InstructionElements {
-    /// Combine multiple values from a base field (e.g. [`BaseField`])
+    /// Combine multiple values from a basefield (e.g. [`BaseField`])
     /// and combine them to a value from an extension field (e.g. [`PackedSecureField`])
     ///
     /// This is used when computing the interaction values from the main trace values.
@@ -451,12 +460,12 @@ impl<F: Clone, EF: RelationEFTraitBound<F>> Relation<F, EF> for InstructionEleme
 /// and the interaction elements for the Instruction component.
 ///
 /// The Instruction table is the concatenation of the execution trace
-/// and the compiled program, sorted by `ip`.
+/// and the compiled program, sorted by `ip`, and then `clk`.
 ///
 /// We want to prove that the Instruction table is a permutation of the Processor table
-/// and a sub list of the Program table (as two disjoint subset whose union is the Instruction
+/// and a sublist of the Program table (as two disjoint subset whose union is the Instruction
 /// table). To do so we make a lookup argument which yields for the Processor and the
-/// Instruction. Here, each fraction have a multiplicity of -1, while the counterpart in the
+/// Instruction. Here, each fraction have a multiplicity of -1, while their counterpart in the
 /// Processor and Program components will have a multiplicity of 1.
 /// The order is kept by having the `ip` register in the denominator.
 ///
@@ -495,7 +504,9 @@ pub fn interaction_trace_evaluation(
         let ni = ni_col[vec_row];
         let d = d_col[vec_row];
 
+        // Set the fraction numerator to 0 if it is a dummy row (d = 1), otherwise set it to -1.
         let num = PackedSecureField::from(d) - PackedSecureField::one();
+        // Only the common registers with the processor table are part of the extension column.
         let denom: PackedSecureField = lookup_elements.combine(&[ip, ci, ni]);
         col_gen.write_frac(vec_row, num, denom);
     }
@@ -664,48 +675,58 @@ mod tests {
             InstructionType::Left.to_base_field(),
             InstructionType::JumpIfZero.to_base_field(),
         );
+
         let ins_4 = InstructionTableEntry::new(
             BaseField::from(4),
             InstructionType::JumpIfZero.to_base_field(),
             BaseField::from(12),
         );
+
         let ins_5 = InstructionTableEntry::new(
             BaseField::from(5),
             BaseField::from(12),
             InstructionType::Right.to_base_field(),
         );
+
         let ins_6 = InstructionTableEntry::new(
             BaseField::from(6),
             InstructionType::Right.to_base_field(),
             InstructionType::Plus.to_base_field(),
         );
+
         let ins_7 = InstructionTableEntry::new(
             BaseField::from(7),
             InstructionType::Plus.to_base_field(),
             InstructionType::PutChar.to_base_field(),
         );
+
         let ins_8 = InstructionTableEntry::new(
             BaseField::from(8),
             InstructionType::PutChar.to_base_field(),
             InstructionType::Left.to_base_field(),
         );
+
         let ins_9 = InstructionTableEntry::new(
             BaseField::from(9),
             InstructionType::Left.to_base_field(),
             InstructionType::Minus.to_base_field(),
         );
+
         let inst_10 = InstructionTableEntry::new(
             BaseField::from(10),
             InstructionType::Minus.to_base_field(),
             InstructionType::JumpIfNotZero.to_base_field(),
         );
+
         let ins_11 = InstructionTableEntry::new(
             BaseField::from(11),
             InstructionType::JumpIfNotZero.to_base_field(),
             BaseField::from(6),
         );
+
         let ins_12 =
             InstructionTableEntry::new(BaseField::from(12), BaseField::from(6), BaseField::zero());
+
         let ins_13 =
             InstructionTableEntry::new(BaseField::from(13), BaseField::zero(), BaseField::zero());
 
