@@ -9,16 +9,20 @@ use stwo_prover::{
     core::fields::m31::BaseField,
 };
 
-/// Implementation of `Component` and `ComponentProver`
-/// for the `SimdBackend` from the constraint framework provided by Stwo
+/// Implementation of `Component` and `ComponentProver` for the Instruction component.
+/// It targets the `SimdBackend` from the Stwo constraint framework, with a fallback
+/// on `CpuBakend` for small traces.
 pub type InstructionComponent = FrameworkComponent<InstructionEval>;
 
-/// The AIR for the Instruction component.
+/// The AIR for the [`InstructionComponent`].
 ///
-/// Constraints are defined through the `FrameworkEval`
+/// Constraints are defined through the [`FrameworkEval`]
 /// provided by the constraint framework of Stwo.
 pub struct InstructionEval {
+    /// The log size of the component's main trace height.
     log_size: u32,
+    /// The random elements used for the lookup protocol linking the instruction and
+    /// program components to the processor one.
     instruction_lookup_elements: InstructionElements,
 }
 
@@ -44,16 +48,16 @@ impl FrameworkEval for InstructionEval {
         self.log_size + 1
     }
 
-    /// Defines the AIR for the Instruction component
+    /// Defines the AIR for the Instruction component.
     ///
-    /// Registers values from the current row are obtained through masks.
+    /// Registers' values from the current row are obtained through masks.
     /// When you apply a mask, you target the current column and then pass to the next
-    /// one: the register order matters to correctly fetch them.
+    /// one: the register order matters to correctly fetch them, and all registers must be fetched.
     ///
     /// - Use `eval.next_trace_mask()` to get the current register from the main trace
     ///   (`ORIGINAL_TRACE_IDX`)
     ///
-    /// Use `eval.add_constraint` to define a local constraint (boundary, transition).
+    /// Use `eval.add_constraint` to define a local constraint (boundary, consistency, transition).
     /// Use `eval.add_to_relation` to define a global constraint for the logUp protocol.
     ///
     /// The logUp must be finalized with `eval.finalize_logup()`.
@@ -72,26 +76,38 @@ impl FrameworkEval for InstructionEval {
         let next_ni = eval.next_trace_mask();
         let next_d = eval.next_trace_mask();
 
-        // Boundary constraints
+        // ┌──────────────────────────┐
+        // │   Boundary Constraints   │
+        // └──────────────────────────┘
+
+        // The first `ip` value equals 0.
         eval.add_constraint(is_first * ip.clone());
 
-        // Consistency constraints
+        // ┌─────────────────────────────┐
+        // │   Consistency Constraints   │
+        // └─────────────────────────────┘
+
+        // `d` is either 0 or 1.
         eval.add_constraint(d.clone() * (d.clone() - BaseField::one().into()));
+
+        // `next_d` is either 0 or 1.
         eval.add_constraint(next_d.clone() * (next_d.clone() - BaseField::one().into()));
 
-        // If `d` is set, then `ci` equals 0
+        // If `d` is set, then `ci` equals 0.
         eval.add_constraint(d.clone() * ci.clone());
 
-        // If `d` is set, then `ni` equals 0
+        // If `d` is set, then `ni` equals 0.
         eval.add_constraint(d.clone() * ni.clone());
 
-        // If `next_d` is set, then `next_ci` equals 0
+        // If `next_d` is set, then `next_ci` equals 0.
         eval.add_constraint(next_d.clone() * next_ci.clone());
 
-        // If `next_d` is set, then `ni` equals 0
+        // If `next_d` is set, then `ni` equals 0.
         eval.add_constraint(next_d * next_ni.clone());
 
-        // Transition constraints
+        // ┌────────────────────────────┐
+        // │   Transition Constraints   │
+        // └────────────────────────────┘
 
         // `ip` increases by 0 or 1
         eval.add_constraint(
@@ -109,7 +125,9 @@ impl FrameworkEval for InstructionEval {
             (next_ip - ip.clone() - BaseField::one().into()) * (next_ni - ni.clone()),
         );
 
-        // Interaction constraints
+        // ┌─────────────────────────────┐
+        // │   Interaction Constraints   │
+        // └─────────────────────────────┘
 
         let num = d - E::F::one();
         eval.add_to_relation(&[RelationEntry::new(
