@@ -16,47 +16,8 @@ use stwo_prover::{
     },
 };
 
-/// Represents a single row in the Program Table.
-///
-/// The Program Table stores:
-/// - The instruction pointer (`ip`),
-/// - The current instruction (`ci`),
-/// - The next instruction (`ni`),
-/// - The dummy flag (`d`),
-#[derive(Debug, Default, PartialEq, Eq, Clone)]
-pub struct ProgramTableRow {
-    /// Instruction pointer: points to the current instruction in the program.
-    ip: BaseField,
-    /// Current instruction: the instruction at the current instruction pointer.
-    ci: BaseField,
-    /// Next instruction:
-    /// - The instruction that follows `ci` in the program,
-    /// - 0 if out of bounds.
-    ni: BaseField,
-    /// Dummy: Flag whether the entry is a dummy one or not.
-    d: BaseField,
-}
-
-impl ProgramTableRow {
-    /// Creates an entry for the [`ProgramTable`] which is considered 'real'.
-    ///
-    /// A 'real' entry, is an entry that is part of the execution trace from the Brainfuck program
-    /// execution.
-    pub fn new(ip: BaseField, ci: BaseField, ni: BaseField) -> Self {
-        Self { ip, ci, ni, ..Default::default() }
-    }
-
-    /// Creates an entry for the [`ProgramTable`] which is considered 'dummy'.
-    ///
-    /// A 'dummy' entry, is an entry that is not part of the execution trace from the Brainfuck
-    /// program execution.
-    /// They are used to flag padding rows.
-    pub fn new_dummy(ip: BaseField) -> Self {
-        Self { ip, d: BaseField::one(), ..Default::default() }
-    }
-}
-
-/// Represents the Program Table, which holds the required register for the Program component.
+/// Represents the Program table for the Program component, containing the required registers for
+/// its constraints.
 #[derive(Debug, Default, PartialEq, Eq, Clone)]
 pub struct ProgramTable {
     /// A vector of [`ProgramTableRow`] representing the table rows.
@@ -130,7 +91,6 @@ impl ProgramTable {
 
         // Compute `log_n_rows`, the base-2 logarithm of the number of rows.
         let log_n_rows = n_rows.ilog2();
-
         // Add `LOG_N_LANES` to account for SIMD optimization.
         let log_size = log_n_rows + LOG_N_LANES;
 
@@ -148,7 +108,6 @@ impl ProgramTable {
 
         // Create a circle domain using a canonical coset.
         let domain = CanonicCoset::new(log_size).circle_domain();
-
         // Map the column into the circle domain.
         let trace = trace.into_iter().map(|col| CircleEvaluation::new(domain, col)).collect();
 
@@ -189,6 +148,46 @@ impl From<&ProgramMemory> for ProgramTable {
     }
 }
 
+/// Represents a single row in the Program Table.
+///
+/// The Program Table stores:
+/// - The instruction pointer (`ip`),
+/// - The current instruction (`ci`),
+/// - The next instruction (`ni`),
+/// - The dummy flag (`d`),
+#[derive(Debug, Default, PartialEq, Eq, Clone)]
+pub struct ProgramTableRow {
+    /// Instruction pointer: points to the current instruction in the program.
+    ip: BaseField,
+    /// Current instruction: the instruction at the current instruction pointer.
+    ci: BaseField,
+    /// Next instruction:
+    /// - The instruction that follows `ci` in the program,
+    /// - 0 if out of bounds.
+    ni: BaseField,
+    /// Dummy: Flag whether the entry is a dummy one or not.
+    d: BaseField,
+}
+
+impl ProgramTableRow {
+    /// Creates an entry for the [`ProgramTable`] which is considered 'real'.
+    ///
+    /// A 'real' entry, is an entry that is part of the execution trace from the Brainfuck program
+    /// execution.
+    pub fn new(ip: BaseField, ci: BaseField, ni: BaseField) -> Self {
+        Self { ip, ci, ni, ..Default::default() }
+    }
+
+    /// Creates an entry for the [`ProgramTable`] which is considered 'dummy'.
+    ///
+    /// A 'dummy' entry, is an entry that is not part of the execution trace from the Brainfuck
+    /// program execution.
+    /// They are used to flag padding rows.
+    pub fn new_dummy(ip: BaseField) -> Self {
+        Self { ip, d: BaseField::one(), ..Default::default() }
+    }
+}
+
 /// Enum representing the column indices in the Program trace.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ProgramColumn {
@@ -203,7 +202,7 @@ pub enum ProgramColumn {
 }
 
 impl ProgramColumn {
-    /// Returns the index of the column in the Program table.
+    /// Returns the index of the column in the Program trace.
     pub const fn index(self) -> usize {
         match self {
             Self::Ip => 0,
@@ -223,11 +222,10 @@ impl TraceColumn for ProgramColumn {
 /// Creates the interaction trace from the main trace evaluation
 /// and the interaction elements for the Program component.
 ///
-/// The Program table is used to prove that the Instruction table (a subset of it actually)
-/// contains the program that has been executed. To do so we make a lookup argument which uses the
-/// Instruction lookup sum. Here, each fraction have a multiplicity of 1, while the counterpart in
-/// the Instruction components will have a multiplicity of -1.
-/// The order is kept by having the `ip` register in the denominator.
+/// The Program table is used to prove that the Instruction table contains the program that has been
+/// executed. To do so we make a lookup argument linked to the Instruction component. Here, each
+/// fraction have a multiplicity of 1, while their counterpart in the Instruction components will
+/// have a multiplicity of -1. The order is kept by having the `ip` register in the denominator.
 ///
 /// Only the 'real' rows are impacting the logUp sum.
 /// Dummy rows are padding rows.
@@ -266,15 +264,15 @@ pub fn interaction_trace_evaluation(
 
         let num = PackedSecureField::one() - PackedSecureField::from(d);
         let denom: PackedSecureField = lookup_elements.combine(&[ip, ci, ni]);
+
         col_gen.write_frac(vec_row, num, denom);
     }
-
     col_gen.finalize_col();
+
     let (trace, claimed_sum) = logup_gen.finalize_last();
 
     Ok((trace, InteractionClaim { claimed_sum }))
 }
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -394,7 +392,6 @@ mod tests {
         let program_table = ProgramTable::new();
 
         let result = program_table.trace_evaluation();
-
         assert!(matches!(result, Err(TraceError::EmptyTrace)));
     }
 
@@ -457,6 +454,7 @@ mod tests {
             ProgramTableRow::new_dummy(BaseField::from(2)),
             ProgramTableRow::new_dummy(BaseField::from(3)),
         ];
+
         program_table.add_rows(rows);
 
         // Perform the trace evaluation.
@@ -496,11 +494,9 @@ mod tests {
 
         // Create the expected domain for evaluation.
         let domain = CanonicCoset::new(expected_log_size).circle_domain();
-
         // Transform expected columns into CircleEvaluation.
         let expected_trace: TraceEval =
             expected_columns.into_iter().map(|col| CircleEvaluation::new(domain, col)).collect();
-
         // Create the expected claim.
         let expected_claim = ProgramClaim::new(expected_log_size);
 
@@ -582,7 +578,6 @@ mod tests {
             interaction_trace_evaluation(&trace_eval, &lookup_elements).unwrap();
 
         let log_size = trace_eval[0].domain.log_size();
-
         let mut denoms = [PackedSecureField::zero(); 8];
         let ip_col = &trace_eval[ProgramColumn::Ip.index()].data;
         let ci_col = &trace_eval[ProgramColumn::Ci.index()].data;
@@ -601,7 +596,6 @@ mod tests {
         let mut logup_gen = LogupTraceGenerator::new(log_size);
 
         let mut col_gen = logup_gen.new_col();
-
         col_gen.write_frac(0, PackedSecureField::one(), denoms[0]);
         col_gen.write_frac(1, PackedSecureField::one(), denoms[1]);
         col_gen.write_frac(2, PackedSecureField::one(), denoms[2]);
@@ -610,12 +604,12 @@ mod tests {
         col_gen.write_frac(5, PackedSecureField::one(), denoms[5]);
         col_gen.write_frac(6, PackedSecureField::one(), denoms[6]);
         col_gen.write_frac(7, PackedSecureField::one(), denoms[7]);
-
         col_gen.finalize_col();
 
         let (expected_interaction_trace_eval, expected_claimed_sum) = logup_gen.finalize_last();
 
         assert_eq!(claim.log_size, log_size,);
+
         for col_index in 0..expected_interaction_trace_eval.len() {
             assert_eq!(
                 interaction_trace_eval[col_index].domain,
