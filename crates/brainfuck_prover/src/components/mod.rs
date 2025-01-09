@@ -1,5 +1,4 @@
 use instruction::table::InstructionColumn;
-use io::table::IoColumn;
 use memory::table::MemoryColumn;
 use processor::{instructions::table::ProcessorInstructionColumn, table::ProcessorColumn};
 use program::table::ProgramColumn;
@@ -14,7 +13,6 @@ use stwo_prover::core::{
 use thiserror::Error;
 
 pub mod instruction;
-pub mod io;
 pub mod memory;
 pub mod processor;
 pub mod program;
@@ -35,9 +33,6 @@ pub type MemoryClaim = Claim<MemoryColumn>;
 
 /// Claim for the Instruction trace.
 pub type InstructionClaim = Claim<InstructionColumn>;
-
-/// IO claim for the Trace.
-pub type IoClaim = Claim<IoColumn>;
 
 /// Claim for the Processor trace.
 pub type ProcessorClaim = Claim<ProcessorColumn>;

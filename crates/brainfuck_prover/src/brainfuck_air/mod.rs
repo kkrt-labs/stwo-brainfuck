@@ -4,11 +4,6 @@ use crate::components::{
         component::{InstructionComponent, InstructionEval},
         table::{InstructionElements, InstructionTable},
     },
-    io::{
-        self,
-        component::{InputComponent, InputEval, OutputComponent, OutputEval},
-        table::{InputTable, IoElements, OutputTable},
-    },
     memory::{
         self,
         component::{MemoryComponent, MemoryEval},
@@ -19,7 +14,7 @@ use crate::components::{
         component::{ProgramComponent, ProgramEval},
         table::ProgramTable,
     },
-    InstructionClaim, InteractionClaim, IoClaim, MemoryClaim, ProgramClaim,
+    InstructionClaim, InteractionClaim, MemoryClaim, ProgramClaim,
 };
 use brainfuck_vm::machine::Machine;
 use stwo_prover::{
@@ -55,8 +50,6 @@ pub struct BrainfuckProof<H: MerkleHasher> {
 /// It includes the common claim values such as the initial and final states
 /// and the claim of each component.
 pub struct BrainfuckClaim {
-    pub input: IoClaim,
-    pub output: IoClaim,
     pub memory: MemoryClaim,
     pub instruction: InstructionClaim,
     pub program: ProgramClaim,
@@ -64,8 +57,6 @@ pub struct BrainfuckClaim {
 
 impl BrainfuckClaim {
     pub fn mix_into(&self, channel: &mut impl Channel) {
-        self.input.mix_into(channel);
-        self.output.mix_into(channel);
         self.memory.mix_into(channel);
         self.instruction.mix_into(channel);
         self.program.mix_into(channel);
@@ -73,14 +64,8 @@ impl BrainfuckClaim {
 
     pub fn log_sizes(&self) -> TreeVec<Vec<u32>> {
         let mut log_sizes = TreeVec::concat_cols(
-            [
-                self.input.log_sizes(),
-                self.output.log_sizes(),
-                self.memory.log_sizes(),
-                self.instruction.log_sizes(),
-                self.program.log_sizes(),
-            ]
-            .into_iter(),
+            [self.memory.log_sizes(), self.instruction.log_sizes(), self.program.log_sizes()]
+                .into_iter(),
         );
 
         // We overwrite the preprocessed column claim to have all log sizes
@@ -94,8 +79,6 @@ impl BrainfuckClaim {
 /// All the interaction elements (drawn from the channel)
 /// required by the various components during the interaction phase.
 pub struct BrainfuckInteractionElements {
-    pub input_lookup_elements: IoElements,
-    pub output_lookup_elements: IoElements,
     pub memory_lookup_elements: MemoryElements,
     pub instruction_lookup_elements: InstructionElements,
 }
@@ -105,8 +88,6 @@ impl BrainfuckInteractionElements {
     /// all the components of the Brainfuck ZK-VM.
     pub fn draw(channel: &mut impl Channel) -> Self {
         Self {
-            input_lookup_elements: IoElements::draw(channel),
-            output_lookup_elements: IoElements::draw(channel),
             memory_lookup_elements: MemoryElements::draw(channel),
             instruction_lookup_elements: InstructionElements::draw(channel),
         }
@@ -117,8 +98,6 @@ impl BrainfuckInteractionElements {
 ///
 /// Mainly the claims on global relations (lookup, permutation, evaluation).
 pub struct BrainfuckInteractionClaim {
-    input: InteractionClaim,
-    output: InteractionClaim,
     memory: InteractionClaim,
     instruction: InteractionClaim,
     program: InteractionClaim,
@@ -127,8 +106,6 @@ pub struct BrainfuckInteractionClaim {
 impl BrainfuckInteractionClaim {
     /// Mix the claimed sums of every components in the Fiat-Shamir [`Channel`].
     pub fn mix_into(&self, channel: &mut impl Channel) {
-        self.input.mix_into(channel);
-        self.output.mix_into(channel);
         self.memory.mix_into(channel);
         self.instruction.mix_into(channel);
         self.program.mix_into(channel);
@@ -149,8 +126,6 @@ pub fn lookup_sum_valid(
 /// Components are used by the prover as a `ComponentProver`,
 /// and by the verifier as a `Component`.
 pub struct BrainfuckComponents {
-    input: InputComponent,
-    output: OutputComponent,
     memory: MemoryComponent,
     instruction: InstructionComponent,
     program: ProgramComponent,
@@ -169,18 +144,6 @@ impl BrainfuckComponents {
                 .copied()
                 .map(PreprocessedColumn::IsFirst)
                 .collect::<Vec<_>>(),
-        );
-
-        let input = InputComponent::new(
-            tree_span_provider,
-            InputEval::new(&claim.input, interaction_elements.input_lookup_elements.clone()),
-            (interaction_claim.input.claimed_sum, None),
-        );
-
-        let output = OutputComponent::new(
-            tree_span_provider,
-            OutputEval::new(&claim.output, interaction_elements.output_lookup_elements.clone()),
-            (interaction_claim.output.claimed_sum, None),
         );
 
         let memory = MemoryComponent::new(
@@ -207,12 +170,12 @@ impl BrainfuckComponents {
             (interaction_claim.program.claimed_sum, None),
         );
 
-        Self { input, output, memory, instruction, program }
+        Self { memory, instruction, program }
     }
 
     /// Returns the `ComponentProver` of each components, used by the prover.
     pub fn provers(&self) -> Vec<&dyn ComponentProver<SimdBackend>> {
-        vec![&self.input, &self.output, &self.memory, &self.instruction, &self.program]
+        vec![&self.memory, &self.instruction, &self.program]
     }
 
     /// Returns the `Component` of each components, used by the verifier.
@@ -283,23 +246,17 @@ pub fn prove_brainfuck(
     let mut tree_builder = commitment_scheme.tree_builder();
 
     let vm_trace = inputs.trace();
-    let (input_trace, input_claim) = InputTable::from(&vm_trace).trace_evaluation();
-    let (output_trace, output_claim) = OutputTable::from(&vm_trace).trace_evaluation();
     let (memory_trace, memory_claim) = MemoryTable::from(&vm_trace).trace_evaluation().unwrap();
     let (instruction_trace, instruction_claim) =
         InstructionTable::from((&vm_trace, inputs.program())).trace_evaluation().unwrap();
     let (program_trace, program_claim) =
         ProgramTable::from(inputs.program()).trace_evaluation().unwrap();
 
-    tree_builder.extend_evals(input_trace.clone());
-    tree_builder.extend_evals(output_trace.clone());
     tree_builder.extend_evals(memory_trace.clone());
     tree_builder.extend_evals(instruction_trace.clone());
     tree_builder.extend_evals(program_trace.clone());
 
     let claim = BrainfuckClaim {
-        input: input_claim,
-        output: output_claim,
         memory: memory_claim,
         instruction: instruction_claim,
         program: program_claim,
@@ -319,20 +276,6 @@ pub fn prove_brainfuck(
 
     // Generate the interaction trace and the BrainfuckInteractionClaim
     let mut tree_builder = commitment_scheme.tree_builder();
-
-    let (input_interaction_trace_eval, input_interaction_claim) =
-        io::table::interaction_trace_evaluation(
-            &input_trace,
-            &interaction_elements.input_lookup_elements,
-        )
-        .unwrap();
-
-    let (output_interaction_trace_eval, output_interaction_claim) =
-        io::table::interaction_trace_evaluation(
-            &output_trace,
-            &interaction_elements.output_lookup_elements,
-        )
-        .unwrap();
 
     let (memory_interaction_trace_eval, memory_interaction_claim) =
         memory::table::interaction_trace_evaluation(
@@ -355,15 +298,11 @@ pub fn prove_brainfuck(
         )
         .unwrap();
 
-    tree_builder.extend_evals(input_interaction_trace_eval);
-    tree_builder.extend_evals(output_interaction_trace_eval);
     tree_builder.extend_evals(memory_interaction_trace_eval);
     tree_builder.extend_evals(instruction_interaction_trace_eval);
     tree_builder.extend_evals(program_interaction_trace_eval);
 
     let interaction_claim = BrainfuckInteractionClaim {
-        input: input_interaction_claim,
-        output: output_interaction_claim,
         memory: memory_interaction_claim,
         instruction: instruction_interaction_claim,
         program: program_interaction_claim,
