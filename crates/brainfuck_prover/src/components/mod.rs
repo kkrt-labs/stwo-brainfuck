@@ -1,6 +1,9 @@
 use instruction::table::InstructionColumn;
 use memory::table::MemoryColumn;
-use processor::{instructions::table::ProcessorInstructionColumn, table::ProcessorColumn};
+use processor::{
+    instructions::{jump::table::JumpColumn, table::ProcessorInstructionColumn},
+    table::ProcessorColumn,
+};
 use program::table::ProgramColumn;
 use stwo_prover::core::{
     backend::simd::SimdBackend,
@@ -42,6 +45,9 @@ pub type ProgramClaim = Claim<ProgramColumn>;
 
 /// Claim for all the instructions traces (all except jumps and end of execution).
 pub type ProcessorInstructionClaim = Claim<ProcessorInstructionColumn>;
+
+/// Claims for the `JumpIfNotZero` and `JumpIfZero` traces.
+pub type JumpClaim = Claim<JumpColumn>;
 
 /// The claim of the interaction phase 2 (with the logUp protocol).
 ///
