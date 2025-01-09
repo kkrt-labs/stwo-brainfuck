@@ -1,63 +1,23 @@
-use crate::components::{InteractionClaim, ProgramClaim, TraceColumn, TraceError, TraceEval};
+use crate::components::{
+    instruction::table::InstructionElements, InteractionClaim, ProgramClaim, TraceColumn,
+    TraceError, TraceEval,
+};
 use brainfuck_vm::{machine::ProgramMemory, registers::Registers};
 use num_traits::{One, Zero};
 use stwo_prover::{
-    constraint_framework::{
-        logup::{LogupTraceGenerator, LookupElements},
-        Relation, RelationEFTraitBound,
-    },
+    constraint_framework::{logup::LogupTraceGenerator, Relation},
     core::{
         backend::{
             simd::{column::BaseColumn, m31::LOG_N_LANES, qm31::PackedSecureField},
             Column,
         },
-        channel::Channel,
         fields::m31::BaseField,
         poly::circle::{CanonicCoset, CircleEvaluation},
     },
 };
 
-/// Represents a single row in the Program Table.
-///
-/// The Program Table stores:
-/// - The instruction pointer (`ip`),
-/// - The current instruction (`ci`),
-/// - The next instruction (`ni`),
-/// - The dummy flag (`d`),
-#[derive(Debug, Default, PartialEq, Eq, Clone)]
-pub struct ProgramTableRow {
-    /// Instruction pointer: points to the current instruction in the program.
-    ip: BaseField,
-    /// Current instruction: the instruction at the current instruction pointer.
-    ci: BaseField,
-    /// Next instruction:
-    /// - The instruction that follows `ci` in the program,
-    /// - 0 if out of bounds.
-    ni: BaseField,
-    /// Dummy: Flag whether the entry is a dummy one or not.
-    d: BaseField,
-}
-
-impl ProgramTableRow {
-    /// Creates an entry for the [`ProgramTable`] which is considered 'real'.
-    ///
-    /// A 'real' entry, is an entry that is part of the execution trace from the Brainfuck program
-    /// execution.
-    pub fn new(ip: BaseField, ci: BaseField, ni: BaseField) -> Self {
-        Self { ip, ci, ni, ..Default::default() }
-    }
-
-    /// Creates an entry for the [`ProgramTable`] which is considered 'dummy'.
-    ///
-    /// A 'dummy' entry, is an entry that is not part of the execution trace from the Brainfuck
-    /// program execution.
-    /// They are used to flag padding rows.
-    pub fn new_dummy(ip: BaseField) -> Self {
-        Self { ip, d: BaseField::one(), ..Default::default() }
-    }
-}
-
-/// Represents the Program Table, which holds the required register for the Program component.
+/// Represents the Program table for the Program component, containing the required registers for
+/// its constraints.
 #[derive(Debug, Default, PartialEq, Eq, Clone)]
 pub struct ProgramTable {
     /// A vector of [`ProgramTableRow`] representing the table rows.
@@ -131,7 +91,6 @@ impl ProgramTable {
 
         // Compute `log_n_rows`, the base-2 logarithm of the number of rows.
         let log_n_rows = n_rows.ilog2();
-
         // Add `LOG_N_LANES` to account for SIMD optimization.
         let log_size = log_n_rows + LOG_N_LANES;
 
@@ -149,7 +108,6 @@ impl ProgramTable {
 
         // Create a circle domain using a canonical coset.
         let domain = CanonicCoset::new(log_size).circle_domain();
-
         // Map the column into the circle domain.
         let trace = trace.into_iter().map(|col| CircleEvaluation::new(domain, col)).collect();
 
@@ -190,6 +148,46 @@ impl From<&ProgramMemory> for ProgramTable {
     }
 }
 
+/// Represents a single row in the Program Table.
+///
+/// The Program Table stores:
+/// - The instruction pointer (`ip`),
+/// - The current instruction (`ci`),
+/// - The next instruction (`ni`),
+/// - The dummy flag (`d`),
+#[derive(Debug, Default, PartialEq, Eq, Clone)]
+pub struct ProgramTableRow {
+    /// Instruction pointer: points to the current instruction in the program.
+    ip: BaseField,
+    /// Current instruction: the instruction at the current instruction pointer.
+    ci: BaseField,
+    /// Next instruction:
+    /// - The instruction that follows `ci` in the program,
+    /// - 0 if out of bounds.
+    ni: BaseField,
+    /// Dummy: Flag whether the entry is a dummy one or not.
+    d: BaseField,
+}
+
+impl ProgramTableRow {
+    /// Creates an entry for the [`ProgramTable`] which is considered 'real'.
+    ///
+    /// A 'real' entry, is an entry that is part of the execution trace from the Brainfuck program
+    /// execution.
+    pub fn new(ip: BaseField, ci: BaseField, ni: BaseField) -> Self {
+        Self { ip, ci, ni, ..Default::default() }
+    }
+
+    /// Creates an entry for the [`ProgramTable`] which is considered 'dummy'.
+    ///
+    /// A 'dummy' entry, is an entry that is not part of the execution trace from the Brainfuck
+    /// program execution.
+    /// They are used to flag padding rows.
+    pub fn new_dummy(ip: BaseField) -> Self {
+        Self { ip, d: BaseField::one(), ..Default::default() }
+    }
+}
+
 /// Enum representing the column indices in the Program trace.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ProgramColumn {
@@ -204,7 +202,7 @@ pub enum ProgramColumn {
 }
 
 impl ProgramColumn {
-    /// Returns the index of the column in the Program table.
+    /// Returns the index of the column in the Program trace.
     pub const fn index(self) -> usize {
         match self {
             Self::Ip => 0,
@@ -221,66 +219,13 @@ impl TraceColumn for ProgramColumn {
     }
 }
 
-/// The number of random elements necessary for the Program lookup arguments.
-const PROGRAM_LOOKUP_ELEMENTS: usize = 3;
-
-/// The interaction elements are drawn for the extension column of the Program components.
-///
-/// The logUp protocol uses these elements to combine the values of the different
-/// registers of the main trace to create a random linear combination
-/// of them, and use it in the denominator of the fractions in the logUp protocol.
-///
-/// There are three lookup elements in the Program components: `ip`, `ci` and `ni`.
-#[derive(Clone, Debug, Eq, PartialEq)]
-pub struct ProgramElements(LookupElements<PROGRAM_LOOKUP_ELEMENTS>);
-
-impl ProgramElements {
-    /// Provides dummy lookup elements.
-    pub fn dummy() -> Self {
-        Self(LookupElements::dummy())
-    }
-
-    /// Draw random elements from the Fiat-Shamir [`Channel`].
-    ///
-    /// These elements are randomly secured, and will be use
-    /// to generate the interaction trace with the logUp protocol.
-    pub fn draw(channel: &mut impl Channel) -> Self {
-        Self(LookupElements::draw(channel))
-    }
-}
-
-impl<F: Clone, EF: RelationEFTraitBound<F>> Relation<F, EF> for ProgramElements {
-    /// Combine multiple values from a basefield (e.g. [`BaseField`])
-    /// and combine them to a value from an extension field (e.g. [`PackedSecureField`])
-    ///
-    /// This is used when computing the interaction values from the main trace values.
-    fn combine(&self, values: &[F]) -> EF {
-        values
-            .iter()
-            .zip(self.0.alpha_powers)
-            .fold(EF::zero(), |acc, (value, power)| acc + EF::from(power) * value.clone()) -
-            self.0.z.into()
-    }
-
-    /// Returns the name of the struct.
-    fn get_name(&self) -> &str {
-        stringify!(IoElements)
-    }
-
-    /// Returns the number interaction elements.
-    fn get_size(&self) -> usize {
-        PROGRAM_LOOKUP_ELEMENTS
-    }
-}
-
 /// Creates the interaction trace from the main trace evaluation
 /// and the interaction elements for the Program component.
 ///
-/// The Program table is used to prove that the Instruction table (a subset of it actually)
-/// contains the program that has been executed. To do so we make a lookup argument which uses the
-/// Instruction lookup sum. Here, each fraction have a multiplicity of 1, while the counterpart in
-/// the Instruction components will have a multiplicity of -1.
-/// The order is kept by having the `ip` register in the denominator.
+/// The Program table is used to prove that the Instruction table contains the program that has been
+/// executed. To do so we make a lookup argument linked to the Instruction component. Here, each
+/// fraction have a multiplicity of 1, while their counterpart in the Instruction components will
+/// have a multiplicity of -1. The order is kept by having the `ip` register in the denominator.
 ///
 /// Only the 'real' rows are impacting the logUp sum.
 /// Dummy rows are padding rows.
@@ -295,7 +240,7 @@ impl<F: Clone, EF: RelationEFTraitBound<F>> Relation<F, EF> for ProgramElements 
 #[allow(clippy::similar_names)]
 pub fn interaction_trace_evaluation(
     main_trace_eval: &TraceEval,
-    lookup_elements: &ProgramElements,
+    lookup_elements: &InstructionElements,
 ) -> Result<(TraceEval, InteractionClaim), TraceError> {
     if main_trace_eval.is_empty() {
         return Err(TraceError::EmptyTrace)
@@ -319,15 +264,15 @@ pub fn interaction_trace_evaluation(
 
         let num = PackedSecureField::one() - PackedSecureField::from(d);
         let denom: PackedSecureField = lookup_elements.combine(&[ip, ci, ni]);
+
         col_gen.write_frac(vec_row, num, denom);
     }
-
     col_gen.finalize_col();
+
     let (trace, claimed_sum) = logup_gen.finalize_last();
 
     Ok((trace, InteractionClaim { claimed_sum }))
 }
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -447,7 +392,6 @@ mod tests {
         let program_table = ProgramTable::new();
 
         let result = program_table.trace_evaluation();
-
         assert!(matches!(result, Err(TraceError::EmptyTrace)));
     }
 
@@ -510,6 +454,7 @@ mod tests {
             ProgramTableRow::new_dummy(BaseField::from(2)),
             ProgramTableRow::new_dummy(BaseField::from(3)),
         ];
+
         program_table.add_rows(rows);
 
         // Perform the trace evaluation.
@@ -549,11 +494,9 @@ mod tests {
 
         // Create the expected domain for evaluation.
         let domain = CanonicCoset::new(expected_log_size).circle_domain();
-
         // Transform expected columns into CircleEvaluation.
         let expected_trace: TraceEval =
             expected_columns.into_iter().map(|col| CircleEvaluation::new(domain, col)).collect();
-
         // Create the expected claim.
         let expected_claim = ProgramClaim::new(expected_log_size);
 
@@ -610,7 +553,7 @@ mod tests {
     #[test]
     fn test_empty_interaction_trace_evaluation() {
         let empty_eval = vec![];
-        let lookup_elements = ProgramElements::dummy();
+        let lookup_elements = InstructionElements::dummy();
         let interaction_trace_eval = interaction_trace_evaluation(&empty_eval, &lookup_elements);
 
         assert!(matches!(interaction_trace_eval, Err(TraceError::EmptyTrace)));
@@ -630,12 +573,11 @@ mod tests {
 
         let (trace_eval, claim) = program_table.trace_evaluation().unwrap();
 
-        let lookup_elements = ProgramElements::dummy();
+        let lookup_elements = InstructionElements::dummy();
         let (interaction_trace_eval, interaction_claim) =
             interaction_trace_evaluation(&trace_eval, &lookup_elements).unwrap();
 
         let log_size = trace_eval[0].domain.log_size();
-
         let mut denoms = [PackedSecureField::zero(); 8];
         let ip_col = &trace_eval[ProgramColumn::Ip.index()].data;
         let ci_col = &trace_eval[ProgramColumn::Ci.index()].data;
@@ -654,7 +596,6 @@ mod tests {
         let mut logup_gen = LogupTraceGenerator::new(log_size);
 
         let mut col_gen = logup_gen.new_col();
-
         col_gen.write_frac(0, PackedSecureField::one(), denoms[0]);
         col_gen.write_frac(1, PackedSecureField::one(), denoms[1]);
         col_gen.write_frac(2, PackedSecureField::one(), denoms[2]);
@@ -663,12 +604,12 @@ mod tests {
         col_gen.write_frac(5, PackedSecureField::one(), denoms[5]);
         col_gen.write_frac(6, PackedSecureField::one(), denoms[6]);
         col_gen.write_frac(7, PackedSecureField::one(), denoms[7]);
-
         col_gen.finalize_col();
 
         let (expected_interaction_trace_eval, expected_claimed_sum) = logup_gen.finalize_last();
 
         assert_eq!(claim.log_size, log_size,);
+
         for col_index in 0..expected_interaction_trace_eval.len() {
             assert_eq!(
                 interaction_trace_eval[col_index].domain,
