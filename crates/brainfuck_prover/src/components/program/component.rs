@@ -5,10 +5,7 @@ use stwo_prover::{
         preprocessed_columns::PreprocessedColumn, EvalAtRow, FrameworkComponent, FrameworkEval,
         RelationEntry,
     },
-    core::{
-        channel::Channel,
-        fields::{m31::BaseField, qm31::SecureField},
-    },
+    core::fields::m31::BaseField,
 };
 
 /// Implementation of `Component` and `ComponentProver`
