@@ -163,8 +163,8 @@ impl Machine {
     fn read_char(&mut self) -> Result<(), MachineError> {
         let mut buf = [0; 1];
         self.io.input.read_exact(&mut buf)?;
-        let input_char = buf[0] as usize;
-        self.state.ram[self.state.registers.mp.0 as usize] = BaseField::from(input_char as u32);
+        let input_char = buf[0];
+        self.state.ram[self.state.registers.mp.0 as usize] = BaseField::from(u32::from(input_char));
         Ok(())
     }
 
