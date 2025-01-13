@@ -451,7 +451,7 @@ impl<F: Clone, EF: RelationEFTraitBound<F>> Relation<F, EF> for MemoryElements {
     }
 
     /// Returns the name of the struct.
-    fn get_name(&self) -> &str {
+    fn get_name(&self) -> &'static str {
         stringify!(MemoryElements)
     }
 
@@ -476,8 +476,8 @@ impl<F: Clone, EF: RelationEFTraitBound<F>> Relation<F, EF> for MemoryElements {
 ///
 /// # Returns
 /// - Interaction trace evaluation, to be committed.
-/// - Interaction claim: the total sum from the logUp protocol,
-/// to be mixed into the Fiat-Shamir [`Channel`].
+/// - Interaction claim: the total sum from the logUp protocol, to be mixed into the Fiat-Shamir
+///   [`Channel`].
 #[allow(clippy::similar_names)]
 pub fn interaction_trace_evaluation(
     main_trace_eval: &TraceEval,

@@ -440,8 +440,7 @@ const IS_FIRST_LOG_SIZES: [u32; 12] = [15, 14, 13, 12, 11, 10, 9, 8, 7, 6, 5, 4]
 /// Generate a STARK proof of the given Brainfuck program execution.
 ///
 /// # Arguments
-/// * `inputs` - The [`Machine`] struct after the program execution
-/// The inputs contains the program, the memory, the I/O and the trace.
+/// * `inputs` - The Brainfuck VM state to be proven (i.e. after the program execution).
 #[allow(clippy::too_many_lines)]
 pub fn prove_brainfuck(
     inputs: &Machine,
