@@ -6,7 +6,7 @@ use crate::{
 };
 use num_traits::identities::{One, Zero};
 use std::io::{Read, Write};
-use stwo_prover::core::fields::{m31::BaseField, FieldExpOps};
+use stwo_prover::core::fields::m31::BaseField;
 use thiserror::Error;
 
 /// Custom error type for the Machine.
@@ -83,7 +83,7 @@ pub struct ProgramMemory {
 }
 
 impl ProgramMemory {
-    pub fn new(code: Vec<BaseField>) -> Self {
+    pub const fn new(code: Vec<BaseField>) -> Self {
         Self { code }
     }
 

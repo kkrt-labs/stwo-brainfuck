@@ -126,11 +126,11 @@ impl FrameworkEval for MemoryEval {
         // └─────────────────────────────┘
 
         let num = d - E::F::one();
-        eval.add_to_relation(&[RelationEntry::new(
+        eval.add_to_relation(RelationEntry::new(
             &self.memory_lookup_elements,
             num.into(),
             &[clk, mp, mv],
-        )]);
+        ));
         eval.finalize_logup();
 
         eval
