@@ -77,11 +77,12 @@ impl FrameworkEval for EndOfExecutionEval {
         // │   Interaction Constraints   │
         // └─────────────────────────────┘
 
-        eval.add_to_relation(&[RelationEntry::new(
+        eval.add_to_relation(RelationEntry::new(
             &self.processor_lookup_elements,
             -E::EF::one(),
             &[clk, ip, ci, ni, mp, mv, mvi],
-        )]);
+        ));
+
         eval.finalize_logup();
 
         eval

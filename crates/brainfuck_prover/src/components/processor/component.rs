@@ -137,25 +137,21 @@ impl FrameworkEval for ProcessorEval {
         let num = E::EF::one() - E::EF::from(d);
 
         // Processor & instruction Sub-Components
-        eval.add_to_relation(&[RelationEntry::new(
+        eval.add_to_relation(RelationEntry::new(
             &self.processor_lookup_elements,
             num.clone(),
             &[clk.clone(), ip.clone(), ci.clone(), ni.clone(), mp.clone(), mv.clone(), mvi],
-        )]);
+        ));
 
         // Processor & Instruction
-        eval.add_to_relation(&[RelationEntry::new(
+        eval.add_to_relation(RelationEntry::new(
             &self.instruction_lookup_elements,
             num.clone(),
             &[ip, ci, ni],
-        )]);
+        ));
 
         // Processor & Memory
-        eval.add_to_relation(&[RelationEntry::new(
-            &self.memory_lookup_elements,
-            num,
-            &[clk, mp, mv],
-        )]);
+        eval.add_to_relation(RelationEntry::new(&self.memory_lookup_elements, num, &[clk, mp, mv]));
 
         eval.finalize_logup();
 

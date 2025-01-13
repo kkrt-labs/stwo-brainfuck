@@ -92,11 +92,11 @@ impl FrameworkEval for ProgramEval {
         // └─────────────────────────────┘
 
         let num = E::F::one() - d;
-        eval.add_to_relation(&[RelationEntry::new(
+        eval.add_to_relation(RelationEntry::new(
             &self.instruction_lookup_elements,
             num.into(),
             &[ip, ci, ni],
-        )]);
+        ));
 
         eval.finalize_logup();
 

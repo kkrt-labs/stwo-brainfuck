@@ -584,7 +584,6 @@ mod tests {
         compiler::Compiler, registers::Registers, test_helper::create_test_machine,
     };
     use num_traits::{One, Zero};
-    use stwo_prover::core::fields::FieldExpOps;
 
     #[test]
     fn test_processor_table_entry_from_registers() {

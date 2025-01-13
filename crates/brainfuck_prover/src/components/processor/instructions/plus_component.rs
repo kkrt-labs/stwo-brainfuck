@@ -113,11 +113,11 @@ impl FrameworkEval for PlusInstructionEval {
 
         let num = d - E::F::one();
 
-        eval.add_to_relation(&[RelationEntry::new(
+        eval.add_to_relation(RelationEntry::new(
             &self.processor_lookup_elements,
             num.into(),
             &[clk, ip, ci, ni, mp, mv, mvi],
-        )]);
+        ));
 
         eval.finalize_logup();
 

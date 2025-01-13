@@ -250,7 +250,7 @@ impl BrainfuckComponents {
         interaction_elements: &BrainfuckInteractionElements,
         interaction_claim: &BrainfuckInteractionClaim,
     ) -> Self {
-        let tree_span_provider = &mut TraceLocationAllocator::new_with_preproccessed_columnds(
+        let tree_span_provider = &mut TraceLocationAllocator::new_with_preproccessed_columns(
             &IS_FIRST_LOG_SIZES
                 .iter()
                 .copied()
@@ -457,8 +457,8 @@ pub fn prove_brainfuck(
             .half_coset,
     );
     let channel = &mut Blake2sChannel::default();
-    let commitment_scheme =
-        &mut CommitmentSchemeProver::<_, Blake2sMerkleChannel>::new(config, &twiddles);
+    let mut commitment_scheme =
+        CommitmentSchemeProver::<_, Blake2sMerkleChannel>::new(config, &twiddles);
 
     // ┌───────────────────────────────────────────────┐
     // │   Interaction Phase 0 - Preprocessed Trace    │

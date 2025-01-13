@@ -359,12 +359,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "downcast-rs"
-version = "1.2.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "75b325c5dbd37f80359721ad39aca5a29fb04c89279657cffdda8736d0c0b9d2"
-
-[[package]]
 name = "educe"
 version = "0.5.11"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -811,13 +805,12 @@ checksum = "7da8b5736845d9f2fcb837ea5d9e2628564b3b043a70948a3f0b778838c5fb4f"
 [[package]]
 name = "stwo-prover"
 version = "0.1.1"
-source = "git+https://github.com/starkware-libs/stwo?rev=77de4d7#77de4d79b08dd89600994e4dc3dc06f77ddce25b"
+source = "git+https://github.com/starkware-libs/stwo?rev=31e8dbc#31e8dbcc4752240b596774743946c561ab5b9cd1"
 dependencies = [
  "blake2",
  "blake3",
  "bytemuck",
  "cfg-if",
- "downcast-rs",
  "educe",
  "hex",
  "itertools 0.12.1",

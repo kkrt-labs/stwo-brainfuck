@@ -38,7 +38,7 @@ module_name_repetitions = "allow"
 brainfuck_vm = { path = "crates/brainfuck_vm" }
 brainfuck_prover = { path = "crates/brainfuck_prover" }
 clap = { version = "4.3.10", features = ["derive"] }
-stwo-prover = { git = "https://github.com/starkware-libs/stwo", rev = "77de4d7" }
+stwo-prover = { git = "https://github.com/starkware-libs/stwo", rev = "31e8dbc" }
 tracing = "0.1"
 tracing-subscriber = "0.3"
 num-traits = "0.2.19"
