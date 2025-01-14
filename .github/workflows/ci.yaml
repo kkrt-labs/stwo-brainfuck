@@ -32,6 +32,16 @@ jobs:
       - uses: Swatinem/rust-cache@v2
       - run: cargo test --package brainfuck_prover --release --lib
 
+  run-brainfuck-prover-unit-tests-parallel:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: nightly-2025-01-02
+      - uses: Swatinem/rust-cache@v2
+      - run: cargo test --package brainfuck_prover --features parallel --release --lib
+
   run-brainfuck-vm-unit-tests:
     runs-on: ubuntu-latest
     steps:
