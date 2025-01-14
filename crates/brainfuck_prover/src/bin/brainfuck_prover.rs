@@ -6,7 +6,7 @@ use std::{
     io::{stdin, stdout, Write},
     path::PathBuf,
 };
-use stwo_prover::core::prover::{ProvingError, VerificationError};
+use stwo_prover::core::prover::ProvingError;
 
 #[derive(Parser, Debug)]
 #[command(author, version, about, long_about = None)]
@@ -29,10 +29,10 @@ enum Commands {
         /// Log Level.
         #[clap(long, default_value = "info")]
         log: String,
-        /// Print the BrainfuckVM execution trace.
+        /// Print the Brainfuck VM execution trace.
         #[clap(long)]
         trace: bool,
-        /// Print the BrainfuckVM memory.
+        /// Print the Brainfuck VM memory.
         #[clap(long)]
         memory: bool,
         /// Configure the size of the memory.
@@ -92,7 +92,7 @@ fn prove(execution_config: ExecutionConfig) -> Result<(), ProvingError> {
 
     if execution_config.trace {
         tracing::info!("Execution Trace");
-        println!("{:#?}", trace);
+        println!("{trace:#?}");
     }
 
     if execution_config.memory {
@@ -111,25 +111,23 @@ fn prove(execution_config: ExecutionConfig) -> Result<(), ProvingError> {
         file.write_all(json_bf_proof.as_bytes()).unwrap();
     } else if execution_config.print {
         tracing::info!("Printing Proof");
-        println!("{:#?}", bf_proof);
+        println!("{bf_proof:#?}");
     }
 
     Ok(())
 }
 
 /// Verify a CSTARK Proof for the Brainfuck ZK-VM from the proof filepath.
-fn verify(path: &PathBuf) -> Result<(), VerificationError> {
+fn verify(path: &PathBuf) {
     tracing::info!("Reading Proof from file");
     let bf_proof_str = fs::read_to_string(path).expect("Failed to read file");
     let bf_proof = serde_json::from_str(&bf_proof_str).unwrap();
 
     tracing::info!("Proof Verification");
     verify_brainfuck(bf_proof).unwrap();
-
-    Ok(())
 }
 
-fn main() -> Result<(), ProvingError> {
+fn main() {
     let cli = Cli::parse();
 
     match &cli.command {
@@ -150,10 +148,8 @@ fn main() -> Result<(), ProvingError> {
         Commands::Verify { filename, log } => {
             tracing_subscriber::fmt().with_env_filter(log).init();
             tracing::info!("Brainfuck ZK-VM - Verify");
-            verify(filename).unwrap();
+            verify(filename);
             tracing::info!("Verification succeed!");
         }
     }
-
-    Ok(())
 }
