@@ -8,6 +8,10 @@ description.workspace = true
 [lints]
 workspace = true
 
+[features]
+default = []
+parallel = ["stwo-prover/parallel"]
+
 [dependencies]
 clap = { workspace = true, features = ["derive"] }
 brainfuck_vm.workspace = true
