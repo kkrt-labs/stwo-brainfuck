@@ -244,6 +244,10 @@ impl Machine {
     pub const fn program(&self) -> &ProgramMemory {
         &self.program
     }
+
+    pub const fn memory(&self) -> &Vec<BaseField> {
+        &self.state.ram
+    }
 }
 
 #[cfg(test)]

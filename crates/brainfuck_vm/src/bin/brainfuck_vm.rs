@@ -29,6 +29,7 @@ fn main() -> Result<(), MachineError> {
 
     tracing_subscriber::fmt().with_env_filter(args.log).init();
 
+    tracing::info!("Program compilation");
     let code = fs::read_to_string(&args.filename).expect("Failed to read file");
     let mut bf_compiler = Compiler::new(&code);
     let ins = bf_compiler.compile();
@@ -40,7 +41,7 @@ fn main() -> Result<(), MachineError> {
         Some(size) => Machine::new_with_config(&ins, stdin, stdout, size)?,
         None => Machine::new(&ins, stdin, stdout)?,
     };
-    tracing::info!("Provide inputs separated by linefeeds: ");
+    tracing::info!("Provide inputs if any:");
     bf_vm.execute().unwrap();
     if args.trace {
         let trace = bf_vm.trace();

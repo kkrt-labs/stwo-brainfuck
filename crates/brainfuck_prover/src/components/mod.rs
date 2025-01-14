@@ -8,6 +8,7 @@ use processor::{
     table::ProcessorColumn,
 };
 use program::table::ProgramColumn;
+use serde::{Deserialize, Serialize};
 use stwo_prover::core::{
     backend::simd::SimdBackend,
     channel::Channel,
@@ -64,7 +65,7 @@ pub type EndOfExecutionClaim = Claim<EndOfExecutionColumn>;
 /// including the padding rows.
 /// It allows proving that the main trace of a component is either a permutation, or a sublist of
 /// another.
-#[derive(Debug, Eq, PartialEq)]
+#[derive(Debug, Eq, PartialEq, Serialize, Deserialize)]
 pub struct InteractionClaim {
     /// The computed sum of the logUp extension column, including padding rows (which are actually
     /// set to a multiplicity of 0).
@@ -80,7 +81,7 @@ impl InteractionClaim {
 }
 
 /// Represents a claim associated with a specific trace in the Brainfuck STARK proving system.
-#[derive(Debug, Eq, PartialEq)]
+#[derive(Debug, Eq, PartialEq, Serialize, Deserialize)]
 pub struct Claim<T: TraceColumn> {
     /// Logarithmic size (`log2`) of the evaluated trace.
     pub log_size: u32,
