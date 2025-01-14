@@ -422,8 +422,15 @@ impl BrainfuckComponents {
 
 /// `LOG_MAX_ROWS = ilog2(MAX_ROWS)`
 ///
-/// Means that the ZK-VM does not accept programs with more than 2^20 steps (1M steps).
-const LOG_MAX_ROWS: u32 = 25;
+/// Means that the ZK-VM does not accept programs inducing a component with more than 2^23 steps (8M
+/// steps).
+#[cfg(not(test))]
+const LOG_MAX_ROWS: u32 = 23;
+
+#[cfg(test)]
+/// Means that the ZK-VM does not accept programs inducing a component with more than 2^23 steps (8M
+/// steps).
+const LOG_MAX_ROWS: u32 = 20;
 
 /// Log sizes of the preprocessed columns
 /// used for enforcing boundary constraints.
@@ -439,8 +446,12 @@ const LOG_MAX_ROWS: u32 = 25;
 ///
 /// Ideally, we should cover all possible log sizes, between
 /// 1 and `LOG_MAX_ROW`
+#[cfg(not(test))]
 const IS_FIRST_LOG_SIZES: [u32; 21] =
     [24, 23, 22, 21, 20, 19, 18, 17, 16, 15, 14, 13, 12, 11, 10, 9, 8, 7, 6, 5, 4];
+
+#[cfg(test)]
+const IS_FIRST_LOG_SIZES: [u32; 12] = [15, 14, 13, 12, 11, 10, 9, 8, 7, 6, 5, 4];
 
 /// Generate a STARK proof of the given Brainfuck program execution.
 ///
