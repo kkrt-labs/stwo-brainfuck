@@ -8,6 +8,7 @@ use stwo_prover::{
 
 /// Implementation of `Component` and `ComponentProver` for the Jnz (Jump if not zero) `]`
 /// instruction component.
+///
 /// It targets the `SimdBackend` from the Stwo constraint framework, with a
 /// fallback on `CpuBakend` for small traces.
 pub type JumpIfNotZeroComponent = FrameworkComponent<JumpIfNotZeroEval>;

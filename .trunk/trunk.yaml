@@ -30,8 +30,8 @@ lint:
         - name: lint
           run: cargo clippy --message-format json --locked --all-targets --all-features -- -D warnings
   enabled:
-    - actionlint@1.7.4
-    - checkov@3.2.344
+    - actionlint@1.7.6
+    - checkov@3.2.352
     - rustfmt@SYSTEM
     - clippy@SYSTEM
     - git-diff-check
@@ -41,5 +41,5 @@ lint:
     - shellcheck@0.10.0
     - shfmt@3.6.0
     - taplo@0.9.3
-    - trufflehog@3.88.0
+    - trufflehog@3.88.2
     - yamllint@1.35.1

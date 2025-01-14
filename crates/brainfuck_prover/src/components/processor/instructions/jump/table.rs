@@ -21,7 +21,9 @@ pub type JumpIfNotZeroTable = JumpTable<{ InstructionType::JumpIfNotZero.to_u32(
 pub type JumpIfZeroTable = JumpTable<{ InstructionType::JumpIfZero.to_u32() }>;
 
 /// Represents the `Jump` table for the Processor sub-components representing the jump instructions
-/// `[` and `]`. The table contains the required registers for verifying the correct state
+/// `[` and `]`.
+///
+/// The table contains the required registers for verifying the correct state
 /// transition of a jump instruction.
 ///
 /// The `Jump` tables ensure that the `[` and `]` instruction are correctly executed.
@@ -449,8 +451,8 @@ impl TraceColumn for JumpColumn {
 ///
 /// # Returns
 /// - Interaction trace evaluation, to be committed.
-/// - Interaction claim: the total sum from the logUp protocol,
-/// to be mixed into the Fiat-Shamir channel.
+/// - Interaction claim: the total sum from the logUp protocol, to be mixed into the Fiat-Shamir
+///   channel.
 #[allow(clippy::similar_names)]
 pub fn interaction_trace_evaluation(
     main_trace_eval: &TraceEval,

@@ -6,6 +6,7 @@ use stwo_prover::constraint_framework::{
 };
 
 /// Implementation of `Component` and `ComponentProver` for the Plus `+` instruction component.
+///
 /// It targets the `SimdBackend` from the Stwo constraint framework, with a fallback
 /// on `CpuBakend` for small traces.
 pub type PlusInstructionComponent = FrameworkComponent<PlusInstructionEval>;

@@ -220,8 +220,8 @@ impl TraceColumn for EndOfExecutionColumn {
 ///
 /// # Returns
 /// - Interaction trace evaluation, to be committed.
-/// - Interaction claim: the total sum from the logUp protocol,
-/// to be mixed into the Fiat-Shamir [`Channel`].
+/// - Interaction claim: the total sum from the logUp protocol, to be mixed into the Fiat-Shamir
+///   [`Channel`].
 #[allow(clippy::similar_names)]
 pub fn interaction_trace_evaluation(
     main_trace_eval: &TraceEval,
