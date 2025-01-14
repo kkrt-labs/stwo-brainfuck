@@ -76,3 +76,14 @@ fn test_hello_world_4() {
     let expected_output = b"Hello World!\n".to_vec();
     assert_eq!(output.output(), expected_output);
 }
+
+#[test]
+fn test_fib_19() {
+    let path = "../../brainfuck_programs/fib.bf";
+
+    let code = compile_from_path(path);
+    let (mut machine, output) = create_test_machine(&code, &[]);
+    machine.execute().unwrap();
+    let expected_output = [85];
+    assert_eq!(output.output(), expected_output);
+}
