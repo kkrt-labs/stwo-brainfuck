@@ -110,14 +110,9 @@ impl<const N: u32> ProcessorInstructionTable<N> {
             trace[ProcessorInstructionColumn::Mv.index()].data[index] = row.mv.into();
             trace[ProcessorInstructionColumn::Mvi.index()].data[index] = row.mvi.into();
             trace[ProcessorInstructionColumn::D.index()].data[index] = row.d.into();
-            trace[ProcessorInstructionColumn::NextClk.index()].data[index] = row.next_clk.into();
             trace[ProcessorInstructionColumn::NextIp.index()].data[index] = row.next_ip.into();
-            trace[ProcessorInstructionColumn::NextCi.index()].data[index] = row.next_ci.into();
-            trace[ProcessorInstructionColumn::NextNi.index()].data[index] = row.next_ni.into();
             trace[ProcessorInstructionColumn::NextMp.index()].data[index] = row.next_mp.into();
             trace[ProcessorInstructionColumn::NextMv.index()].data[index] = row.next_mv.into();
-            trace[ProcessorInstructionColumn::NextMvi.index()].data[index] = row.next_mvi.into();
-            trace[ProcessorInstructionColumn::NextD.index()].data[index] = row.next_d.into();
         }
 
         // Evaluate columns on the circle domain
@@ -193,22 +188,12 @@ pub struct ProcessorInstructionRow {
     mvi: BaseField,
     /// Dummy: Flag whether the current entry is a dummy one or not.
     d: BaseField,
-    /// Next Clock cycle counter
-    next_clk: BaseField,
     /// Next Instruction pointer
     next_ip: BaseField,
-    /// Next Current instruction
-    next_ci: BaseField,
-    /// Next Next instruction
-    next_ni: BaseField,
     /// Next Memory pointer
     next_mp: BaseField,
     /// Next Memory value
     next_mv: BaseField,
-    /// Next Memory value inverse
-    next_mvi: BaseField,
-    /// Next Dummy.
-    next_d: BaseField,
 }
 
 impl ProcessorInstructionRow {
@@ -229,14 +214,9 @@ impl ProcessorInstructionRow {
             mv: entry_1.mv,
             mvi: entry_1.mvi,
             d: entry_1.d,
-            next_clk: entry_2.clk,
             next_ip: entry_2.ip,
-            next_ci: entry_2.ci,
-            next_ni: entry_2.ni,
             next_mp: entry_2.mp,
             next_mv: entry_2.mv,
-            next_mvi: entry_2.mvi,
-            next_d: entry_2.d,
         }
     }
 }
@@ -438,14 +418,9 @@ pub enum ProcessorInstructionColumn {
     Mv,
     Mvi,
     D,
-    NextClk,
     NextIp,
-    NextCi,
-    NextNi,
     NextMp,
     NextMv,
-    NextMvi,
-    NextD,
 }
 
 impl ProcessorInstructionColumn {
@@ -460,21 +435,16 @@ impl ProcessorInstructionColumn {
             Self::Mv => 5,
             Self::Mvi => 6,
             Self::D => 7,
-            Self::NextClk => 8,
-            Self::NextIp => 9,
-            Self::NextCi => 10,
-            Self::NextNi => 11,
-            Self::NextMp => 12,
-            Self::NextMv => 13,
-            Self::NextMvi => 14,
-            Self::NextD => 15,
+            Self::NextIp => 8,
+            Self::NextMp => 9,
+            Self::NextMv => 10,
         }
     }
 }
 
 impl TraceColumn for ProcessorInstructionColumn {
     fn count() -> (usize, usize) {
-        (16, 1)
+        (11, 1)
     }
 }
 
@@ -598,9 +568,7 @@ mod tests {
             mv: BaseField::from(7),
             mvi: BaseField::zero(),
             d: BaseField::zero(),
-            next_clk: BaseField::one(),
             next_ip: BaseField::from(5),
-            next_d: BaseField::one(),
             ..Default::default()
         };
 
@@ -753,7 +721,6 @@ mod tests {
         let row_0 = ProcessorInstructionRow::new(&process_0, &process_1);
         let row_1 = ProcessorInstructionRow::new(&process_2, &process_3);
 
-        // TODO: Eventually add a `add_rows` method for test purposes..
         expected_processor_instruction_table.add_row(row_0);
         expected_processor_instruction_table.add_row(row_1);
 
@@ -886,14 +853,9 @@ mod tests {
         let mut mv_col = BaseColumn::zeros(expected_size);
         let mut mvi_col = BaseColumn::zeros(expected_size);
         let mut d_col = BaseColumn::zeros(expected_size);
-        let mut next_clk_col = BaseColumn::zeros(expected_size);
         let mut next_ip_col = BaseColumn::zeros(expected_size);
-        let mut next_ci_col = BaseColumn::zeros(expected_size);
-        let mut next_ni_col = BaseColumn::zeros(expected_size);
         let mut next_mp_col = BaseColumn::zeros(expected_size);
         let mut next_mv_col = BaseColumn::zeros(expected_size);
-        let mut next_mvi_col = BaseColumn::zeros(expected_size);
-        let mut next_d_col = BaseColumn::zeros(expected_size);
 
         clk_col.data[0] = BaseField::zero().into();
         clk_col.data[1] = BaseField::from(2).into();
@@ -919,29 +881,14 @@ mod tests {
         d_col.data[0] = BaseField::zero().into();
         d_col.data[1] = BaseField::zero().into();
 
-        next_clk_col.data[0] = BaseField::one().into();
-        next_clk_col.data[1] = BaseField::from(3).into();
-
         next_ip_col.data[0] = BaseField::one().into();
         next_ip_col.data[1] = BaseField::from(3).into();
-
-        next_ci_col.data[0] = InstructionType::Plus.to_base_field().into();
-        next_ci_col.data[1] = InstructionType::Minus.to_base_field().into();
-
-        next_ni_col.data[0] = InstructionType::Left.to_base_field().into();
-        next_ni_col.data[1] = BaseField::zero().into();
 
         next_mp_col.data[0] = BaseField::one().into();
         next_mp_col.data[1] = BaseField::one().into();
 
         next_mv_col.data[0] = BaseField::from(2).into();
         next_mv_col.data[1] = BaseField::from(2).into();
-
-        next_mvi_col.data[0] = BaseField::from(3).into();
-        next_mvi_col.data[1] = BaseField::from(3).into();
-
-        next_d_col.data[0] = BaseField::zero().into();
-        next_d_col.data[1] = BaseField::zero().into();
 
         // Create the expected domain for evaluation
         let domain = CanonicCoset::new(expected_log_size).circle_domain();
