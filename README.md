@@ -2,7 +2,80 @@
 
 `stwo-brainfuck` is a ZK-VM for the Brainfuck language[^1], based on Stwo[^2].
 
-## Objectives
+## CLI - Installation
+
+Here are the steps to get the Brainfuck ZK-VM up and running.
+
+You can either download the binaries from the [releases](https://github.com/kkrt-labs/stwo-brainfuck/releases), or build them from source.
+
+### Build from Source
+
+1. Clone the repository
+
+```shell
+git clone git@github.com:kkrt-labs/stwo-brainfuck.git
+```
+
+2. Build the `brainfuck_prover`
+
+The `brainfuck_prover` has a feature flag which enables the CPU parallelization feature of Stwo.
+
+```shell
+# No feature flags
+cargo --package brainfuck_prover --release
+```
+
+```shell
+# Parallel feature flag
+cargo --package brainfuck_prover --features parallel --release
+```
+
+## CLI - Usage
+
+The `brainfuck_prover` CLI has two subcommands:
+
+- `prove`, which generates a CSTARK proof from a given Brainfuck program file or code string.
+- `verify`, which verify a CSTARK proof from a given Brainfuck proof file.
+
+For more information, try `brainfuck_prover --help`, `brainfuck_prover prove --help` and `brainfuck_prover verify --help`.
+
+### Example usage
+
+Consider this Brainfuck program which, given an ASCII character from Stdin, outputs the following two characters in the ASCII table:
+
+```brainfuck
+++>,<[>+.<-]
+```
+
+### Prove
+
+To generate a proof of this program, you can provide the Brainfuck program as a string, with the `--code` argument,
+or store it in a file `my_program.bf` and provide the path to it with the `--file` argument.
+
+Here, the proof will be serialized to a JSON file `my_program_proof.json`.
+You can also print the proof to `stdout` with the `--print` flag.
+
+1. Proof from a Brainfuck program given in the command
+
+```shell
+brainfuck_prover prove --code "++>,<[>+.<-]" --output my_program_proof.json
+```
+
+2. Proof from program file
+
+```shell
+brainfuck_prover prove --file my_program.bf --output my_program_proof.json
+```
+
+### Verify
+
+To verify a proof, the proof must be stored in a JSON file (`--output` flag from the `prove` subcommand).
+
+```shell
+brainfuck_prover verify my_program_proof.json
+```
+
+## Project Objectives
 
 - Capacity of generating and verifying a proof for arbitrary Brainfuck programs.
 - Understanding of using Stwo for building ZK-VMs
