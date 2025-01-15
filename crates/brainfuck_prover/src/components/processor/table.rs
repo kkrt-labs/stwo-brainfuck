@@ -98,13 +98,6 @@ impl ProcessorTable {
             trace[ProcessorColumn::Mvi.index()].data[index] = row.mvi.into();
             trace[ProcessorColumn::D.index()].data[index] = row.d.into();
             trace[ProcessorColumn::NextClk.index()].data[index] = row.next_clk.into();
-            trace[ProcessorColumn::NextIp.index()].data[index] = row.next_ip.into();
-            trace[ProcessorColumn::NextCi.index()].data[index] = row.next_ci.into();
-            trace[ProcessorColumn::NextNi.index()].data[index] = row.next_ni.into();
-            trace[ProcessorColumn::NextMp.index()].data[index] = row.next_mp.into();
-            trace[ProcessorColumn::NextMv.index()].data[index] = row.next_mv.into();
-            trace[ProcessorColumn::NextMvi.index()].data[index] = row.next_mvi.into();
-            trace[ProcessorColumn::NextD.index()].data[index] = row.next_d.into();
         }
 
         // Evaluate columns on the circle domain
@@ -179,20 +172,6 @@ pub struct ProcessorTableRow {
     d: BaseField,
     /// Next Clock cycle counter
     next_clk: BaseField,
-    /// Next Instruction pointer
-    next_ip: BaseField,
-    /// Next Current instruction
-    next_ci: BaseField,
-    /// Next Next instruction
-    next_ni: BaseField,
-    /// Next Memory pointer
-    next_mp: BaseField,
-    /// Next Memory value
-    next_mv: BaseField,
-    /// Next Memory value inverse
-    next_mvi: BaseField,
-    /// Next Dummy.
-    next_d: BaseField,
 }
 
 impl ProcessorTableRow {
@@ -211,13 +190,6 @@ impl ProcessorTableRow {
             mvi: entry_1.mvi,
             d: entry_1.d,
             next_clk: entry_2.clk,
-            next_ip: entry_2.ip,
-            next_ci: entry_2.ci,
-            next_ni: entry_2.ni,
-            next_mp: entry_2.mp,
-            next_mv: entry_2.mv,
-            next_mvi: entry_2.mvi,
-            next_d: entry_2.d,
         }
     }
 }
@@ -383,13 +355,6 @@ pub enum ProcessorColumn {
     Mvi,
     D,
     NextClk,
-    NextIp,
-    NextCi,
-    NextNi,
-    NextMp,
-    NextMv,
-    NextMvi,
-    NextD,
 }
 
 impl ProcessorColumn {
@@ -405,20 +370,13 @@ impl ProcessorColumn {
             Self::Mvi => 6,
             Self::D => 7,
             Self::NextClk => 8,
-            Self::NextIp => 9,
-            Self::NextCi => 10,
-            Self::NextNi => 11,
-            Self::NextMp => 12,
-            Self::NextMv => 13,
-            Self::NextMvi => 14,
-            Self::NextD => 15,
         }
     }
 }
 
 impl TraceColumn for ProcessorColumn {
     fn count() -> (usize, usize) {
-        (16, 3)
+        (9, 3)
     }
 }
 
@@ -638,9 +596,6 @@ mod tests {
             mvi: BaseField::zero(),
             d: BaseField::zero(),
             next_clk: BaseField::one(),
-            next_ip: BaseField::from(5),
-            next_d: BaseField::one(),
-            ..Default::default()
         };
 
         assert_eq!(row, expected_row);
@@ -1030,6 +985,8 @@ mod tests {
         let mut mp_column = BaseColumn::zeros(expected_size);
         let mut mv_column = BaseColumn::zeros(expected_size);
         let mut mvi_column = BaseColumn::zeros(expected_size);
+        let d_column = BaseColumn::zeros(expected_size);
+        let mut next_clk_column = BaseColumn::zeros(expected_size);
 
         clk_column.data[0] = BaseField::zero().into();
         clk_column.data[1] = BaseField::one().into();
@@ -1052,15 +1009,27 @@ mod tests {
         mvi_column.data[0] = BaseField::from(6).into();
         mvi_column.data[1] = BaseField::from(7).into();
 
+        next_clk_column.data[0] = BaseField::one().into();
+        next_clk_column.data[1] = BaseField::from(2).into();
+
         // Create the expected domain for evaluation
         let domain = CanonicCoset::new(expected_log_size).circle_domain();
 
         // Transform expected columns into CircleEvaluation
-        let expected_trace: TraceEval =
-            vec![clk_column, ip_column, ci_column, ni_column, mp_column, mv_column, mvi_column]
-                .into_iter()
-                .map(|col| CircleEvaluation::new(domain, col))
-                .collect();
+        let expected_trace: TraceEval = vec![
+            clk_column,
+            ip_column,
+            ci_column,
+            ni_column,
+            mp_column,
+            mv_column,
+            mvi_column,
+            d_column,
+            next_clk_column,
+        ]
+        .into_iter()
+        .map(|col| CircleEvaluation::new(domain, col))
+        .collect();
 
         // Create the expected claim
         let expected_claim = ProcessorClaim::new(expected_log_size);
