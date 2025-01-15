@@ -8,8 +8,17 @@ description.workspace = true
 [lints]
 workspace = true
 
+[features]
+default = []
+parallel = ["stwo-prover/parallel"]
+
 [dependencies]
+clap = { workspace = true, features = ["derive"] }
 brainfuck_vm.workspace = true
 stwo-prover.workspace = true
 num-traits.workspace = true
+tracing.workspace = true
+tracing-subscriber = { workspace = true, features = ["env-filter"] }
 thiserror.workspace = true
+serde = { version = "1.0.217", features = ["derive"] }
+serde_json = "1.0.135"

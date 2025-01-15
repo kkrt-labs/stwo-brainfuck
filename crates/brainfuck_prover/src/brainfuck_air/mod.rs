@@ -45,6 +45,7 @@ use crate::components::{
 };
 use brainfuck_vm::machine::Machine;
 use num_traits::Zero;
+use serde::{Deserialize, Serialize};
 use stwo_prover::{
     constraint_framework::{
         preprocessed_columns::{gen_is_first, PreprocessedColumn},
@@ -67,6 +68,7 @@ use stwo_prover::{
 /// The STARK proof of the execution of a given Brainfuck program.
 ///
 /// It includes the proof as well as the claims during the various phases of the proof generation.
+#[derive(Serialize, Deserialize, Debug)]
 pub struct BrainfuckProof<H: MerkleHasher> {
     pub claim: BrainfuckClaim,
     pub interaction_claim: BrainfuckInteractionClaim,
@@ -79,6 +81,7 @@ pub struct BrainfuckProof<H: MerkleHasher> {
 /// - Preprocessed Trace (Phase 0)
 /// - Main Trace (Phase 1)
 /// - Interaction Trace (Phase 2)
+#[derive(Serialize, Deserialize, Debug)]
 pub struct BrainfuckClaim {
     pub memory: MemoryClaim,
     pub instruction: InstructionClaim,
@@ -164,6 +167,7 @@ impl BrainfuckInteractionElements {
 /// A claim over the claimed sum of the interaction columns for each component of the system
 ///
 /// Needed for the lookup protocol (logUp with AIR).
+#[derive(Serialize, Deserialize, Debug)]
 pub struct BrainfuckInteractionClaim {
     memory: InteractionClaim,
     instruction: InteractionClaim,
@@ -418,7 +422,14 @@ impl BrainfuckComponents {
 
 /// `LOG_MAX_ROWS = ilog2(MAX_ROWS)`
 ///
-/// Means that the ZK-VM does not accept programs with more than 2^20 steps (1M steps).
+/// Means that the ZK-VM does not accept programs inducing a component with more than 2^23 steps (8M
+/// steps).
+#[cfg(not(test))]
+const LOG_MAX_ROWS: u32 = 23;
+
+#[cfg(test)]
+/// Means that the ZK-VM does not accept programs inducing a component with more than 2^23 steps (8M
+/// steps).
 const LOG_MAX_ROWS: u32 = 20;
 
 /// Log sizes of the preprocessed columns
@@ -435,6 +446,11 @@ const LOG_MAX_ROWS: u32 = 20;
 ///
 /// Ideally, we should cover all possible log sizes, between
 /// 1 and `LOG_MAX_ROW`
+#[cfg(not(test))]
+const IS_FIRST_LOG_SIZES: [u32; 21] =
+    [24, 23, 22, 21, 20, 19, 18, 17, 16, 15, 14, 13, 12, 11, 10, 9, 8, 7, 6, 5, 4];
+
+#[cfg(test)]
 const IS_FIRST_LOG_SIZES: [u32; 12] = [15, 14, 13, 12, 11, 10, 9, 8, 7, 6, 5, 4];
 
 /// Generate a STARK proof of the given Brainfuck program execution.
@@ -449,6 +465,7 @@ pub fn prove_brainfuck(
     // │     Protocol Setup       │
     // └──────────────────────────┘
 
+    tracing::info!("Protocol Setup");
     let config = PcsConfig::default();
     let twiddles = SimdBackend::precompute_twiddles(
         CanonicCoset::new(LOG_MAX_ROWS + config.fri_config.log_blowup_factor + 2)
@@ -463,6 +480,7 @@ pub fn prove_brainfuck(
     // │   Interaction Phase 0 - Preprocessed Trace    │
     // └───────────────────────────────────────────────┘
 
+    tracing::info!("Preprocessed Trace");
     // Generate all preprocessed columns
     let mut tree_builder = commitment_scheme.tree_builder();
 
@@ -475,12 +493,11 @@ pub fn prove_brainfuck(
     // │    Interaction Phase 1 - Main Trace   │
     // └───────────────────────────────────────┘
 
+    tracing::info!("Main Trace");
     let mut tree_builder = commitment_scheme.tree_builder();
-
     let vm_trace = inputs.trace();
 
     // Get the component's trace from the execution trace, and do the trace evaluation.
-
     let (memory_trace, memory_claim) = MemoryTable::from(&vm_trace).trace_evaluation().unwrap();
 
     let (instruction_trace, instruction_claim) =
@@ -559,6 +576,7 @@ pub fn prove_brainfuck(
     // │    Interaction Phase 2 - Interaction Trace    │
     // └───────────────────────────────────────────────┘
 
+    tracing::info!("Interaction Trace");
     // Draw interaction elements
     let interaction_elements = BrainfuckInteractionElements::draw(channel);
 
@@ -697,6 +715,7 @@ pub fn prove_brainfuck(
     // ┌──────────────────────────┐
     // │     Proof Generation     │
     // └──────────────────────────┘
+    tracing::info!("Proof Generation");
     let component_builder =
         BrainfuckComponents::new(&claim, &interaction_elements, &interaction_claim);
     let components = component_builder.provers();
