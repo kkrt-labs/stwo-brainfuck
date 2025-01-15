@@ -19,13 +19,21 @@ struct Cli {
 enum Commands {
     /// Generate a proof
     #[command(group(
+        ArgGroup::new("input_mode")
+            .args(["file", "code"])
+            .required(true),
+    ))]
+    #[command(group(
         ArgGroup::new("output_mode")
             .args(["output", "print"]),
     ))]
     Prove {
         /// Path to the Brainfuck program file.
-        #[clap(value_parser, value_hint=ValueHint::FilePath)]
-        filename: PathBuf,
+        #[clap(value_parser, long, value_hint=ValueHint::FilePath)]
+        file: Option<PathBuf>,
+        /// Direct Brainfuck code input.
+        #[clap(long)]
+        code: Option<String>,
         /// Log Level.
         #[clap(long, default_value = "info")]
         log: String,
@@ -46,10 +54,6 @@ enum Commands {
         print: bool,
     },
     /// Verify a proof
-    #[command(group(
-        ArgGroup::new("output_mode")
-            .args(["output", "print"]),
-    ))]
     Verify {
         /// Path to the CSTARK proof of the Brainfuck program execution.
         #[clap(value_parser, value_hint=ValueHint::FilePath)]
@@ -61,7 +65,8 @@ enum Commands {
 }
 
 struct ExecutionConfig {
-    filename: PathBuf,
+    file: Option<PathBuf>,
+    code: Option<String>,
     trace: bool,
     memory: bool,
     ram_size: Option<usize>,
@@ -72,7 +77,13 @@ struct ExecutionConfig {
 /// Generate a CSTARK Proof from a given Brainfuck filepath.
 fn prove(execution_config: ExecutionConfig) -> Result<(), ProvingError> {
     tracing::info!("Program compilation");
-    let code = fs::read_to_string(execution_config.filename).expect("Failed to read file");
+
+    let code = if let Some(path) = execution_config.file {
+        fs::read_to_string(path).expect("Failed to read file")
+    } else {
+        execution_config.code.unwrap()
+    };
+
     let mut bf_compiler = Compiler::new(&code);
     let ins = bf_compiler.compile();
 
@@ -131,11 +142,12 @@ fn main() {
     let cli = Cli::parse();
 
     match &cli.command {
-        Commands::Prove { filename, log, trace, memory, ram_size, output, print } => {
+        Commands::Prove { file, code, log, trace, memory, ram_size, output, print } => {
             tracing_subscriber::fmt().with_env_filter(log).init();
             tracing::info!("Brainfuck ZK-VM - Prove");
             let execution_config = ExecutionConfig {
-                filename: filename.clone(),
+                file: file.clone(),
+                code: code.clone(),
                 trace: *trace,
                 memory: *memory,
                 ram_size: *ram_size,
