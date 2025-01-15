@@ -99,11 +99,8 @@ impl<const N: u32> JumpTable<N> {
             trace[JumpColumn::D.index()].data[index] = row.d.into();
             trace[JumpColumn::NextClk.index()].data[index] = row.next_clk.into();
             trace[JumpColumn::NextIp.index()].data[index] = row.next_ip.into();
-            trace[JumpColumn::NextCi.index()].data[index] = row.next_ci.into();
-            trace[JumpColumn::NextNi.index()].data[index] = row.next_ni.into();
             trace[JumpColumn::NextMp.index()].data[index] = row.next_mp.into();
             trace[JumpColumn::NextMv.index()].data[index] = row.next_mv.into();
-            trace[JumpColumn::NextMvi.index()].data[index] = row.next_mvi.into();
             trace[JumpColumn::IsMvZero.index()].data[index] = row.is_mv_zero.into();
         }
 
@@ -179,16 +176,10 @@ pub struct JumpRow {
     next_clk: BaseField,
     /// Next Instruction pointer
     next_ip: BaseField,
-    /// Next Current instruction
-    next_ci: BaseField,
-    /// Next Next instruction
-    next_ni: BaseField,
     /// Next Memory pointer
     next_mp: BaseField,
     /// Next Memory value
     next_mv: BaseField,
-    /// Next Memory value inverse
-    next_mvi: BaseField,
     /// Dummy: Flag whether the current row is dummy or not.
     d: BaseField,
     /// Flag to indicate whether `mv` equals zero or not.
@@ -212,11 +203,8 @@ impl JumpRow {
             mvi: entry_1.mvi,
             next_clk: entry_2.clk,
             next_ip: entry_2.ip,
-            next_ci: entry_2.ci,
-            next_ni: entry_2.ni,
             next_mp: entry_2.mp,
             next_mv: entry_2.mv,
-            next_mvi: entry_2.mvi,
             d: entry_1.d,
             is_mv_zero: BaseField::one() - entry_1.mv * entry_1.mvi,
         }
@@ -396,11 +384,8 @@ pub enum JumpColumn {
     Mvi,
     NextClk,
     NextIp,
-    NextCi,
-    NextNi,
     NextMp,
     NextMv,
-    NextMvi,
     D,
     IsMvZero,
 }
@@ -418,20 +403,17 @@ impl JumpColumn {
             Self::Mvi => 6,
             Self::NextClk => 7,
             Self::NextIp => 8,
-            Self::NextCi => 9,
-            Self::NextNi => 10,
-            Self::NextMp => 11,
-            Self::NextMv => 12,
-            Self::NextMvi => 13,
-            Self::D => 14,
-            Self::IsMvZero => 15,
+            Self::NextMp => 9,
+            Self::NextMv => 10,
+            Self::D => 11,
+            Self::IsMvZero => 12,
         }
     }
 }
 
 impl TraceColumn for JumpColumn {
     fn count() -> (usize, usize) {
-        (16, 1)
+        (13, 1)
     }
 }
 
@@ -566,8 +548,6 @@ mod tests {
             mvi: BaseField::one(),
             next_clk: BaseField::from(2),
             next_ip: BaseField::from(4),
-            next_ci: BaseField::from(91),
-            next_ni: BaseField::from(6),
             next_mp: BaseField::one(),
             is_mv_zero: BaseField::zero(),
             ..Default::default()
@@ -822,9 +802,10 @@ mod tests {
         let expected_mvi_col = vec![BaseField::zero(); 1 << LOG_N_LANES];
         let expected_next_clk_col = vec![BaseField::from(2); 1 << LOG_N_LANES];
         let expected_next_ip_col = vec![BaseField::from(3); 1 << LOG_N_LANES];
-        let expected_next_ci_col = vec![BaseField::zero(); 1 << LOG_N_LANES];
         let expected_next_mp_col = vec![BaseField::from(5); 1 << LOG_N_LANES];
         let expected_next_mv_col = vec![BaseField::zero(); 1 << LOG_N_LANES];
+        let expected_d_col = vec![BaseField::zero(); 1 << LOG_N_LANES];
+        let expected_is_mv_zero_col = vec![BaseField::one(); 1 << LOG_N_LANES];
 
         assert_eq!(trace[JumpColumn::Clk.index()].to_cpu().values, expected_clk_col);
         assert_eq!(trace[JumpColumn::Ip.index()].to_cpu().values, expected_ip_col);
@@ -835,9 +816,10 @@ mod tests {
         assert_eq!(trace[JumpColumn::Mvi.index()].to_cpu().values, expected_mvi_col);
         assert_eq!(trace[JumpColumn::NextClk.index()].to_cpu().values, expected_next_clk_col);
         assert_eq!(trace[JumpColumn::NextIp.index()].to_cpu().values, expected_next_ip_col);
-        assert_eq!(trace[JumpColumn::NextCi.index()].to_cpu().values, expected_next_ci_col);
         assert_eq!(trace[JumpColumn::NextMp.index()].to_cpu().values, expected_next_mp_col);
         assert_eq!(trace[JumpColumn::NextMv.index()].to_cpu().values, expected_next_mv_col);
+        assert_eq!(trace[JumpColumn::D.index()].to_cpu().values, expected_d_col);
+        assert_eq!(trace[JumpColumn::IsMvZero.index()].to_cpu().values, expected_is_mv_zero_col);
     }
 
     #[test]
@@ -908,11 +890,8 @@ mod tests {
         let mut mvi_col = BaseColumn::zeros(expected_size);
         let mut next_clk_col = BaseColumn::zeros(expected_size);
         let mut next_ip_col = BaseColumn::zeros(expected_size);
-        let mut next_ci_col = BaseColumn::zeros(expected_size);
-        let mut next_ni_col = BaseColumn::zeros(expected_size);
         let mut next_mp_col = BaseColumn::zeros(expected_size);
         let mut next_mv_col = BaseColumn::zeros(expected_size);
-        let mut next_mvi_col = BaseColumn::zeros(expected_size);
         let mut d_col = BaseColumn::zeros(expected_size);
         let mut is_mv_zero_col = BaseColumn::zeros(expected_size);
 
@@ -943,20 +922,11 @@ mod tests {
         next_ip_col.data[0] = BaseField::from(7).into();
         next_ip_col.data[1] = BaseField::from(14).into();
 
-        next_ci_col.data[0] = InstructionType::Right.to_base_field().into();
-        next_ci_col.data[1] = BaseField::zero().into();
-
-        next_ni_col.data[0] = InstructionType::Plus.to_base_field().into();
-        next_ni_col.data[1] = BaseField::zero().into();
-
         next_mp_col.data[0] = BaseField::zero().into();
         next_mp_col.data[1] = BaseField::zero().into();
 
         next_mv_col.data[0] = BaseField::one().into();
         next_mv_col.data[1] = BaseField::zero().into();
-
-        next_mvi_col.data[0] = BaseField::one().into();
-        next_mvi_col.data[1] = BaseField::zero().into();
 
         d_col.data[0] = BaseField::zero().into();
         d_col.data[1] = BaseField::zero().into();
@@ -978,11 +948,8 @@ mod tests {
             mvi_col,
             next_clk_col,
             next_ip_col,
-            next_ci_col,
-            next_ni_col,
             next_mp_col,
             next_mv_col,
-            next_mvi_col,
             d_col,
             is_mv_zero_col,
         ]

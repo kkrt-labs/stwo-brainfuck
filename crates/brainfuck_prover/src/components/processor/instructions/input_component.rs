@@ -68,14 +68,9 @@ impl FrameworkEval for InputInstructionEval {
         let mv = eval.next_trace_mask();
         let mvi = eval.next_trace_mask();
         let d = eval.next_trace_mask();
-        let _next_clk = eval.next_trace_mask();
         let next_ip = eval.next_trace_mask();
-        let _next_ci = eval.next_trace_mask();
-        let _next_ni = eval.next_trace_mask();
         let next_mp = eval.next_trace_mask();
         let _next_mv = eval.next_trace_mask();
-        let _next_mvi = eval.next_trace_mask();
-        let _next_d = eval.next_trace_mask();
 
         // ┌─────────────────────────────┐
         // │   Consistency Constraints   │
