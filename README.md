@@ -63,10 +63,22 @@ You can also print the proof to `stdout` with the `--print` flag.
 brainfuck_prover prove --code "++>,<[>+.<-]" --output my_program_proof.json
 ```
 
+Or if you built from source,
+
+```shell
+./target/release/brainfuck_prover prove --code "++>,<[>+.<-]" --output my_program_proof.json
+```
+
 2. Proof from program file
 
 ```shell
 brainfuck_prover prove --file my_program.bf --output my_program_proof.json
+```
+
+Or if you built from source,
+
+```shell
+./target/release/brainfuck_prover prove --file my_program.bf --output my_program_proof.json
 ```
 
 ### Verify
