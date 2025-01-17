@@ -20,14 +20,14 @@ git clone git@github.com:kkrt-labs/stwo-brainfuck.git
 
 The `brainfuck_prover` has a feature flag which enables the CPU parallelization feature of Stwo.
 
+No feature flags:
 ```shell
-# No feature flags
-cargo --package brainfuck_prover --release
+cargo build --package brainfuck_prover --release
 ```
 
+Parallel feature flag:
 ```shell
-# Parallel feature flag
-cargo --package brainfuck_prover --features parallel --release
+cargo build --package brainfuck_prover --features parallel --release
 ```
 
 ## CLI - Usage
