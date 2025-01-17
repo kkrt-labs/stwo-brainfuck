@@ -20,14 +20,16 @@ git clone git@github.com:kkrt-labs/stwo-brainfuck.git
 
 The `brainfuck_prover` has a feature flag which enables the CPU parallelization feature of Stwo.
 
-```shell
-# No feature flags
-cargo --package brainfuck_prover --release
-```
+No feature flags:
 
 ```shell
-# Parallel feature flag
-cargo --package brainfuck_prover --features parallel --release
+cargo build --package brainfuck_prover --release
+```
+
+Parallel feature flag:
+
+```shell
+cargo build --package brainfuck_prover --features parallel --release
 ```
 
 ## CLI - Usage
@@ -61,10 +63,22 @@ You can also print the proof to `stdout` with the `--print` flag.
 brainfuck_prover prove --code "++>,<[>+.<-]" --output my_program_proof.json
 ```
 
+Or if you built from source,
+
+```shell
+./target/release/brainfuck_prover prove --code "++>,<[>+.<-]" --output my_program_proof.json
+```
+
 2. Proof from program file
 
 ```shell
 brainfuck_prover prove --file my_program.bf --output my_program_proof.json
+```
+
+Or if you built from source,
+
+```shell
+./target/release/brainfuck_prover prove --file my_program.bf --output my_program_proof.json
 ```
 
 ### Verify
