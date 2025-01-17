@@ -78,7 +78,7 @@ brainfuck_prover prove --file my_program.bf --output my_program_proof.json
 Or if you built from source,
 
 ```shell
-./target/release/brainfuck_prover prove --file ./brainfuck_programs/fib19.bf --output fib19_proof.json
+./target/release/brainfuck_prover prove --file ./brainfuck_programs/hello_kakarot.bf --output hello_kakarot_proof.json
 ```
 
 ### Verify
@@ -92,12 +92,14 @@ brainfuck_prover verify my_program_proof.json
 Or if you built from source and previously generated the proof of the 19th Fibonacci number:
 
 ```shell
-./target/release/brainfuck_prover verify fib19_proof.json
+./target/release/brainfuck_prover verify hello_kakarot.json
 ```
 
 ### Visualizing the memory
 
 To visualize the memory of the Brainfuck VM, use the `--memory` flag of the `brainfuck_prover`, and reduce the RAM size to avoid printing too much memory cells to your terminal with the `--ram-size` flag.
+
+Let's try it with a Brainfuck program that yields the 19th Fibonacci number. Note that it is a bit more resource intensive than the other example programs.
 
 ```shell
 ./target/release/brainfuck_prover prove --file ./brainfuck_programs/fib19.bf --output fib19_proof.json --memory --ram-size 20
