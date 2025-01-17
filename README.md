@@ -89,10 +89,10 @@ To verify a proof, the proof must be stored in a JSON file (`--output` flag from
 brainfuck_prover verify my_program_proof.json
 ```
 
-Or if you built from source and previously generated the proof of the 19th Fibonacci number:
+Or if you built from source and previously generated the proof of the `hello_kakarot` example:
 
 ```shell
-./target/release/brainfuck_prover verify hello_kakarot.json
+./target/release/brainfuck_prover verify hello_kakarot_proof.json
 ```
 
 ### Visualizing the memory
