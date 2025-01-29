@@ -89,12 +89,16 @@ fn test_hello_kakarot_world() {
 }
 
 #[test]
-fn test_fib_19() {
-    let path = "../../brainfuck_programs/fib.bf";
+fn test_fib19() {
+    let path = "../../brainfuck_programs/fib19.bf";
 
     let code = compile_from_path(path);
     let (mut machine, output) = create_test_machine(&code, &[]);
     machine.execute().unwrap();
+    // 19th Fibonacci number is 4181
+    // Output is misleading as the I/O of Brainfuck is only 1 byte,
+    // so the memory values are truncated
+    // (hence the output of 85, 4181 % 256 = 85)
     let expected_output = [85];
     assert_eq!(output.output(), expected_output);
 }
