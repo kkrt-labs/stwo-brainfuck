@@ -120,9 +120,9 @@ fn prove(execution_config: ExecutionConfig) -> Result<(), ProvingError> {
     let proof_start = Instant::now();
     let bf_proof = prove_brainfuck(&bf_vm)?;
     let proof_duration = proof_start.elapsed();
-    let proof_mhz = (steps as f64) / proof_duration.as_secs_f64() / 1_000_000.0;
+    let proof_khz = (steps as f64) / proof_duration.as_secs_f64() / 1_000.0;
     tracing::info!("Proof successfully generated!");
-    tracing::info!("Proof generation speed: {:.2} MHz", proof_mhz);
+    tracing::info!("Proof generation speed: {:.2} kHz", proof_khz);
 
     if let Some(path) = execution_config.output {
         tracing::info!("Exporting Proof");
