@@ -102,13 +102,13 @@ To visualize the memory of the Brainfuck VM, use the `--memory` flag of the `bra
 Let's try it with a Brainfuck program that yields the 19th Fibonacci number. Note that it is a bit more resource intensive than the other example programs.
 
 ```shell
-./target/release/brainfuck_prover prove --file ./brainfuck_programs/fib19.bf --output fib19_proof.json --memory --ram-size 20
+./target/release/brainfuck_prover prove --file ./brainfuck_programs/fib19.bf --output fib19_proof.json --memory --ram-size 5
 ```
 
 You should be able to see:
 
 ```shell
-[M31(0), M31(2584), M31(4181), M31(0), M31(0), M31(0), M31(0), M31(0), M31(0), M31(0), M31(0), M31(0), M31(0), M31(0), M31(0), M31(0), M31(0), M31(0), M31(0), M31(0)]
+[M31(0), M31(2584), M31(4181), M31(0), M31(0)]
 ```
 
 The third memory cell contains the desired output: `Fibonacci(19) = 4181`.
