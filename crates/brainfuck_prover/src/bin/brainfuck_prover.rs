@@ -134,7 +134,7 @@ fn prove(execution_config: ExecutionConfig) -> Result<(), ProvingError> {
         println!("{bf_proof:#?}");
     }
 
-    tracing::info!("Execution trace time: {}s", trace_duration.as_millis());
+    tracing::info!("Execution trace time: {}ms", trace_duration.as_millis());
     tracing::info!("Proof generation time: {:.2}s", proof_duration.as_secs_f64());
     tracing::info!("Total execution time: {:.2}s", (trace_duration + proof_duration).as_secs_f64());
 
