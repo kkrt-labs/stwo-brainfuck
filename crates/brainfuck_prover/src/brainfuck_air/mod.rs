@@ -53,7 +53,7 @@ use stwo_prover::{
     },
     core::{
         air::{Component, ComponentProver},
-        backend::simd::{qm31::PackedSecureField, SimdBackend},
+        backend::simd::{m31::LOG_N_LANES, qm31::PackedSecureField, SimdBackend},
         channel::{Blake2sChannel, Channel},
         pcs::{CommitmentSchemeProver, CommitmentSchemeVerifier, PcsConfig, TreeVec},
         poly::circle::{CanonicCoset, PolyOps},
@@ -422,15 +422,19 @@ impl BrainfuckComponents {
 
 /// `LOG_MAX_ROWS = ilog2(MAX_ROWS)`
 ///
-/// Means that the ZK-VM does not accept programs inducing a component with more than 2^23 steps (8M
-/// steps).
+/// Means that the ZK-VM does not accept programs inducing a component with more than 2^24 steps
+/// (16M8 steps).
 #[cfg(not(test))]
-const LOG_MAX_ROWS: u32 = 23;
+const LOG_MAX_ROWS: u32 = 24;
 
 #[cfg(test)]
-/// Means that the ZK-VM does not accept programs inducing a component with more than 2^23 steps (8M
-/// steps).
+/// Means that the ZK-VM does not accept programs inducing a component with more than 2^23 steps
+/// (1M steps).
 const LOG_MAX_ROWS: u32 = 20;
+
+/// The minimal size of a table is `LOG_N_LANES`.
+/// So all the valid tables' log sizes are from `LOG_N_LANES` to `LOG_MAX_ROWS`.
+const N_PREPROCESSED_COLUMN_SIZES: usize = (LOG_MAX_ROWS - LOG_N_LANES) as usize + 1;
 
 /// Log sizes of the preprocessed columns
 /// used for enforcing boundary constraints.
@@ -440,18 +444,24 @@ const LOG_MAX_ROWS: u32 = 20;
 /// of the main and interaction traces.
 ///
 /// Therefore, we generate all log sizes that we
-/// want to support, so that the verifier can be
+/// want to support, so the verifier can be
 /// provided a merkle root it can trust, for a claim
 /// of any dynamic size.
 ///
 /// Ideally, we should cover all possible log sizes, between
 /// 1 and `LOG_MAX_ROW`
-#[cfg(not(test))]
-const IS_FIRST_LOG_SIZES: [u32; 21] =
-    [24, 23, 22, 21, 20, 19, 18, 17, 16, 15, 14, 13, 12, 11, 10, 9, 8, 7, 6, 5, 4];
+const IS_FIRST_LOG_SIZES: [u32; N_PREPROCESSED_COLUMN_SIZES] = preprocessed_log_sizes();
 
-#[cfg(test)]
-const IS_FIRST_LOG_SIZES: [u32; 12] = [15, 14, 13, 12, 11, 10, 9, 8, 7, 6, 5, 4];
+/// `[LOG_MAX_ROWS, LOG_MAX_ROWS - 1, ..., LOG_N_LANES]`
+const fn preprocessed_log_sizes() -> [u32; N_PREPROCESSED_COLUMN_SIZES] {
+    let mut arr = [0; N_PREPROCESSED_COLUMN_SIZES];
+    let mut i = 0;
+    while i < N_PREPROCESSED_COLUMN_SIZES {
+        arr[i] = LOG_MAX_ROWS - i as u32;
+        i += 1;
+    }
+    arr
+}
 
 /// Generate a STARK proof of the given Brainfuck program execution.
 ///
