@@ -5,6 +5,7 @@ use std::{
     fs::{self, File},
     io::{stdin, stdout, Write},
     path::PathBuf,
+    time::Instant,
 };
 use stwo_prover::core::prover::ProvingError;
 
@@ -96,10 +97,14 @@ fn prove(execution_config: ExecutionConfig) -> Result<(), ProvingError> {
     };
 
     tracing::info!("Provide inputs if any:");
+    let trace_start = Instant::now();
     bf_vm.execute().unwrap();
-
     let trace = bf_vm.trace();
-    tracing::info!("Steps: {}", trace.len());
+    let trace_duration = trace_start.elapsed();
+    let steps = trace.len();
+    let trace_mhz = (steps as f64) / trace_duration.as_secs_f64() / 1_000_000.0;
+    tracing::info!("Steps: {}", steps);
+    tracing::info!("Trace generation speed: {:.2} MHz", trace_mhz);
 
     if execution_config.trace {
         tracing::info!("Execution Trace");
@@ -112,8 +117,12 @@ fn prove(execution_config: ExecutionConfig) -> Result<(), ProvingError> {
     }
 
     tracing::info!("Proof Generation");
+    let proof_start = Instant::now();
     let bf_proof = prove_brainfuck(&bf_vm)?;
+    let proof_duration = proof_start.elapsed();
+    let proof_khz = (steps as f64) / proof_duration.as_secs_f64() / 1_000.0;
     tracing::info!("Proof successfully generated!");
+    tracing::info!("Proof generation speed: {:.2} kHz", proof_khz);
 
     if let Some(path) = execution_config.output {
         tracing::info!("Exporting Proof");
@@ -124,6 +133,10 @@ fn prove(execution_config: ExecutionConfig) -> Result<(), ProvingError> {
         tracing::info!("Printing Proof");
         println!("{bf_proof:#?}");
     }
+
+    tracing::info!("Execution trace time: {}ms", trace_duration.as_millis());
+    tracing::info!("Proof generation time: {:.2}s", proof_duration.as_secs_f64());
+    tracing::info!("Total execution time: {:.2}s", (trace_duration + proof_duration).as_secs_f64());
 
     Ok(())
 }
