@@ -28,7 +28,9 @@ lint:
     - name: clippy
       commands:
         - name: lint
-          run: cargo clippy --message-format json --locked --all-targets --all-features -- -D warnings
+          run:
+            cargo clippy --message-format json --locked --all-targets
+            --all-features -- -D warnings
   enabled:
     - actionlint@1.7.6
     - checkov@3.2.352
