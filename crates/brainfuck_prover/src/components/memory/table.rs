@@ -63,7 +63,7 @@ impl MemoryTable {
         self.table.push(row);
     }
 
-    /// Transforms the [`MemoryTable`] into [`TraceEval`], to be commited
+    /// Transforms the [`MemoryTable`] into [`TraceEval`], to be committed
     /// when generating a STARK proof.
     ///
     /// The [`MemoryTable`] is transformed from an array of consecutive rows (one
