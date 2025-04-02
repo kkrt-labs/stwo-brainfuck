@@ -87,7 +87,8 @@ impl<const N: u32> ProcessorInstructionTable<N> {
     /// Returns `TraceError::EmptyTrace` if the table is empty.
     pub fn trace_evaluation(&self) -> Result<(TraceEval, ProcessorInstructionClaim), TraceError> {
         let n_rows = self.table.len() as u32;
-        // It is possible that the table is empty because the program has no jump instruction.
+        // The table can be empty if the program has zero occurrence of a Brainfuck ISA instruction
+        // (jump instructions are handled in another table though).
         if n_rows == 0 {
             return Ok((TraceEval::new(), ProcessorInstructionClaim::new(0)));
         }
