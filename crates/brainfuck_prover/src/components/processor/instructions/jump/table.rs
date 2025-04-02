@@ -73,22 +73,21 @@ impl<const N: u32> JumpTable<N> {
     /// # Returns
     /// A tuple containing the evaluated trace and claim for STARK proof.
     /// If the table is empty, returns an empty trace and a claim with a log size of 0.
-    pub fn trace_evaluation(&self) -> (TraceEval, JumpClaim) {
+    pub fn trace_evaluation(&self) -> Result<(TraceEval, JumpClaim), TraceError> {
         let n_rows = self.table.len() as u32;
         // It is possible that the table is empty because the program has no jump instruction.
         if n_rows == 0 {
-            return (TraceEval::new(), JumpClaim::new(0));
+            return Ok((TraceEval::new(), JumpClaim::new(0)));
+        }
+        if !n_rows.is_power_of_two() {
+            return Err(TraceError::InvalidTraceLength);
         }
 
-        // Compute log size and adjust for SIMD lanes
         let log_n_rows = n_rows.ilog2();
         let log_size = log_n_rows + LOG_N_LANES;
-
-        // Initialize trace columns
         let mut trace = vec![BaseColumn::zeros(1 << log_size); JumpColumn::count().0];
 
-        // Fill columns with table data
-        for (index, row) in self.table.iter().enumerate().take(1 << log_n_rows) {
+        for (index, row) in self.table.iter().enumerate() {
             trace[JumpColumn::Clk.index()].data[index] = row.clk.into();
             trace[JumpColumn::Ip.index()].data[index] = row.ip.into();
             trace[JumpColumn::Ci.index()].data[index] = row.ci.into();
@@ -104,12 +103,10 @@ impl<const N: u32> JumpTable<N> {
             trace[JumpColumn::IsMvZero.index()].data[index] = row.is_mv_zero.into();
         }
 
-        // Evaluate columns on the circle domain
         let domain = CanonicCoset::new(log_size).circle_domain();
         let trace = trace.into_iter().map(|col| CircleEvaluation::new(domain, col)).collect();
 
-        // Return the evaluated trace and claim
-        (trace, JumpClaim::new(log_size))
+        Ok((trace, JumpClaim::new(log_size)))
     }
 }
 
@@ -751,7 +748,7 @@ mod tests {
     #[test]
     fn test_trace_evaluation_empty_jump_table() {
         let jump_if_not_zero_table = JumpIfNotZeroTable::new();
-        let (trace, claim) = jump_if_not_zero_table.trace_evaluation();
+        let (trace, claim) = jump_if_not_zero_table.trace_evaluation().unwrap();
 
         assert_eq!(trace.len(), 0);
         assert_eq!(claim.log_size, 0);
@@ -783,7 +780,7 @@ mod tests {
 
         let jump_if_not_zero_table = JumpIfNotZeroTable::from(jump_if_not_zero_intermediate_table);
 
-        let (trace, claim) = jump_if_not_zero_table.trace_evaluation();
+        let (trace, claim) = jump_if_not_zero_table.trace_evaluation().unwrap();
 
         assert_eq!(claim.log_size, LOG_N_LANES, "Log size should include SIMD lanes.");
         assert_eq!(
@@ -873,7 +870,7 @@ mod tests {
         let jump_if_not_zero_table = JumpIfNotZeroTable::from(jump_if_not_zero_intermediate_table);
 
         // Perform the trace evaluation
-        let (trace, claim) = jump_if_not_zero_table.trace_evaluation();
+        let (trace, claim) = jump_if_not_zero_table.trace_evaluation().unwrap();
 
         // Calculate the expected parameters
         let expected_log_n_rows: u32 = 1; // log2(2 rows)
@@ -990,7 +987,7 @@ mod tests {
 
         let jump_if_not_zero_table = JumpIfNotZeroTable::from(&machine.trace());
 
-        let (trace_eval, claim) = jump_if_not_zero_table.trace_evaluation();
+        let (trace_eval, claim) = jump_if_not_zero_table.trace_evaluation().unwrap();
 
         let processor_lookup_elements = ProcessorElements::dummy();
 

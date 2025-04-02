@@ -83,26 +83,17 @@ impl ProgramTable {
     /// Returns [`TraceError::EmptyTrace`] if the table is empty.
     pub fn trace_evaluation(&self) -> Result<(TraceEval, ProgramClaim), TraceError> {
         let n_rows = self.table.len() as u32;
-
-        // If the table is empty, there is no data to evaluate, so return an error.
         if n_rows == 0 {
             return Err(TraceError::EmptyTrace);
         }
-
-        // Compute `log_n_rows`, the base-2 logarithm of the number of rows.
-        let log_n_rows = n_rows.ilog2();
-        if 1 << log_n_rows != n_rows {
+        if !n_rows.is_power_of_two() {
             return Err(TraceError::InvalidTraceLength);
         }
 
-        // Add `LOG_N_LANES` to account for SIMD optimization.
+        let log_n_rows = n_rows.ilog2();
         let log_size = log_n_rows + LOG_N_LANES;
-
-        // Initialize a trace with 4 columns (`ip`, `ci`, `ni`, `d`), each column containing
-        // `2^log_size` entries initialized to zero.
         let mut trace = vec![BaseColumn::zeros(1 << log_size); ProgramColumn::count().0];
 
-        // Populate the column with data from the table rows.
         for (index, row) in self.table.iter().enumerate() {
             trace[ProgramColumn::Ip.index()].data[index] = row.ip.into();
             trace[ProgramColumn::Ci.index()].data[index] = row.ci.into();
@@ -110,12 +101,9 @@ impl ProgramTable {
             trace[ProgramColumn::D.index()].data[index] = row.d.into();
         }
 
-        // Create a circle domain using a canonical coset.
         let domain = CanonicCoset::new(log_size).circle_domain();
-        // Map the column into the circle domain.
         let trace = trace.into_iter().map(|col| CircleEvaluation::new(domain, col)).collect();
 
-        // Return the evaluated trace and a claim containing the log size of the domain.
         Ok((trace, ProgramClaim::new(log_size)))
     }
 }
@@ -277,6 +265,7 @@ pub fn interaction_trace_evaluation(
 
     Ok((trace, InteractionClaim { claimed_sum }))
 }
+
 #[cfg(test)]
 mod tests {
     use super::*;

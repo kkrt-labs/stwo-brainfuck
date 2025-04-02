@@ -75,36 +75,18 @@ impl InstructionTable {
     /// Returns [`TraceError::EmptyTrace`] if the table is empty.
     pub fn trace_evaluation(&self) -> Result<(TraceEval, InstructionClaim), TraceError> {
         let n_rows = self.table.len() as u32;
-        // If the table is empty, there is no data to evaluate, so return an error.
         if n_rows == 0 {
             return Err(TraceError::EmptyTrace);
         }
+        if !n_rows.is_power_of_two() {
+            return Err(TraceError::InvalidTraceLength);
+        }
 
-        // Compute `log_n_rows`, the base-2 logarithm of the number of rows.
-        // This determines the smallest power of two greater than or equal to `n_rows`
-        //
-        // The result is rounded down (i.e. (17 as u32).ilog2() = 4).
         let log_n_rows = n_rows.ilog2();
-
-        // Add `LOG_N_LANES` to account for SIMD optimization. This ensures that
-        // the domain size is aligned for parallel processing.
         let log_size = log_n_rows + LOG_N_LANES;
-
-        // Initialize a trace with 8 columns (8 registers),
-        // each column containing `2^log_size` entries initialized to zero.
         let mut trace = vec![BaseColumn::zeros(1 << log_size); InstructionColumn::count().0];
 
-        // Populate the columns with data from the table rows.
-        // We iterate over the table rows and, for each row:
-        // - Map the `ip` value to the first column.
-        // - Map the `ci` value to the second column.
-        // - Map the `ni` value to the third column.
-        // - Map the `d` value to the fourth column.
-        // - Map the `next_ip` value to the fourth column.
-        // - Map the `next_ci` value to the fifth column.
-        // - Map the `next_ni` value to the sixth column.
-        // - Map the `next_d` value to the seventh column.
-        for (index, row) in self.table.iter().enumerate().take(1 << log_n_rows) {
+        for (index, row) in self.table.iter().enumerate() {
             trace[InstructionColumn::Ip.index()].data[index] = row.ip.into();
             trace[InstructionColumn::Ci.index()].data[index] = row.ci.into();
             trace[InstructionColumn::Ni.index()].data[index] = row.ni.into();
@@ -115,18 +97,9 @@ impl InstructionTable {
             trace[InstructionColumn::NextD.index()].data[index] = row.next_d.into();
         }
 
-        // Create a circle domain using a canonical coset.
-        // This domain provides the mathematical structure required for FFT-based evaluation.
         let domain = CanonicCoset::new(log_size).circle_domain();
-
-        // Map each column into the circle domain.
-        //
-        // This converts the columnar data into polynomial evaluations over the domain, enabling
-        // constraint verification in STARK proofs.
         let trace = trace.into_iter().map(|col| CircleEvaluation::new(domain, col)).collect();
 
-        // Return the evaluated trace and a claim containing the log size of the domain, which is
-        // the log height of the component's trace.
         Ok((trace, InstructionClaim::new(log_size)))
     }
 }
