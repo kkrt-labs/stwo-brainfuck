@@ -11,7 +11,7 @@ use stwo_prover::{
 
 /// Implementation of `Component` and `ComponentProver` for the Instruction component.
 /// It targets the `SimdBackend` from the Stwo constraint framework, with a fallback
-/// on `CpuBakend` for small traces.
+/// on `CpuBackend` for small traces.
 pub type InstructionComponent = FrameworkComponent<InstructionEval>;
 
 /// The AIR for the [`InstructionComponent`].

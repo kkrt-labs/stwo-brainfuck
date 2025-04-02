@@ -39,7 +39,7 @@ impl ProgramTable {
     /// * `row` - The [`ProgramTableRow`] to add to the table.
     ///
     /// This method pushes a new [`ProgramTableRow`] onto the `table` vector.
-    pub fn add_row(&mut self, row: ProgramTableRow) {
+    fn add_row(&mut self, row: ProgramTableRow) {
         self.table.push(row);
     }
 
@@ -49,7 +49,7 @@ impl ProgramTable {
     /// * `rows` - A vector of [`ProgramTableRow`] to add to the table.
     ///
     /// This method extends the `table` vector with the provided rows.
-    pub fn add_rows(&mut self, rows: Vec<ProgramTableRow>) {
+    fn add_rows(&mut self, rows: Vec<ProgramTableRow>) {
         self.table.extend(rows);
     }
 
@@ -91,15 +91,19 @@ impl ProgramTable {
 
         // Compute `log_n_rows`, the base-2 logarithm of the number of rows.
         let log_n_rows = n_rows.ilog2();
+        if 1 << log_n_rows != n_rows {
+            return Err(TraceError::InvalidTraceLength);
+        }
+
         // Add `LOG_N_LANES` to account for SIMD optimization.
         let log_size = log_n_rows + LOG_N_LANES;
 
         // Initialize a trace with 4 columns (`ip`, `ci`, `ni`, `d`), each column containing
         // `2^log_size` entries initialized to zero.
-        let mut trace = vec![BaseColumn::zeros(1 << log_size); 4];
+        let mut trace = vec![BaseColumn::zeros(1 << log_size); ProgramColumn::count().0];
 
         // Populate the column with data from the table rows.
-        for (index, row) in self.table.iter().enumerate().take(1 << log_n_rows) {
+        for (index, row) in self.table.iter().enumerate() {
             trace[ProgramColumn::Ip.index()].data[index] = row.ip.into();
             trace[ProgramColumn::Ci.index()].data[index] = row.ci.into();
             trace[ProgramColumn::Ni.index()].data[index] = row.ni.into();
@@ -536,6 +540,11 @@ mod tests {
                 InstructionType::ReadChar.to_base_field(),
                 BaseField::from(7),
             ),
+            ProgramTableRow::new(
+                BaseField::from(3),
+                InstructionType::ReadChar.to_base_field(),
+                BaseField::from(7),
+            ),
         ]);
 
         let (trace, claim) = program_table.trace_evaluation().unwrap();
@@ -548,6 +557,31 @@ mod tests {
                 "Trace column domain should match the expected circle domain."
             );
         }
+    }
+
+    #[test]
+    fn test_trace_evaluation_invalid_trace_length() {
+        let mut program_table = ProgramTable::new();
+        program_table.add_rows(vec![
+            ProgramTableRow::new(
+                BaseField::zero(),
+                InstructionType::ReadChar.to_base_field(),
+                BaseField::one(),
+            ),
+            ProgramTableRow::new(
+                BaseField::one(),
+                InstructionType::ReadChar.to_base_field(),
+                BaseField::from(2),
+            ),
+            ProgramTableRow::new(
+                BaseField::from(3),
+                InstructionType::ReadChar.to_base_field(),
+                BaseField::from(7),
+            ),
+        ]);
+
+        let result = program_table.trace_evaluation();
+        assert!(matches!(result, Err(TraceError::InvalidTraceLength)));
     }
 
     #[test]
