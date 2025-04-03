@@ -85,23 +85,23 @@ impl<const N: u32> ProcessorInstructionTable<N> {
     ///
     /// # Errors
     /// Returns `TraceError::EmptyTrace` if the table is empty.
-    pub fn trace_evaluation(&self) -> (TraceEval, ProcessorInstructionClaim) {
+    pub fn trace_evaluation(&self) -> Result<(TraceEval, ProcessorInstructionClaim), TraceError> {
         let n_rows = self.table.len() as u32;
-        // It is possible that the table is empty because the program has no jump instruction.
+        // The table can be empty if the program has zero occurrence of a Brainfuck ISA instruction
+        // (jump instructions are handled in another table though).
         if n_rows == 0 {
-            return (TraceEval::new(), ProcessorInstructionClaim::new(0));
+            return Ok((TraceEval::new(), ProcessorInstructionClaim::new(0)));
+        }
+        if !n_rows.is_power_of_two() {
+            return Err(TraceError::InvalidTraceLength);
         }
 
-        // Compute log size and adjust for SIMD lanes
         let log_n_rows = n_rows.ilog2();
         let log_size = log_n_rows + LOG_N_LANES;
-
-        // Initialize trace columns
         let mut trace =
             vec![BaseColumn::zeros(1 << log_size); ProcessorInstructionColumn::count().0];
 
-        // Fill columns with table data
-        for (index, row) in self.table.iter().enumerate().take(1 << log_n_rows) {
+        for (index, row) in self.table.iter().enumerate() {
             trace[ProcessorInstructionColumn::Clk.index()].data[index] = row.clk.into();
             trace[ProcessorInstructionColumn::Ip.index()].data[index] = row.ip.into();
             trace[ProcessorInstructionColumn::Ci.index()].data[index] = row.ci.into();
@@ -115,12 +115,10 @@ impl<const N: u32> ProcessorInstructionTable<N> {
             trace[ProcessorInstructionColumn::NextMv.index()].data[index] = row.next_mv.into();
         }
 
-        // Evaluate columns on the circle domain
         let domain = CanonicCoset::new(log_size).circle_domain();
         let trace = trace.into_iter().map(|col| CircleEvaluation::new(domain, col)).collect();
 
-        // Return the evaluated trace and claim
-        (trace, ProcessorInstructionClaim::new(log_size))
+        Ok((trace, ProcessorInstructionClaim::new(log_size)))
     }
 }
 
@@ -732,7 +730,7 @@ mod tests {
     #[test]
     fn test_trace_evaluation_empty_processor_instruction_table() {
         let left_table = LeftInstructionTable::new();
-        let (trace, claim) = left_table.trace_evaluation();
+        let (trace, claim) = left_table.trace_evaluation().unwrap();
 
         assert_eq!(trace.len(), 0);
         assert_eq!(claim.log_size, 0);
@@ -754,7 +752,7 @@ mod tests {
 
         let processor_instruction_table = ProcessorInstructionTable::from(left_intermediate_table);
 
-        let (trace, claim) = processor_instruction_table.trace_evaluation();
+        let (trace, claim) = processor_instruction_table.trace_evaluation().unwrap();
 
         assert_eq!(claim.log_size, LOG_N_LANES, "Log size should include SIMD lanes.");
         assert_eq!(
@@ -837,7 +835,7 @@ mod tests {
         let left_table = ProcessorInstructionTable::from(left_intermediate_table);
 
         // Perform the trace evaluation
-        let (trace, claim) = left_table.trace_evaluation();
+        let (trace, claim) = left_table.trace_evaluation().unwrap();
 
         // Calculate the expected parameters
         let expected_log_n_rows: u32 = 1; // log2(2 rows)
@@ -933,7 +931,7 @@ mod tests {
 
         let left_table = LeftInstructionTable::from(&machine.trace());
 
-        let (trace_eval, claim) = left_table.trace_evaluation();
+        let (trace_eval, claim) = left_table.trace_evaluation().unwrap();
 
         let processor_lookup_elements = ProcessorElements::dummy();
 

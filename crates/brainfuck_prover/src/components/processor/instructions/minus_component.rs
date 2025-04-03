@@ -159,7 +159,7 @@ mod test {
 
         // Construct the main trace from the execution trace
         let table = MinusInstructionTable::from(&trace_vm);
-        let (main_trace, claim) = table.trace_evaluation();
+        let (main_trace, claim) = table.trace_evaluation().unwrap();
 
         // Draw Interaction elements
         let processor_lookup_elements = ProcessorElements::dummy();

@@ -33,6 +33,9 @@ pub enum TraceError {
     /// The trace of the End of Execution component is not equal to one.
     #[error("The end of execution trace is not equal to one.")]
     InvalidEndOfExecution,
+    /// The trace length is not a power of 2.
+    #[error("The trace length is not a power of 2.")]
+    InvalidTraceLength,
 }
 
 /// Type for trace evaluation to be used in Stwo.

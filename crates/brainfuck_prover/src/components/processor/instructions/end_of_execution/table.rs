@@ -76,23 +76,17 @@ impl EndOfExecInstructionTable {
             return Err(TraceError::InvalidEndOfExecution);
         }
 
-        // Compute log size and adjust for SIMD lanes
-        let log_n_rows = n_rows.ilog2();
-        let log_size = log_n_rows + LOG_N_LANES;
+        let log_size = LOG_N_LANES;
 
-        // Initialize trace columns
         let mut trace = vec![BaseColumn::zeros(1 << log_size); EndOfExecutionColumn::count().0];
 
-        // Fill columns with table data
-        for (index, row) in self.table.iter().enumerate().take(1 << log_n_rows) {
-            trace[EndOfExecutionColumn::Clk.index()].data[index] = row.clk.into();
-            trace[EndOfExecutionColumn::Ip.index()].data[index] = row.ip.into();
-            trace[EndOfExecutionColumn::Ci.index()].data[index] = row.ci.into();
-            trace[EndOfExecutionColumn::Ni.index()].data[index] = row.ni.into();
-            trace[EndOfExecutionColumn::Mp.index()].data[index] = row.mp.into();
-            trace[EndOfExecutionColumn::Mv.index()].data[index] = row.mv.into();
-            trace[EndOfExecutionColumn::Mvi.index()].data[index] = row.mvi.into();
-        }
+        trace[EndOfExecutionColumn::Clk.index()].data[0] = self.table[0].clk.into();
+        trace[EndOfExecutionColumn::Ip.index()].data[0] = self.table[0].ip.into();
+        trace[EndOfExecutionColumn::Ci.index()].data[0] = self.table[0].ci.into();
+        trace[EndOfExecutionColumn::Ni.index()].data[0] = self.table[0].ni.into();
+        trace[EndOfExecutionColumn::Mp.index()].data[0] = self.table[0].mp.into();
+        trace[EndOfExecutionColumn::Mv.index()].data[0] = self.table[0].mv.into();
+        trace[EndOfExecutionColumn::Mvi.index()].data[0] = self.table[0].mvi.into();
 
         // Evaluate columns on the circle domain
         let domain = CanonicCoset::new(log_size).circle_domain();

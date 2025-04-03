@@ -79,16 +79,15 @@ impl ProcessorTable {
         if n_rows == 0 {
             return Err(TraceError::EmptyTrace);
         }
+        if !n_rows.is_power_of_two() {
+            return Err(TraceError::InvalidTraceLength);
+        }
 
-        // Compute log size and adjust for SIMD lanes
         let log_n_rows = n_rows.ilog2();
         let log_size = log_n_rows + LOG_N_LANES;
-
-        // Initialize trace columns
         let mut trace = vec![BaseColumn::zeros(1 << log_size); ProcessorColumn::count().0];
 
-        // Fill columns with table data
-        for (index, row) in self.table.iter().enumerate().take(1 << log_n_rows) {
+        for (index, row) in self.table.iter().enumerate() {
             trace[ProcessorColumn::Clk.index()].data[index] = row.clk.into();
             trace[ProcessorColumn::Ip.index()].data[index] = row.ip.into();
             trace[ProcessorColumn::Ci.index()].data[index] = row.ci.into();
@@ -100,11 +99,9 @@ impl ProcessorTable {
             trace[ProcessorColumn::NextClk.index()].data[index] = row.next_clk.into();
         }
 
-        // Evaluate columns on the circle domain
         let domain = CanonicCoset::new(log_size).circle_domain();
         let trace = trace.into_iter().map(|col| CircleEvaluation::new(domain, col)).collect();
 
-        // Return the evaluated trace and claim
         Ok((trace, ProcessorClaim::new(log_size)))
     }
 }

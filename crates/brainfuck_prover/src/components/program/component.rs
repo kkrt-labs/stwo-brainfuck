@@ -10,7 +10,7 @@ use stwo_prover::{
 
 /// Implementation of `Component` and `ComponentProver` for the [`ProgramComponent`].
 /// It targets the `SimdBackend` from the Stwo constraint framework, with a fallback
-/// on `CpuBakend` for small traces.
+/// on `CpuBackend` for small traces.
 pub type ProgramComponent = FrameworkComponent<ProgramEval>;
 /// The AIR for the [`ProgramComponent`].
 ///

@@ -517,28 +517,28 @@ pub fn prove_brainfuck(
         ProgramTable::from(inputs.program()).trace_evaluation().unwrap();
 
     let (jump_if_not_zero_trace, jump_if_not_zero_claim) =
-        JumpIfNotZeroTable::from(&vm_trace).trace_evaluation();
+        JumpIfNotZeroTable::from(&vm_trace).trace_evaluation().unwrap();
 
     let (jump_if_zero_trace, jump_if_zero_claim) =
-        JumpIfZeroTable::from(&vm_trace).trace_evaluation();
+        JumpIfZeroTable::from(&vm_trace).trace_evaluation().unwrap();
 
     let (input_instruction_trace, input_instruction_claim) =
-        InputInstructionTable::from(&vm_trace).trace_evaluation();
+        InputInstructionTable::from(&vm_trace).trace_evaluation().unwrap();
 
     let (left_instruction_trace, left_instruction_claim) =
-        LeftInstructionTable::from(&vm_trace).trace_evaluation();
+        LeftInstructionTable::from(&vm_trace).trace_evaluation().unwrap();
 
     let (minus_instruction_trace, minus_instruction_claim) =
-        MinusInstructionTable::from(&vm_trace).trace_evaluation();
+        MinusInstructionTable::from(&vm_trace).trace_evaluation().unwrap();
 
     let (output_instruction_trace, output_instruction_claim) =
-        OutputInstructionTable::from(&vm_trace).trace_evaluation();
+        OutputInstructionTable::from(&vm_trace).trace_evaluation().unwrap();
 
     let (plus_instruction_trace, plus_instruction_claim) =
-        PlusInstructionTable::from(&vm_trace).trace_evaluation();
+        PlusInstructionTable::from(&vm_trace).trace_evaluation().unwrap();
 
     let (right_instruction_trace, right_instruction_claim) =
-        RightInstructionTable::from(&vm_trace).trace_evaluation();
+        RightInstructionTable::from(&vm_trace).trace_evaluation().unwrap();
 
     let (end_of_execution_trace, end_of_execution_claim) =
         EndOfExecInstructionTable::from(&vm_trace).trace_evaluation().unwrap();

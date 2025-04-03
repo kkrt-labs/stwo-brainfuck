@@ -63,7 +63,7 @@ impl MemoryTable {
         self.table.push(row);
     }
 
-    /// Transforms the [`MemoryTable`] into [`TraceEval`], to be commited
+    /// Transforms the [`MemoryTable`] into [`TraceEval`], to be committed
     /// when generating a STARK proof.
     ///
     /// The [`MemoryTable`] is transformed from an array of consecutive rows (one
@@ -83,6 +83,9 @@ impl MemoryTable {
         let n_rows = self.table.len() as u32;
         if n_rows == 0 {
             return Err(TraceError::EmptyTrace);
+        }
+        if !n_rows.is_power_of_two() {
+            return Err(TraceError::InvalidTraceLength);
         }
 
         let log_n_rows = n_rows.ilog2();
